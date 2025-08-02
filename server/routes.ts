@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { eventFilterSchema, insertEventSchema } from "@shared/schema";
+import { dataCollector } from "./data-collector";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events
@@ -113,6 +114,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
+  // Data collection routes
+  app.get("/api/data-sources", async (req, res) => {
+    try {
+      const sources = dataCollector.getSources();
+      res.json({
+        sources,
+        activeCount: dataCollector.getActiveSourcesCount(),
+        totalCount: sources.length
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch data sources" });
+    }
+  });
+
+  app.post("/api/data-sources/:id/toggle", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const isActive = dataCollector.toggleSource(id);
+      res.json({ sourceId: id, isActive });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle data source" });
+    }
+  });
+
+  app.post("/api/sync-events", async (req, res) => {
+    try {
+      console.log("Starting event synchronization from all sources...");
+      const syncedCount = await dataCollector.syncEventsToStorage();
+      res.json({ 
+        message: "Event synchronization completed",
+        syncedCount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Event sync failed:", error);
+      res.status(500).json({ message: "Failed to sync events" });
     }
   });
 

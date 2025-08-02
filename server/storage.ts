@@ -116,7 +116,13 @@ export class MemStorage implements IStorage {
 
     mockEvents.forEach(event => {
       const id = randomUUID();
-      this.events.set(id, { ...event, id });
+      this.events.set(id, { 
+        ...event, 
+        id,
+        attendees: event.attendees ?? 0,
+        imageUrl: event.imageUrl ?? null,
+        isFree: event.isFree ?? "true"
+      });
     });
   }
 
@@ -164,7 +170,13 @@ export class MemStorage implements IStorage {
 
   async createEvent(insertEvent: InsertEvent): Promise<Event> {
     const id = randomUUID();
-    const event: Event = { ...insertEvent, id };
+    const event: Event = { 
+      ...insertEvent, 
+      id,
+      attendees: insertEvent.attendees ?? 0,
+      imageUrl: insertEvent.imageUrl ?? null,
+      isFree: insertEvent.isFree ?? "true"
+    };
     this.events.set(id, event);
     return event;
   }

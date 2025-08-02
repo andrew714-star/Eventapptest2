@@ -1,4 +1,4 @@
-import { X, Calendar, Clock, MapPin, Building, Share, Heart, CalendarPlus } from "lucide-react";
+import { X, Calendar, Clock, MapPin, Building, Share, Heart, CalendarPlus, Building2, School, Globe, BookOpen, Database } from "lucide-react";
 import { Event } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,32 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
   if (!event) return null;
 
   const eventDate = new Date(event.startDate);
+
+  const getSourceIcon = (source: string) => {
+    if (source.includes('city') || source.includes('parks')) {
+      return <Building2 className="text-blue-600" size={16} />;
+    }
+    if (source.includes('school')) {
+      return <School className="text-green-600" size={16} />;
+    }
+    if (source.includes('chamber')) {
+      return <Globe className="text-purple-600" size={16} />;
+    }
+    if (source.includes('library') || source.includes('community')) {
+      return <BookOpen className="text-orange-600" size={16} />;
+    }
+    return <Database className="text-gray-600" size={16} />;
+  };
+
+  const getSourceLabel = (source: string) => {
+    if (source.includes('city')) return 'City Government';
+    if (source.includes('parks')) return 'Parks & Recreation';
+    if (source.includes('school')) return 'School District';
+    if (source.includes('chamber')) return 'Chamber of Commerce';
+    if (source.includes('library')) return 'Library System';
+    if (source.includes('community')) return 'Community Organization';
+    return 'Data Source';
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -44,11 +70,15 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
           )}
 
           {/* Event Tags */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-wrap gap-2">
             <Badge variant="secondary">{event.category}</Badge>
             <Badge variant={event.isFree === "true" ? "default" : "outline"}>
               {event.isFree === "true" ? "Free" : "Paid"}
             </Badge>
+            <div className="flex items-center space-x-1 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md">
+              {getSourceIcon(event.source)}
+              <span className="text-xs text-gray-600 dark:text-gray-300">{getSourceLabel(event.source)}</span>
+            </div>
           </div>
 
           {/* Event Details Grid */}

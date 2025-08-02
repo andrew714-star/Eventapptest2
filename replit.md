@@ -1,6 +1,6 @@
 # Overview
 
-CityWide Events is a local events aggregation platform that collects and displays community events from various sources like city websites, schools, and community centers. The application features a calendar view, filtering capabilities, and detailed event information to help users discover local activities and events in their area.
+CityWide Events is an automated local events aggregation platform that collects and displays community events in real-time from multiple sources including city websites, school districts, and Chamber of Commerce. The application features calendar and list views, advanced filtering capabilities, detailed event information, and automated data synchronization to help users discover local activities and events without any manual data entry.
 
 # User Preferences
 
@@ -33,16 +33,19 @@ The backend is an Express.js API server with TypeScript:
 
 The server uses middleware for request logging and error handling, with a clean separation between route handlers and storage operations.
 
-## Data Storage
+## Data Storage & Collection
 
-The application uses a flexible storage architecture:
+The application uses a flexible storage architecture with automated data collection:
 
-- **Current Implementation**: In-memory storage with mock data for development
-- **Database Schema**: Designed for PostgreSQL with Drizzle ORM
+- **Current Implementation**: In-memory storage with automated event collection from multiple sources
+- **Database Schema**: Designed for PostgreSQL with Drizzle ORM, includes source tracking fields
 - **Migration Strategy**: Drizzle Kit for database migrations and schema management
 - **Future Integration**: Ready to connect to Neon Database or other PostgreSQL providers
+- **Data Collection**: EventDataCollector service that aggregates events from city websites, school districts, Chamber of Commerce, and community organizations
+- **Automatic Sync**: Periodic synchronization every 6 hours with manual sync capabilities
+- **Source Management**: Admin interface to enable/disable data sources and monitor sync status
 
-The schema defines events with comprehensive fields including categorization, location, timing, and metadata for source tracking.
+The schema defines events with comprehensive fields including categorization, location, timing, source attribution, and metadata for tracking data origins.
 
 ## Component Architecture
 

@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Building2, School, Globe, BookOpen } from "lucide-react";
 
 export default function Home() {
   const [filters, setFilters] = useState<EventFilter>({});
@@ -38,6 +39,31 @@ export default function Home() {
     setFilters(newFilters);
   };
 
+  const getSourceIcon = (source: string) => {
+    if (source.includes('city') || source.includes('parks')) {
+      return <Building2 className="text-blue-600" size={14} />;
+    }
+    if (source.includes('school')) {
+      return <School className="text-green-600" size={14} />;
+    }
+    if (source.includes('chamber')) {
+      return <Globe className="text-purple-600" size={14} />;
+    }
+    if (source.includes('library') || source.includes('community')) {
+      return <BookOpen className="text-orange-600" size={14} />;
+    }
+    return <Globe className="text-gray-600" size={14} />;
+  };
+
+  const getSourceLabel = (source: string) => {
+    if (source.includes('city')) return 'City';
+    if (source.includes('school')) return 'School';
+    if (source.includes('chamber')) return 'Chamber';
+    if (source.includes('library')) return 'Library';
+    if (source.includes('community')) return 'Community';
+    return 'Other';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -58,8 +84,8 @@ export default function Home() {
                       Showing {events.length} events
                     </span>
                     <div className="flex items-center space-x-1">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span className="text-xs text-gray-500">Live updates</span>
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      <span className="text-xs text-gray-500">Auto-synced from city, school & community sources</span>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -111,6 +137,10 @@ export default function Home() {
                               {event.title}
                             </h4>
                             <Badge variant="secondary">{event.category}</Badge>
+                            <div className="flex items-center space-x-1 text-xs text-gray-500">
+                              {getSourceIcon(event.source)}
+                              <span>{getSourceLabel(event.source)}</span>
+                            </div>
                           </div>
                           <p className="text-sm text-gray-600 mb-2">
                             {event.description}
