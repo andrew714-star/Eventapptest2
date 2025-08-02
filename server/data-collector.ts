@@ -1,5 +1,6 @@
 import { InsertEvent } from "@shared/schema";
 import { storage } from "./storage";
+import { calendarCollector } from "./calendar-collector";
 
 export interface DataSource {
   id: string;
@@ -62,13 +63,18 @@ export class EventDataCollector {
   ];
 
   async collectFromAllSources(): Promise<InsertEvent[]> {
-    const allEvents: InsertEvent[] = [];
+    console.log('Starting event synchronization from all sources...');
     
+    // Collect from real calendar feeds across the US
+    const realEvents = await calendarCollector.collectFromAllSources();
+    
+    // Also collect from local Springfield sources for additional coverage
+    const localEvents: InsertEvent[] = [];
     for (const source of this.sources.filter(s => s.isActive)) {
       try {
         console.log(`Collecting events from ${source.name}...`);
         const events = await this.collectFromSource(source);
-        allEvents.push(...events);
+        localEvents.push(...events);
         
         // Update last sync date
         source.lastSyncDate = new Date();
@@ -78,6 +84,9 @@ export class EventDataCollector {
       }
     }
 
+    const allEvents = [...realEvents, ...localEvents];
+    console.log(`Total events collected: ${allEvents.length} (${realEvents.length} from national sources, ${localEvents.length} from local sources)`);
+    
     return allEvents;
   }
 

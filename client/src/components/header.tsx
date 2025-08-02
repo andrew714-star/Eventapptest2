@@ -2,6 +2,7 @@ import { Calendar, Bell, Settings, Menu, Database, RefreshCw } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { DataSourcesModal } from "@/components/data-sources-modal";
+import { CalendarSourcesModal } from "@/components/calendar-sources-modal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +50,7 @@ export function Header() {
                 </div>
                 <div>
                   <h1 className="text-xl font-medium text-gray-900 dark:text-white">CityWide Events</h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Automated local events aggregator</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Real-time events from cities, schools & chambers nationwide</p>
                 </div>
               </div>
             </div>
@@ -63,13 +64,14 @@ export function Header() {
                 <RefreshCw className={`mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} size={16} />
                 {syncMutation.isPending ? 'Syncing...' : 'Sync Events'}
               </Button>
+              <CalendarSourcesModal />
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => setIsDataSourcesOpen(true)}
               >
                 <Database className="mr-2" size={16} />
-                Sources
+                Local Sources
               </Button>
               <Button variant="ghost" size="sm">
                 <Bell size={18} />

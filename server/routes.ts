@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { eventFilterSchema, insertEventSchema } from "@shared/schema";
 import { dataCollector } from "./data-collector";
+import { calendarCollector } from "./calendar-collector";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events
@@ -153,6 +154,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Event sync failed:", error);
       res.status(500).json({ message: "Failed to sync events" });
+    }
+  });
+
+  // Calendar feed sources management
+  app.get("/api/calendar-sources", async (req, res) => {
+    try {
+      const sources = calendarCollector.getSources();
+      const activeSources = sources.filter(s => s.isActive);
+      
+      res.json({
+        sources,
+        activeCount: activeSources.length,
+        totalCount: sources.length,
+        states: Array.from(new Set(sources.map(s => s.state))).sort(),
+        cities: Array.from(new Set(sources.map(s => s.city))).sort(),
+        types: Array.from(new Set(sources.map(s => s.type))).sort()
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch calendar sources" });
+    }
+  });
+
+  app.get("/api/calendar-sources/by-state/:state", async (req, res) => {
+    try {
+      const { state } = req.params;
+      const sources = calendarCollector.getSourcesByState(state.toUpperCase());
+      res.json(sources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sources by state" });
+    }
+  });
+
+  app.get("/api/calendar-sources/by-type/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      const sources = calendarCollector.getSourcesByType(type);
+      res.json(sources);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch sources by type" });
+    }
+  });
+
+  app.post("/api/calendar-sources/:id/toggle", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const isActive = calendarCollector.toggleSource(id);
+      res.json({ sourceId: id, isActive });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle calendar source" });
     }
   });
 

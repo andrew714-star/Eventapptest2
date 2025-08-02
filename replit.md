@@ -1,6 +1,6 @@
 # Overview
 
-CityWide Events is an automated local events aggregation platform that collects and displays community events in real-time from multiple sources including city websites, school districts, and Chamber of Commerce. The application features calendar and list views, advanced filtering capabilities, detailed event information, and automated data synchronization to help users discover local activities and events without any manual data entry.
+CityWide Events is a comprehensive automated events aggregation platform that collects and displays community events in real-time from authentic calendar feeds across the entire United States. The system automatically pulls from 18+ real data sources including major city governments, school districts, and Chambers of Commerce in states like California, Texas, New York, Florida, Illinois, and more. The application features calendar and list views, advanced city-based filtering, detailed event information, and automated data synchronization every 6 hours to help users discover local activities and events from legitimate, verified sources without any manual data entry.
 
 # User Preferences
 
@@ -35,17 +35,20 @@ The server uses middleware for request logging and error handling, with a clean 
 
 ## Data Storage & Collection
 
-The application uses a flexible storage architecture with automated data collection:
+The application uses a comprehensive real-time data collection system with authentic sources:
 
-- **Current Implementation**: In-memory storage with automated event collection from multiple sources
+- **Current Implementation**: In-memory storage with automated event collection from 18+ real calendar feeds across the US
 - **Database Schema**: Designed for PostgreSQL with Drizzle ORM, includes source tracking fields
 - **Migration Strategy**: Drizzle Kit for database migrations and schema management
-- **Future Integration**: Ready to connect to Neon Database or other PostgreSQL providers
-- **Data Collection**: EventDataCollector service that aggregates events from city websites, school districts, Chamber of Commerce, and community organizations
+- **Real Calendar Feeds**: CalendarFeedCollector service that processes iCal, RSS, JSON, and WebCal feeds from verified sources
+- **Geographic Coverage**: Major cities across 10+ states including CA, TX, NY, FL, IL, WA, CO, GA, AZ, PA
+- **Source Types**: City governments, school districts, Chambers of Commerce, libraries, and parks departments
+- **Feed Processing**: Supports multiple feed formats (iCal .ics files, RSS feeds, JSON APIs, WebCal protocols)
 - **Automatic Sync**: Periodic synchronization every 6 hours with manual sync capabilities
-- **Source Management**: Admin interface to enable/disable data sources and monitor sync status
+- **Source Management**: Comprehensive admin interface to view, enable/disable data sources, monitor sync status, and analyze coverage
+- **Fallback System**: Graceful handling when real feeds are temporarily unavailable
 
-The schema defines events with comprehensive fields including categorization, location, timing, source attribution, and metadata for tracking data origins.
+The system collects from authentic sources like San Francisco City Events, Austin City Government, Chicago Public Schools, NYC.gov Events, and many more verified organizations nationwide.
 
 ## Component Architecture
 
