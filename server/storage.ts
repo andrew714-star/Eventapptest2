@@ -151,8 +151,11 @@ export class MemStorage implements IStorage {
       events = events.filter(event => filters.categories!.includes(event.category));
     }
 
-    if (filters.location && filters.location !== "All Locations") {
-      events = events.filter(event => event.location.toLowerCase().includes(filters.location!.toLowerCase()));
+    if (filters.location) {
+      events = events.filter(event => 
+        event.location.toLowerCase().includes(filters.location!.toLowerCase()) ||
+        event.organizer.toLowerCase().includes(filters.location!.toLowerCase())
+      );
     }
 
     if (filters.startDate) {

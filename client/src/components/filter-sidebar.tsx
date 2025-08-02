@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import { EventFilter, categories, locations } from "@shared/schema";
+import { EventFilter, categories } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -40,12 +40,10 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
   };
 
   const handleLocationChange = (location: string) => {
-    setLocalFilters(prev => ({ ...prev, location: location === "all" ? undefined : location }));
+    setLocalFilters(prev => ({ ...prev, location: location || undefined }));
   };
 
-  const handleDateChange = (field: "startDate" | "endDate", value: string) => {
-    setLocalFilters(prev => ({ ...prev, [field]: value || undefined }));
-  };
+
 
   const clearFilters = () => {
     setLocalFilters({});
@@ -71,22 +69,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           </div>
         </div>
 
-        {/* Date Range */}
-        <div className="space-y-2">
-          <Label>Date Range</Label>
-          <div className="space-y-2">
-            <Input
-              type="date"
-              value={localFilters.startDate || ""}
-              onChange={(e) => handleDateChange("startDate", e.target.value)}
-            />
-            <Input
-              type="date"
-              value={localFilters.endDate || ""}
-              onChange={(e) => handleDateChange("endDate", e.target.value)}
-            />
-          </div>
-        </div>
+
 
         {/* Categories */}
         <div className="space-y-3">
@@ -107,22 +90,18 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           </div>
         </div>
 
-        {/* Location */}
+        {/* City Search */}
         <div className="space-y-2">
-          <Label>Location</Label>
-          <Select value={localFilters.location || "all"} onValueChange={handleLocationChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location} value={location}>
-                  {location}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>City</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <Input
+              placeholder="Search by city name..."
+              className="pl-10"
+              value={localFilters.location || ""}
+              onChange={(e) => handleLocationChange(e.target.value)}
+            />
+          </div>
         </div>
 
         <Button variant="outline" className="w-full" onClick={clearFilters}>

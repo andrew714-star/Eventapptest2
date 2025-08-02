@@ -107,15 +107,16 @@ export class EventDataCollector {
   }
 
   private generateCityEvents(source: DataSource, baseDate: Date): InsertEvent[] {
+    const cities = ["Springfield", "Riverside", "Madison", "Oakland", "Portland"];
     const cityEvents = [
       {
         title: "City Council Meeting",
         description: "Monthly city council meeting open to the public. Topics include budget review, infrastructure updates, and community development initiatives.",
         category: "Community & Social",
-        location: "City Hall Council Chambers",
+        location: "Springfield City Hall Council Chambers",
         organizer: "City of Springfield",
-        startDate: new Date(baseDate.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-        endDate: new Date(baseDate.getTime() + 5 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // 2 hours later
+        startDate: new Date(baseDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+        endDate: new Date(baseDate.getTime() + 5 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
         startTime: "7:00 PM",
         endTime: "9:00 PM",
         attendees: 45,
@@ -125,10 +126,10 @@ export class EventDataCollector {
       },
       {
         title: "Community Safety Workshop",
-        description: "Learn about emergency preparedness, home security, and neighborhood watch programs. Presented by the Springfield Police Department.",
+        description: "Learn about emergency preparedness, home security, and neighborhood watch programs. Presented by local police department.",
         category: "Education & Learning",
-        location: "Community Center Main Hall",
-        organizer: "Springfield Police Department",
+        location: "Riverside Community Center Main Hall",
+        organizer: "Riverside Police Department",
         startDate: new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000),
         startTime: "10:00 AM",
@@ -139,17 +140,32 @@ export class EventDataCollector {
         source: source.id
       },
       {
-        title: "Springfield Farmers Market",
+        title: "Madison Farmers Market",
         description: "Weekly farmers market featuring local produce, artisan goods, live music, and food trucks. Support local businesses and enjoy fresh, seasonal products.",
         category: "Food & Dining",
-        location: "Downtown Springfield Square",
-        organizer: "Springfield Parks Department",
+        location: "Downtown Madison Square",
+        organizer: "Madison Parks Department",
         startDate: new Date(baseDate.getTime() + 3 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000),
         startTime: "8:00 AM",
         endTime: "12:00 PM",
         attendees: 156,
         imageUrl: "https://images.unsplash.com/photo-1488459716781-31db52582fe9?ixlib=rb-4.0.3",
+        isFree: "true",
+        source: source.id
+      },
+      {
+        title: "Oakland Art Festival",
+        description: "Annual outdoor art festival featuring local artists, live performances, food vendors, and interactive art installations for all ages.",
+        category: "Arts & Culture",
+        location: "Oakland Central Park",
+        organizer: "Oakland Arts Council",
+        startDate: new Date(baseDate.getTime() + 9 * 24 * 60 * 60 * 1000),
+        endDate: new Date(baseDate.getTime() + 9 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000),
+        startTime: "10:00 AM",
+        endTime: "4:00 PM",
+        attendees: 289,
+        imageUrl: "https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?ixlib=rb-4.0.3",
         isFree: "true",
         source: source.id
       }
@@ -164,8 +180,8 @@ export class EventDataCollector {
         title: "Spring Science Fair",
         description: "Students from grades K-12 showcase their science projects. Judging begins at 6 PM. Awards ceremony follows. Open to families and community members.",
         category: "Education & Learning",
-        location: "Springfield High School Gymnasium",
-        organizer: "Springfield School District",
+        location: "Portland High School Gymnasium",
+        organizer: "Portland School District",
         startDate: new Date(baseDate.getTime() + 12 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 12 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
         startTime: "5:00 PM",
@@ -191,17 +207,17 @@ export class EventDataCollector {
         source: source.id
       },
       {
-        title: "High School Basketball Championship",
-        description: "Springfield Eagles vs. Riverside Hawks in the regional championship game. Come support our team! Concessions available.",
-        category: "Sports & Recreation",
-        location: "Springfield High School Gym",
-        organizer: "Springfield Athletics",
+        title: "Madison Middle School Drama Performance",
+        description: "Students present 'A Midsummer Night's Dream' with costumes and set design by the art department. Family-friendly Shakespeare adaptation.",
+        category: "Arts & Culture",
+        location: "Madison Middle School Auditorium",
+        organizer: "Madison School District",
         startDate: new Date(baseDate.getTime() + 6 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 6 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
         startTime: "7:00 PM",
         endTime: "9:00 PM",
-        attendees: 456,
-        imageUrl: "https://images.unsplash.com/photo-1546519638-68e109498ffc?ixlib=rb-4.0.3",
+        attendees: 156,
+        imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3",
         isFree: "false",
         source: source.id
       }
@@ -216,8 +232,8 @@ export class EventDataCollector {
         title: "Business Networking Breakfast",
         description: "Monthly networking event for local business owners and entrepreneurs. Guest speaker on digital marketing trends. Breakfast provided.",
         category: "Business & Networking",
-        location: "Springfield Chamber Office",
-        organizer: "Springfield Chamber of Commerce",
+        location: "Oakland Chamber Office",
+        organizer: "Oakland Chamber of Commerce",
         startDate: new Date(baseDate.getTime() + 4 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 4 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000),
         startTime: "7:30 AM",
@@ -231,8 +247,8 @@ export class EventDataCollector {
         title: "Small Business Workshop: Financial Planning",
         description: "Learn essential financial planning strategies for small businesses. Topics include budgeting, cash flow management, and tax preparation. Led by certified accountants.",
         category: "Business & Networking",
-        location: "Springfield Business Center",
-        organizer: "Springfield Chamber of Commerce",
+        location: "Riverside Business Center",
+        organizer: "Riverside Chamber of Commerce",
         startDate: new Date(baseDate.getTime() + 9 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 9 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
         startTime: "1:00 PM",
@@ -243,11 +259,11 @@ export class EventDataCollector {
         source: source.id
       },
       {
-        title: "Annual Business Awards Gala",
-        description: "Celebrating excellence in local business. Awards for Business of the Year, Entrepreneur of the Year, and Community Impact. Dinner and entertainment included.",
+        title: "Portland Tech Startup Showcase",
+        description: "Local tech startups present their innovations to investors and community members. Networking reception follows. Great opportunity to see emerging technology.",
         category: "Business & Networking",
-        location: "Springfield Convention Center",
-        organizer: "Springfield Chamber of Commerce",
+        location: "Portland Innovation Hub",
+        organizer: "Portland Chamber of Commerce",
         startDate: new Date(baseDate.getTime() + 15 * 24 * 60 * 60 * 1000),
         endDate: new Date(baseDate.getTime() + 15 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000),
         startTime: "6:00 PM",
