@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { eventFilterSchema, insertEventSchema } from "@shared/schema";
 import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
+import { feedDiscoverer } from "./location-feed-discoverer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events
@@ -203,6 +204,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ sourceId: id, isActive });
     } catch (error) {
       res.status(500).json({ message: "Failed to toggle calendar source" });
+    }
+  });
+
+  // Location-based feed discovery
+  app.post("/api/discover-feeds", async (req, res) => {
+    try {
+      const { city, state } = req.body;
+      
+      if (!city || !state) {
+        res.status(400).json({ message: "City and state are required" });
+        return;
+      }
+
+      console.log(`Discovering feeds for ${city}, ${state}...`);
+      const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city, state);
+      
+      res.json({
+        location: { city, state },
+        discoveredFeeds: discoveredFeeds.map(df => ({
+          source: df.source,
+          confidence: df.confidence,
+          lastChecked: df.lastChecked
+        })),
+        count: discoveredFeeds.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Feed discovery failed:", error);
+      res.status(500).json({ message: "Failed to discover feeds for location" });
+    }
+  });
+
+  app.post("/api/add-discovered-feed", async (req, res) => {
+    try {
+      const { source } = req.body;
+      
+      if (!source || !source.feedUrl) {
+        res.status(400).json({ message: "Valid source with feedUrl is required" });
+        return;
+      }
+
+      // Add the discovered source to the calendar collector
+      const success = calendarCollector.addSource(source);
+      
+      if (success) {
+        res.json({ 
+          message: "Feed added successfully",
+          sourceId: source.id,
+          isActive: source.isActive
+        });
+      } else {
+        res.status(400).json({ message: "Failed to add feed - may already exist" });
+      }
+    } catch (error) {
+      console.error("Failed to add discovered feed:", error);
+      res.status(500).json({ message: "Failed to add discovered feed" });
     }
   });
 

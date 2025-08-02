@@ -621,6 +621,32 @@ export class CalendarFeedCollector {
     }
     return false;
   }
+
+  addSource(source: CalendarSource): boolean {
+    // Check if source already exists
+    const existingSource = this.sources.find(s => 
+      s.feedUrl === source.feedUrl || s.id === source.id
+    );
+    
+    if (existingSource) {
+      return false; // Source already exists
+    }
+
+    // Add the new source
+    this.sources.push(source);
+    console.log(`Added new calendar source: ${source.name} (${source.city}, ${source.state})`);
+    return true;
+  }
+
+  removeSource(sourceId: string): boolean {
+    const index = this.sources.findIndex(s => s.id === sourceId);
+    if (index !== -1) {
+      const removed = this.sources.splice(index, 1)[0];
+      console.log(`Removed calendar source: ${removed.name}`);
+      return true;
+    }
+    return false;
+  }
 }
 
 export const calendarCollector = new CalendarFeedCollector();

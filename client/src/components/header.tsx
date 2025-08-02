@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { DataSourcesModal } from "@/components/data-sources-modal";
 import { CalendarSourcesModal } from "@/components/calendar-sources-modal";
+import { LocationSelector } from "@/components/location-selector";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +65,7 @@ export function Header() {
                 <RefreshCw className={`mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} size={16} />
                 {syncMutation.isPending ? 'Syncing...' : 'Sync Events'}
               </Button>
+              <LocationSelector />
               <CalendarSourcesModal />
               <Button 
                 variant="ghost" 
