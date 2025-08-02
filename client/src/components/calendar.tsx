@@ -1,5 +1,16 @@
-import { useState } from "react";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { useMemo, useState } from "react";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+} from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Event } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -15,39 +26,35 @@ export function Calendar({ events, onEventClick }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate]);
+  const monthEnd = useMemo(() => endOfMonth(monthStart), [monthStart]);
+  const startDate = useMemo(() => startOfWeek(monthStart), [monthStart]);
+  const endDate = useMemo(() => endOfWeek(monthEnd), [monthEnd]);
 
-  const days = [];
-  let day = startDate;
-
-  while (day <= endDate) {
-    days.push(day);
-    day = addDays(day, 1);
-  }
+  const days = useMemo(() => {
+    const allDays = [];
+    let day = startDate;
+    while (day <= endDate) {
+      allDays.push(day);
+      day = addDays(day, 1);
+    }
+    return allDays;
+  }, [startDate, endDate]);
 
   const getEventsForDay = (day: Date) => {
-    return events.filter(event => 
-      isSameDay(new Date(event.startDate), day)
-    );
+    return events.filter((event) => isSameDay(new Date(event.startDate), day));
   };
 
   const getCategoryColor = (category: string) => {
     const colorMap: Record<string, string> = {
       "Music & Concerts": "event-red",
-      "Sports & Recreation": "event-green", 
+      "Sports & Recreation": "event-green",
       "Community & Social": "event-blue",
       "Education & Learning": "event-indigo",
       "Arts & Culture": "event-orange",
       "Food & Dining": "event-yellow",
-      "Holiday": "event-red",
-      "Business & Networking": "event-purple",
-      "Health & Wellness": "event-green",
-      "Family & Kids": "event-pink"
     };
-    return colorMap[category] || "event-blue";
+    return colorMap[category] || "event-default";
   };
 
   const selectedDateEvents = getEventsForDay(selectedDate);

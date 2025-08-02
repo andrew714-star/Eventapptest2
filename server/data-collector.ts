@@ -288,74 +288,82 @@ export class EventDataCollector {
   }
 
   private generateCommunityEvents(source: DataSource, baseDate: Date): InsertEvent[] {
-    const communityEvents = [
-      {
-        title: "Author Reading: Local History",
-        description: "Join us for a reading and book signing with local historian Dr. Sarah Miller discussing her new book 'Springfield Through the Decades'.",
-        category: "Arts & Culture",
-        location: "Springfield Main Library",
-        organizer: "Springfield Library System",
-        startDate: new Date(baseDate.getTime() + 10 * 24 * 60 * 60 * 1000),
-        endDate: new Date(baseDate.getTime() + 10 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000),
-        startTime: "2:00 PM",
-        endTime: "3:30 PM",
-        attendees: 42,
-        imageUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3",
-        isFree: "true",
-        source: source.id
-      },
-      {
-        title: "Children's Story Time",
-        description: "Weekly story time for children ages 3-7. This week featuring spring-themed stories and a craft activity. Parents welcome to stay.",
-        category: "Family & Kids",
-        location: "Springfield Main Library Children's Section",
-        organizer: "Springfield Library System",
-        startDate: new Date(baseDate.getTime() + 2 * 24 * 60 * 60 * 1000),
-        endDate: new Date(baseDate.getTime() + 2 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
-        startTime: "10:00 AM",
-        endTime: "10:45 AM",
-        attendees: 18,
-        imageUrl: "https://images.unsplash.com/photo-1544717301-9cdcb1f5940f?ixlib=rb-4.0.3",
-        isFree: "true",
-        source: source.id
-      },
-      {
-        title: "Digital Literacy Workshop for Seniors",
-        description: "Learn basic computer skills, internet safety, and how to use smartphones and tablets. No experience necessary. Devices provided during class.",
-        category: "Education & Learning",
-        location: "Springfield Library Computer Lab",
-        organizer: "Springfield Library System",
-        startDate: new Date(baseDate.getTime() + 11 * 24 * 60 * 60 * 1000),
-        endDate: new Date(baseDate.getTime() + 11 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
-        startTime: "1:00 PM",
-        endTime: "3:00 PM",
-        attendees: 15,
-        imageUrl: "https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?ixlib=rb-4.0.3",
-        isFree: "true",
-        source: source.id
-      }
-    ];
-
-    return communityEvents;
+      const communityEvents: InsertEvent[] = [
+          {
+              title: "Author Reading: Local History",
+              description: "Join us for a reading and book signing with local historian Dr. Sarah Miller discussing her new book 'Springfield Through the Decades'.",
+              category: "Arts & Culture",
+              location: "Springfield Main Library",
+              organizer: "Springfield Library System",
+              startDate: new Date(baseDate.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days later
+              endDate: new Date(baseDate.getTime() + 10 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000),
+              startTime: "2:00 PM",
+              endTime: "3:30 PM",
+              attendees: 42,
+              imageUrl: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3",
+              isFree: "true",
+              source: source.id
+          },
+          {
+              title: "Children's Story Time",
+              description: "Weekly story time for children ages 3-7. This week featuring spring-themed stories and a craft activity. Parents welcome to stay.",
+              category: "Family & Kids",
+              location: "Springfield Main Library Children's Section",
+              organizer: "Springfield Library System",
+              startDate: new Date(baseDate.getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days later
+              endDate: new Date(baseDate.getTime() + 2 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
+              startTime: "10:00 AM",
+              endTime: "10:45 AM",
+              attendees: 18,
+              imageUrl: "https://images.unsplash.com/photo-1544962503-4f6aebb8ecda?ixlib=rb-4.0.3",
+              isFree: "true",
+              source: source.id
+          }
+      ];
+      return communityEvents;
   }
 
   async syncEventsToStorage(): Promise<number> {
-    const collectedEvents = await this.collectFromAllSources();
-    let savedCount = 0;
-
-    for (const event of collectedEvents) {
       try {
-        await storage.createEvent(event);
-        savedCount++;
+          const newEvents = await this.collectFromAllSources();
+          console.log("New Events Collected:", newEvents); // Log newly collected events
+
+          const existingEvents = await storage.getAllEvents();
+          console.log("Existing Events in Storage:", existingEvents); // Log existing events
+
+          // Create a set of existing event keys for comprehensive uniqueness check
+          const existingEventKeys = new Set(existingEvents.map(event => 
+              `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`
+          ));
+
+          // Filter to collect only unique new events
+          const uniqueNewEvents = newEvents.filter(event => {
+              const key = `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`;
+              const isUnique = !existingEventKeys.has(key);
+
+              // Log whether an event is unique or a duplicate
+              if (!isUnique) {
+                  console.log(`Duplicate Found: ${event.title} on ${event.startDate} at ${event.location}`);
+              } else {
+                  console.log(`Unique Event: ${event.title} on ${event.startDate}`);
+              }
+
+              return isUnique;
+          });
+
+          // Store unique new events and log the unique count
+          for (const event of uniqueNewEvents) {
+              await storage.createEvent(event);
+              console.log(`Added Unique Event: ${event.title} on ${event.startDate}`);
+          }
+
+          console.log(`${uniqueNewEvents.length} new unique events added to storage.`);
+          return uniqueNewEvents.length;
       } catch (error) {
-        console.error('Failed to save event:', event.title, error);
+          console.error("Error during synchronization:", error);
+          throw new Error("Failed to sync events due to an error.");
       }
-    }
-
-    console.log(`Successfully synced ${savedCount} out of ${collectedEvents.length} events`);
-    return savedCount;
   }
-
   getSources(): DataSource[] {
     return this.sources;
   }

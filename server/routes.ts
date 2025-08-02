@@ -144,18 +144,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/sync-events", async (req, res) => {
-    try {
-      console.log("Starting event synchronization from all sources...");
-      const syncedCount = await dataCollector.syncEventsToStorage();
-      res.json({ 
-        message: "Event synchronization completed",
-        syncedCount,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error("Event sync failed:", error);
-      res.status(500).json({ message: "Failed to sync events" });
-    }
+      try {
+          console.log("Starting event synchronization from all sources...");
+          const syncedCount = await dataCollector.syncEventsToStorage();
+          res.json({ 
+              message: "Event synchronization completed",
+              syncedCount,
+              timestamp: new Date().toISOString()
+          });
+      } catch (error) {
+          console.error("Event sync failed:", error);
+          res.status(500).json({ message: "Failed to sync events" });
+      }
   });
 
   // Calendar feed sources management
