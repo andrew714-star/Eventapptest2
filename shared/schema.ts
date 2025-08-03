@@ -32,6 +32,7 @@ export const eventFilterSchema = z.object({
   search: z.string().optional(),
   categories: z.array(z.string()).optional(),
   location: z.string().optional(),
+  jurisdiction: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
 });
