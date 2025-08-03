@@ -574,22 +574,23 @@ export class CalendarFeedCollector {
     }
   }
 
-  private generateFallbackEvents(source: CalendarSource): InsertEvent[] {
+  public generateFallbackEvents(source: CalendarSource): InsertEvent[] {
     // Generate realistic fallback events when real feeds are unavailable
     const now = new Date();
     const events: InsertEvent[] = [];
     
+    // Use a fixed seed based on source ID to make events consistent
+    const seedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
     const eventTemplates = [
-      { title: 'City Council Meeting', category: 'Community & Social', duration: 2 },
-      { title: 'Public Library Story Time', category: 'Family & Kids', duration: 1 },
-      { title: 'Business Networking Event', category: 'Business & Networking', duration: 2 },
-      { title: 'Community Health Fair', category: 'Health & Wellness', duration: 4 },
-      { title: 'Local Art Exhibition Opening', category: 'Arts & Culture', duration: 3 }
+      { title: 'City Council Meeting', category: 'Community & Social', duration: 2, dayOffset: 2 },
+      { title: 'Public Library Story Time', category: 'Family & Kids', duration: 1, dayOffset: 4 },
+      { title: 'Business Networking Event', category: 'Business & Networking', duration: 2, dayOffset: 6 }
     ];
     
     for (let i = 0; i < 3; i++) {
-      const template = eventTemplates[i % eventTemplates.length];
-      const startDate = new Date(now.getTime() + (i + 1) * 24 * 60 * 60 * 1000 + Math.random() * 12 * 60 * 60 * 1000);
+      const template = eventTemplates[i];
+      const startDate = new Date(seedDate.getTime() + template.dayOffset * 24 * 60 * 60 * 1000 + 10 * 60 * 60 * 1000); // Fixed 10 AM start
       const endDate = new Date(startDate.getTime() + template.duration * 60 * 60 * 1000);
       
       events.push({
@@ -602,9 +603,9 @@ export class CalendarFeedCollector {
         endDate,
         startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
         endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-        attendees: Math.floor(Math.random() * 100) + 20,
+        attendees: 50 + (i * 25), // Fixed attendee count
         imageUrl: null,
-        isFree: Math.random() > 0.3 ? 'true' : 'false',
+        isFree: i % 2 === 0 ? 'true' : 'false', // Alternating free/paid
         source: source.id
       });
     }

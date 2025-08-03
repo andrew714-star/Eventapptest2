@@ -343,17 +343,17 @@ export class EventDataCollector {
           console.log("Existing Events in Storage:", existingEvents);
 
           const existingEventKeys = new Set(existingEvents.map(event => 
-              `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`
+              `${event.title}::${event.location}::${event.organizer}::${event.source}`
           ));
 
           const uniqueNewEvents = newEvents.filter(event => {
-              const key = `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`;
+              const key = `${event.title}::${event.location}::${event.organizer}::${event.source}`;
               const isUnique = !existingEventKeys.has(key);
 
               // Log events being checked
-              console.log(`Checking Event: ${event.title} on ${event.startDate}`);
+              console.log(`Checking Event: ${event.title} from ${event.organizer}`);
               if (!isUnique) {
-                  console.log(`Duplicate Found: ${event.title} on ${event.startDate} at ${event.location}`);
+                  console.log(`Duplicate Found: ${event.title} from ${event.organizer} at ${event.location}`);
               }
 
               return isUnique;
