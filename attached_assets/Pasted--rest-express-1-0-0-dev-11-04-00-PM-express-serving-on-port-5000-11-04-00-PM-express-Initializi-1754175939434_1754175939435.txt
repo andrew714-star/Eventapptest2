@@ -1,0 +1,1295 @@
+> rest-express@1.0.0 dev
+11:04:00 PM [express] serving on port 5000
+11:04:00 PM [express] Initializing event data from city, school, and community sources...
+Starting event synchronization from all sources...
+Collecting events from 18 real calendar sources across the US...
+Real feed unavailable for Austin City Events, using fallback data
+Real feed unavailable for Los Angeles City Events, using fallback data
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+Real feed unavailable for San Francisco City Events, using fallback data
+Real feed unavailable for San Diego Chamber of Commerce, using fallback data
+Real feed unavailable for Greater Houston Partnership, using fallback data
+✓ Collected 3 events from San Francisco City Events, San Francisco, CA
+✓ Collected 3 events from Los Angeles City Events, Los Angeles, CA
+✓ Collected 3 events from San Diego Chamber of Commerce, San Diego, CA
+✓ Collected 3 events from Austin City Events, Austin, TX
+✓ Collected 3 events from Greater Houston Partnership, Houston, TX
+11:04:06 PM [express] POST /api/events/filter 200 in 3ms :: [{"title":"Holiday Market Opening","descr…
+Starting event synchronization from all sources...
+Starting event synchronization from all sources...
+Collecting events from 18 real calendar sources across the US...
+Real feed unavailable for Austin City Events, using fallback data
+Real feed unavailable for San Francisco City Events, using fallback data
+Real feed unavailable for Los Angeles City Events, using fallback data
+Real feed unavailable for Dallas Independent School District, using fallback data
+Real feed unavailable for NYC.gov Events, using fallback data
+Real feed unavailable for City of Miami Events, using fallback data
+Real feed unavailable for San Diego Chamber of Commerce, using fallback data
+Real feed unavailable for Orlando Regional Chamber, using fallback data
+✓ Collected 3 events from Dallas Independent School District, Dallas, TX
+✓ Collected 3 events from NYC.gov Events, New York, NY
+✓ Collected 0 events from Brooklyn Chamber of Commerce, Brooklyn, NY
+✓ Collected 3 events from City of Miami Events, Miami, FL
+✓ Collected 3 events from Orlando Regional Chamber, Orlando, FL
+Real feed unavailable for Greater Houston Partnership, using fallback data
+✓ Collected 3 events from San Francisco City Events, San Francisco, CA
+✓ Collected 3 events from Los Angeles City Events, Los Angeles, CA
+✓ Collected 3 events from San Diego Chamber of Commerce, San Diego, CA
+✓ Collected 3 events from Austin City Events, Austin, TX
+✓ Collected 3 events from Greater Houston Partnership, Houston, TX
+Real feed unavailable for Chicago City Events, using fallback data
+Real feed unavailable for Denver City Events, using fallback data
+Real feed unavailable for Chicago Public Schools, using fallback data
+Real feed unavailable for Dallas Independent School District, using fallback data
+Real feed unavailable for NYC.gov Events, using fallback data
+Real feed unavailable for Orlando Regional Chamber, using fallback data
+Real feed unavailable for City of Miami Events, using fallback data
+Real feed unavailable for Seattle City Events, using fallback data
+✓ Collected 3 events from Chicago City Events, Chicago, IL
+✓ Collected 3 events from Chicago Public Schools, Chicago, IL
+✓ Collected 3 events from Seattle City Events, Seattle, WA
+✓ Collected 0 events from Seattle Metropolitan Chamber, Seattle, WA
+✓ Collected 3 events from Denver City Events, Denver, CO
+✓ Collected 3 events from Dallas Independent School District, Dallas, TX
+✓ Collected 3 events from NYC.gov Events, New York, NY
+✓ Collected 0 events from Brooklyn Chamber of Commerce, Brooklyn, NY
+✓ Collected 3 events from City of Miami Events, Miami, FL
+✓ Collected 3 events from Orlando Regional Chamber, Orlando, FL
+Real feed unavailable for Chicago City Events, using fallback data
+Real feed unavailable for Denver City Events, using fallback data
+Real feed unavailable for Phoenix City Events, using fallback data
+Real feed unavailable for Chicago Public Schools, using fallback data
+Real feed unavailable for School District of Philadelphia, using fallback data
+Real feed unavailable for Seattle City Events, using fallback data
+✓ Collected 3 events from Chicago City Events, Chicago, IL
+✓ Collected 3 events from Chicago Public Schools, Chicago, IL
+✓ Collected 3 events from Seattle City Events, Seattle, WA
+✓ Collected 0 events from Seattle Metropolitan Chamber, Seattle, WA
+✓ Collected 3 events from Denver City Events, Denver, CO
+Real feed unavailable for Metro Atlanta Chamber, using fallback data
+✓ Collected 3 events from Metro Atlanta Chamber, Atlanta, GA
+✓ Collected 3 events from Phoenix City Events, Phoenix, AZ
+✓ Collected 3 events from School District of Philadelphia, Philadelphia, PA
+Total events collected: 48 from 18 sources
+Collecting events from City of Springfield Events...
+Successfully collected 4 events from City of Springfield Events
+Collecting events from Springfield School District...
+Successfully collected 3 events from Springfield School District
+Collecting events from Springfield Chamber of Commerce...
+Successfully collected 3 events from Springfield Chamber of Commerce
+Collecting events from Parks and Recreation...
+Successfully collected 4 events from Parks and Recreation
+Collecting events from Springfield Library System...
+Successfully collected 2 events from Springfield Library System
+Total events collected: 64 (48 from national sources, 16 from local sources)
+New Events Collected: [
+  {
+    title: 'City Council Meeting - San Francisco',
+    description: 'Join us for this community event in San Francisco, CA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'San Francisco, CA',
+    organizer: 'San Francisco City Events',
+    startDate: 2025-08-04T06:37:08.627Z,
+    endDate: 2025-08-04T08:37:08.627Z,
+    startTime: '6:37 AM',
+    endTime: '8:37 AM',
+    attendees: 47,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'san-francisco-city'
+  },
+  {
+    title: 'Public Library Story Time - San Francisco',
+    description: 'Join us for this community event in San Francisco, CA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'San Francisco, CA',
+    organizer: 'San Francisco City Events',
+    startDate: 2025-08-05T09:00:17.395Z,
+    endDate: 2025-08-05T10:00:17.395Z,
+    startTime: '9:00 AM',
+    endTime: '10:00 AM',
+    attendees: 69,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'san-francisco-city'
+  },
+  {
+    title: 'Business Networking Event - San Francisco',
+    description: 'Join us for this community event in San Francisco, CA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'San Francisco, CA',
+    organizer: 'San Francisco City Events',
+    startDate: 2025-08-06T03:42:49.823Z,
+    endDate: 2025-08-06T05:42:49.823Z,
+    startTime: '3:42 AM',
+    endTime: '5:42 AM',
+    attendees: 75,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'san-francisco-city'
+  },
+  {
+    title: 'City Council Meeting - Los Angeles',
+    description: 'Join us for this community event in Los Angeles, CA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Los Angeles, CA',
+    organizer: 'Los Angeles City Events',
+    startDate: 2025-08-04T00:47:56.132Z,
+    endDate: 2025-08-04T02:47:56.132Z,
+    startTime: '12:47 AM',
+    endTime: '2:47 AM',
+    attendees: 66,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'los-angeles-city'
+  },
+  {
+    title: 'Public Library Story Time - Los Angeles',
+    description: 'Join us for this community event in Los Angeles, CA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Los Angeles, CA',
+    organizer: 'Los Angeles City Events',
+    startDate: 2025-08-05T02:37:26.005Z,
+    endDate: 2025-08-05T03:37:26.005Z,
+    startTime: '2:37 AM',
+    endTime: '3:37 AM',
+    attendees: 32,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'los-angeles-city'
+  },
+  {
+    title: 'Business Networking Event - Los Angeles',
+    description: 'Join us for this community event in Los Angeles, CA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Los Angeles, CA',
+    organizer: 'Los Angeles City Events',
+    startDate: 2025-08-06T06:40:36.601Z,
+    endDate: 2025-08-06T08:40:36.601Z,
+    startTime: '6:40 AM',
+    endTime: '8:40 AM',
+    attendees: 34,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'los-angeles-city'
+  },
+  {
+    title: 'City Council Meeting - San Diego',
+    description: 'Join us for this community event in San Diego, CA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'San Diego, CA',
+    organizer: 'San Diego Chamber of Commerce',
+    startDate: 2025-08-04T01:39:23.865Z,
+    endDate: 2025-08-04T03:39:23.865Z,
+    startTime: '1:39 AM',
+    endTime: '3:39 AM',
+    attendees: 93,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'san-diego-chamber'
+  },
+  {
+    title: 'Public Library Story Time - San Diego',
+    description: 'Join us for this community event in San Diego, CA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'San Diego, CA',
+    organizer: 'San Diego Chamber of Commerce',
+    startDate: 2025-08-05T02:25:56.441Z,
+    endDate: 2025-08-05T03:25:56.441Z,
+    startTime: '2:25 AM',
+    endTime: '3:25 AM',
+    attendees: 27,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'san-diego-chamber'
+  },
+  {
+    title: 'Business Networking Event - San Diego',
+    description: 'Join us for this community event in San Diego, CA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'San Diego, CA',
+    organizer: 'San Diego Chamber of Commerce',
+    startDate: 2025-08-06T00:29:45.328Z,
+    endDate: 2025-08-06T02:29:45.328Z,
+    startTime: '12:29 AM',
+    endTime: '2:29 AM',
+    attendees: 87,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'san-diego-chamber'
+  },
+  {
+    title: 'City Council Meeting - Austin',
+    description: 'Join us for this community event in Austin, TX. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Austin, TX',
+    organizer: 'Austin City Events',
+    startDate: 2025-08-04T07:31:02.376Z,
+    endDate: 2025-08-04T09:31:02.376Z,
+    startTime: '7:31 AM',
+    endTime: '9:31 AM',
+    attendees: 117,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'austin-city'
+  },
+  {
+    title: 'Public Library Story Time - Austin',
+    description: 'Join us for this community event in Austin, TX. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Austin, TX',
+    organizer: 'Austin City Events',
+    startDate: 2025-08-05T09:46:00.139Z,
+    endDate: 2025-08-05T10:46:00.139Z,
+    startTime: '9:46 AM',
+    endTime: '10:46 AM',
+    attendees: 96,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'austin-city'
+  },
+  {
+    title: 'Business Networking Event - Austin',
+    description: 'Join us for this community event in Austin, TX. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Austin, TX',
+    organizer: 'Austin City Events',
+    startDate: 2025-08-06T00:48:45.051Z,
+    endDate: 2025-08-06T02:48:45.051Z,
+    startTime: '12:48 AM',
+    endTime: '2:48 AM',
+    attendees: 27,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'austin-city'
+  },
+  {
+    title: 'City Council Meeting - Houston',
+    description: 'Join us for this community event in Houston, TX. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Houston, TX',
+    organizer: 'Greater Houston Partnership',
+    startDate: 2025-08-04T01:33:43.213Z,
+    endDate: 2025-08-04T03:33:43.213Z,
+    startTime: '1:33 AM',
+    endTime: '3:33 AM',
+    attendees: 99,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'houston-chamber'
+  },
+  {
+    title: 'Public Library Story Time - Houston',
+    description: 'Join us for this community event in Houston, TX. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Houston, TX',
+    organizer: 'Greater Houston Partnership',
+    startDate: 2025-08-05T09:28:08.426Z,
+    endDate: 2025-08-05T10:28:08.426Z,
+    startTime: '9:28 AM',
+    endTime: '10:28 AM',
+    attendees: 36,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'houston-chamber'
+  },
+  {
+    title: 'Business Networking Event - Houston',
+    description: 'Join us for this community event in Houston, TX. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Houston, TX',
+    organizer: 'Greater Houston Partnership',
+    startDate: 2025-08-06T10:17:55.014Z,
+    endDate: 2025-08-06T12:17:55.014Z,
+    startTime: '10:17 AM',
+    endTime: '12:17 PM',
+    attendees: 47,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'houston-chamber'
+  },
+  {
+    title: 'City Council Meeting - Dallas',
+    description: 'Join us for this community event in Dallas, TX. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Dallas, TX',
+    organizer: 'Dallas Independent School District',
+    startDate: 2025-08-04T08:35:57.075Z,
+    endDate: 2025-08-04T10:35:57.075Z,
+    startTime: '8:35 AM',
+    endTime: '10:35 AM',
+    attendees: 31,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'dallas-schools'
+  },
+  {
+    title: 'Public Library Story Time - Dallas',
+    description: 'Join us for this community event in Dallas, TX. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Dallas, TX',
+    organizer: 'Dallas Independent School District',
+    startDate: 2025-08-05T10:31:30.150Z,
+    endDate: 2025-08-05T11:31:30.150Z,
+    startTime: '10:31 AM',
+    endTime: '11:31 AM',
+    attendees: 77,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'dallas-schools'
+  },
+  {
+    title: 'Business Networking Event - Dallas',
+    description: 'Join us for this community event in Dallas, TX. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Dallas, TX',
+    organizer: 'Dallas Independent School District',
+    startDate: 2025-08-06T04:31:30.921Z,
+    endDate: 2025-08-06T06:31:30.921Z,
+    startTime: '4:31 AM',
+    endTime: '6:31 AM',
+    attendees: 118,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'dallas-schools'
+  },
+  {
+    title: 'City Council Meeting - New York',
+    description: 'Join us for this community event in New York, NY. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'New York, NY',
+    organizer: 'NYC.gov Events',
+    startDate: 2025-08-04T03:21:44.257Z,
+    endDate: 2025-08-04T05:21:44.257Z,
+    startTime: '3:21 AM',
+    endTime: '5:21 AM',
+    attendees: 60,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'nyc-events'
+  },
+  {
+    title: 'Public Library Story Time - New York',
+    description: 'Join us for this community event in New York, NY. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'New York, NY',
+    organizer: 'NYC.gov Events',
+    startDate: 2025-08-05T01:19:14.800Z,
+    endDate: 2025-08-05T02:19:14.800Z,
+    startTime: '1:19 AM',
+    endTime: '2:19 AM',
+    attendees: 33,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'nyc-events'
+  },
+  {
+    title: 'Business Networking Event - New York',
+    description: 'Join us for this community event in New York, NY. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'New York, NY',
+    organizer: 'NYC.gov Events',
+    startDate: 2025-08-06T10:28:22.751Z,
+    endDate: 2025-08-06T12:28:22.751Z,
+    startTime: '10:28 AM',
+    endTime: '12:28 PM',
+    attendees: 58,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'nyc-events'
+  },
+  {
+    title: 'City Council Meeting - Miami',
+    description: 'Join us for this community event in Miami, FL. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Miami, FL',
+    organizer: 'City of Miami Events',
+    startDate: 2025-08-04T09:47:52.536Z,
+    endDate: 2025-08-04T11:47:52.536Z,
+    startTime: '9:47 AM',
+    endTime: '11:47 AM',
+    attendees: 26,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'miami-city'
+  },
+  {
+    title: 'Public Library Story Time - Miami',
+    description: 'Join us for this community event in Miami, FL. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Miami, FL',
+    organizer: 'City of Miami Events',
+    startDate: 2025-08-05T06:31:10.265Z,
+    endDate: 2025-08-05T07:31:10.265Z,
+    startTime: '6:31 AM',
+    endTime: '7:31 AM',
+    attendees: 44,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'miami-city'
+  },
+  {
+    title: 'Business Networking Event - Miami',
+    description: 'Join us for this community event in Miami, FL. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Miami, FL',
+    organizer: 'City of Miami Events',
+    startDate: 2025-08-06T04:57:45.391Z,
+    endDate: 2025-08-06T06:57:45.391Z,
+    startTime: '4:57 AM',
+    endTime: '6:57 AM',
+    attendees: 58,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'miami-city'
+  },
+  {
+    title: 'City Council Meeting - Orlando',
+    description: 'Join us for this community event in Orlando, FL. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Orlando, FL',
+    organizer: 'Orlando Regional Chamber',
+    startDate: 2025-08-04T06:45:16.968Z,
+    endDate: 2025-08-04T08:45:16.968Z,
+    startTime: '6:45 AM',
+    endTime: '8:45 AM',
+    attendees: 56,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'orlando-chamber'
+  },
+  {
+    title: 'Public Library Story Time - Orlando',
+    description: 'Join us for this community event in Orlando, FL. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Orlando, FL',
+    organizer: 'Orlando Regional Chamber',
+    startDate: 2025-08-04T23:27:37.081Z,
+    endDate: 2025-08-05T00:27:37.081Z,
+    startTime: '11:27 PM',
+    endTime: '12:27 AM',
+    attendees: 26,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'orlando-chamber'
+  },
+  {
+    title: 'Business Networking Event - Orlando',
+    description: 'Join us for this community event in Orlando, FL. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Orlando, FL',
+    organizer: 'Orlando Regional Chamber',
+    startDate: 2025-08-06T08:42:03.188Z,
+    endDate: 2025-08-06T10:42:03.188Z,
+    startTime: '8:42 AM',
+    endTime: '10:42 AM',
+    attendees: 49,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'orlando-chamber'
+  },
+  {
+    title: 'City Council Meeting - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Chicago, IL',
+    organizer: 'Chicago City Events',
+    startDate: 2025-08-04T08:54:59.201Z,
+    endDate: 2025-08-04T10:54:59.201Z,
+    startTime: '8:54 AM',
+    endTime: '10:54 AM',
+    attendees: 64,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'chicago-city'
+  },
+  {
+    title: 'Public Library Story Time - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Chicago, IL',
+    organizer: 'Chicago City Events',
+    startDate: 2025-08-05T06:10:12.940Z,
+    endDate: 2025-08-05T07:10:12.940Z,
+    startTime: '6:10 AM',
+    endTime: '7:10 AM',
+    attendees: 21,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'chicago-city'
+  },
+  {
+    title: 'Business Networking Event - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Chicago, IL',
+    organizer: 'Chicago City Events',
+    startDate: 2025-08-06T08:52:12.348Z,
+    endDate: 2025-08-06T10:52:12.348Z,
+    startTime: '8:52 AM',
+    endTime: '10:52 AM',
+    attendees: 24,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'chicago-city'
+  },
+  {
+    title: 'City Council Meeting - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Chicago, IL',
+    organizer: 'Chicago Public Schools',
+    startDate: 2025-08-03T23:51:52.943Z,
+    endDate: 2025-08-04T01:51:52.943Z,
+    startTime: '11:51 PM',
+    endTime: '1:51 AM',
+    attendees: 92,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'chicago-schools'
+  },
+  {
+    title: 'Public Library Story Time - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Chicago, IL',
+    organizer: 'Chicago Public Schools',
+    startDate: 2025-08-05T04:35:20.306Z,
+    endDate: 2025-08-05T05:35:20.306Z,
+    startTime: '4:35 AM',
+    endTime: '5:35 AM',
+    attendees: 27,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'chicago-schools'
+  },
+  {
+    title: 'Business Networking Event - Chicago',
+    description: 'Join us for this community event in Chicago, IL. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Chicago, IL',
+    organizer: 'Chicago Public Schools',
+    startDate: 2025-08-06T08:59:20.601Z,
+    endDate: 2025-08-06T10:59:20.601Z,
+    startTime: '8:59 AM',
+    endTime: '10:59 AM',
+    attendees: 94,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'chicago-schools'
+  },
+  {
+    title: 'City Council Meeting - Seattle',
+    description: 'Join us for this community event in Seattle, WA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Seattle, WA',
+    organizer: 'Seattle City Events',
+    startDate: 2025-08-04T08:26:43.846Z,
+    endDate: 2025-08-04T10:26:43.846Z,
+    startTime: '8:26 AM',
+    endTime: '10:26 AM',
+    attendees: 76,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'seattle-city'
+  },
+  {
+    title: 'Public Library Story Time - Seattle',
+    description: 'Join us for this community event in Seattle, WA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Seattle, WA',
+    organizer: 'Seattle City Events',
+    startDate: 2025-08-05T03:26:31.047Z,
+    endDate: 2025-08-05T04:26:31.047Z,
+    startTime: '3:26 AM',
+    endTime: '4:26 AM',
+    attendees: 63,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'seattle-city'
+  },
+  {
+    title: 'Business Networking Event - Seattle',
+    description: 'Join us for this community event in Seattle, WA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Seattle, WA',
+    organizer: 'Seattle City Events',
+    startDate: 2025-08-06T09:59:54.596Z,
+    endDate: 2025-08-06T11:59:54.596Z,
+    startTime: '9:59 AM',
+    endTime: '11:59 AM',
+    attendees: 112,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'seattle-city'
+  },
+  {
+    title: 'City Council Meeting - Denver',
+    description: 'Join us for this community event in Denver, CO. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Denver, CO',
+    organizer: 'Denver City Events',
+    startDate: 2025-08-04T03:57:25.154Z,
+    endDate: 2025-08-04T05:57:25.154Z,
+    startTime: '3:57 AM',
+    endTime: '5:57 AM',
+    attendees: 52,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'denver-city'
+  },
+  {
+    title: 'Public Library Story Time - Denver',
+    description: 'Join us for this community event in Denver, CO. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Denver, CO',
+    organizer: 'Denver City Events',
+    startDate: 2025-08-05T04:24:36.379Z,
+    endDate: 2025-08-05T05:24:36.379Z,
+    startTime: '4:24 AM',
+    endTime: '5:24 AM',
+    attendees: 50,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'denver-city'
+  },
+  {
+    title: 'Business Networking Event - Denver',
+    description: 'Join us for this community event in Denver, CO. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Denver, CO',
+    organizer: 'Denver City Events',
+    startDate: 2025-08-06T02:26:20.615Z,
+    endDate: 2025-08-06T04:26:20.615Z,
+    startTime: '2:26 AM',
+    endTime: '4:26 AM',
+    attendees: 79,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'denver-city'
+  },
+  {
+    title: 'City Council Meeting - Atlanta',
+    description: 'Join us for this community event in Atlanta, GA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Atlanta, GA',
+    organizer: 'Metro Atlanta Chamber',
+    startDate: 2025-08-04T07:57:46.499Z,
+    endDate: 2025-08-04T09:57:46.499Z,
+    startTime: '7:57 AM',
+    endTime: '9:57 AM',
+    attendees: 38,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'atlanta-chamber'
+  },
+  {
+    title: 'Public Library Story Time - Atlanta',
+    description: 'Join us for this community event in Atlanta, GA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Atlanta, GA',
+    organizer: 'Metro Atlanta Chamber',
+    startDate: 2025-08-05T05:46:33.825Z,
+    endDate: 2025-08-05T06:46:33.825Z,
+    startTime: '5:46 AM',
+    endTime: '6:46 AM',
+    attendees: 68,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'atlanta-chamber'
+  },
+  {
+    title: 'Business Networking Event - Atlanta',
+    description: 'Join us for this community event in Atlanta, GA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Atlanta, GA',
+    organizer: 'Metro Atlanta Chamber',
+    startDate: 2025-08-06T06:32:03.906Z,
+    endDate: 2025-08-06T08:32:03.906Z,
+    startTime: '6:32 AM',
+    endTime: '8:32 AM',
+    attendees: 86,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'atlanta-chamber'
+  },
+  {
+    title: 'City Council Meeting - Phoenix',
+    description: 'Join us for this community event in Phoenix, AZ. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Phoenix, AZ',
+    organizer: 'Phoenix City Events',
+    startDate: 2025-08-04T01:37:40.155Z,
+    endDate: 2025-08-04T03:37:40.155Z,
+    startTime: '1:37 AM',
+    endTime: '3:37 AM',
+    attendees: 56,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'phoenix-city'
+  },
+  {
+    title: 'Public Library Story Time - Phoenix',
+    description: 'Join us for this community event in Phoenix, AZ. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Phoenix, AZ',
+    organizer: 'Phoenix City Events',
+    startDate: 2025-08-05T01:42:40.720Z,
+    endDate: 2025-08-05T02:42:40.720Z,
+    startTime: '1:42 AM',
+    endTime: '2:42 AM',
+    attendees: 74,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'phoenix-city'
+  },
+  {
+    title: 'Business Networking Event - Phoenix',
+    description: 'Join us for this community event in Phoenix, AZ. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Phoenix, AZ',
+    organizer: 'Phoenix City Events',
+    startDate: 2025-08-06T01:31:43.795Z,
+    endDate: 2025-08-06T03:31:43.795Z,
+    startTime: '1:31 AM',
+    endTime: '3:31 AM',
+    attendees: 106,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'phoenix-city'
+  },
+  {
+    title: 'City Council Meeting - Philadelphia',
+    description: 'Join us for this community event in Philadelphia, PA. Event details and registration available on our website.',
+    category: 'Community & Social',
+    location: 'Philadelphia, PA',
+    organizer: 'School District of Philadelphia',
+    startDate: 2025-08-04T00:33:55.289Z,
+    endDate: 2025-08-04T02:33:55.289Z,
+    startTime: '12:33 AM',
+    endTime: '2:33 AM',
+    attendees: 40,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'philadelphia-schools'
+  },
+  {
+    title: 'Public Library Story Time - Philadelphia',
+    description: 'Join us for this community event in Philadelphia, PA. Event details and registration available on our website.',
+    category: 'Family & Kids',
+    location: 'Philadelphia, PA',
+    organizer: 'School District of Philadelphia',
+    startDate: 2025-08-05T02:42:11.528Z,
+    endDate: 2025-08-05T03:42:11.528Z,
+    startTime: '2:42 AM',
+    endTime: '3:42 AM',
+    attendees: 100,
+    imageUrl: null,
+    isFree: 'true',
+    source: 'philadelphia-schools'
+  },
+  {
+    title: 'Business Networking Event - Philadelphia',
+    description: 'Join us for this community event in Philadelphia, PA. Event details and registration available on our website.',
+    category: 'Business & Networking',
+    location: 'Philadelphia, PA',
+    organizer: 'School District of Philadelphia',
+    startDate: 2025-08-06T03:08:07.730Z,
+    endDate: 2025-08-06T05:08:07.730Z,
+    startTime: '3:08 AM',
+    endTime: '5:08 AM',
+    attendees: 92,
+    imageUrl: null,
+    isFree: 'false',
+    source: 'philadelphia-schools'
+  },
+  {
+    title: 'City Council Meeting',
+    description: 'Monthly city council meeting open to the public. Topics include budget review, infrastructure updates, and community development initiatives.',
+    category: 'Community & Social',
+    location: 'Springfield City Hall Council Chambers',
+    organizer: 'City of Springfield',
+    startDate: 2025-08-07T23:04:15.724Z,
+    endDate: 2025-08-08T01:04:15.724Z,
+    startTime: '7:00 PM',
+    endTime: '9:00 PM',
+    attendees: 45,
+    imageUrl: 'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-main'
+  },
+  {
+    title: 'Community Safety Workshop',
+    description: 'Learn about emergency preparedness, home security, and neighborhood watch programs. Presented by local police department.',
+    category: 'Education & Learning',
+    location: 'Riverside Community Center Main Hall',
+    organizer: 'Riverside Police Department',
+    startDate: 2025-08-09T23:04:15.724Z,
+    endDate: 2025-08-10T00:34:15.724Z,
+    startTime: '10:00 AM',
+    endTime: '11:30 AM',
+    attendees: 67,
+    imageUrl: 'https://images.unsplash.com/photo-1560472355-a9a0593b6e80?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-main'
+  },
+  {
+    title: 'Madison Farmers Market',
+    description: 'Weekly farmers market featuring local produce, artisan goods, live music, and food trucks. Support local businesses and enjoy fresh, seasonal products.',
+    category: 'Food & Dining',
+    location: 'Downtown Madison Square',
+    organizer: 'Madison Parks Department',
+    startDate: 2025-08-05T23:04:15.724Z,
+    endDate: 2025-08-06T03:04:15.724Z,
+    startTime: '8:00 AM',
+    endTime: '12:00 PM',
+    attendees: 156,
+    imageUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-main'
+  },
+  {
+    title: 'Oakland Art Festival',
+    description: 'Annual outdoor art festival featuring local artists, live performances, food vendors, and interactive art installations for all ages.',
+    category: 'Arts & Culture',
+    location: 'Oakland Central Park',
+    organizer: 'Oakland Arts Council',
+    startDate: 2025-08-11T23:04:15.724Z,
+    endDate: 2025-08-12T05:04:15.724Z,
+    startTime: '10:00 AM',
+    endTime: '4:00 PM',
+    attendees: 289,
+    imageUrl: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-main'
+  },
+  {
+    title: 'Spring Science Fair',
+    description: 'Students from grades K-12 showcase their science projects. Judging begins at 6 PM. Awards ceremony follows. Open to families and community members.',
+    category: 'Education & Learning',
+    location: 'Portland High School Gymnasium',
+    organizer: 'Portland School District',
+    startDate: 2025-08-14T23:04:15.724Z,
+    endDate: 2025-08-15T02:04:15.724Z,
+    startTime: '5:00 PM',
+    endTime: '8:00 PM',
+    attendees: 234,
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'school-district'
+  },
+  {
+    title: 'Parent-Teacher Conference Night',
+    description: 'Scheduled conferences between parents and teachers to discuss student progress. Please sign up for time slots in advance through the school portal.',
+    category: 'Education & Learning',
+    location: 'Various Springfield Schools',
+    organizer: 'Springfield School District',
+    startDate: 2025-08-10T23:04:15.724Z,
+    endDate: 2025-08-11T03:04:15.724Z,
+    startTime: '4:00 PM',
+    endTime: '8:00 PM',
+    attendees: 89,
+    imageUrl: 'https://images.unsplash.com/photo-1509062522246-3755977927d7?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'school-district'
+  },
+  {
+    title: 'Madison Middle School Drama Performance',
+    description: "Students present 'A Midsummer Night's Dream' with costumes and set design by the art department. Family-friendly Shakespeare adaptation.",
+    category: 'Arts & Culture',
+    location: 'Madison Middle School Auditorium',
+    organizer: 'Madison School District',
+    startDate: 2025-08-08T23:04:15.724Z,
+    endDate: 2025-08-09T01:04:15.724Z,
+    startTime: '7:00 PM',
+    endTime: '9:00 PM',
+    attendees: 156,
+    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'school-district'
+  },
+  {
+    title: 'Business Networking Breakfast',
+    description: 'Monthly networking event for local business owners and entrepreneurs. Guest speaker on digital marketing trends. Breakfast provided.',
+    category: 'Business & Networking',
+    location: 'Oakland Chamber Office',
+    organizer: 'Oakland Chamber of Commerce',
+    startDate: 2025-08-06T23:04:15.724Z,
+    endDate: 2025-08-07T00:34:15.724Z,
+    startTime: '7:30 AM',
+    endTime: '9:00 AM',
+    attendees: 34,
+    imageUrl: 'https://images.unsplash.com/photo-1515169067868-5387ec356754?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'chamber-commerce'
+  },
+  {
+    title: 'Small Business Workshop: Financial Planning',
+    description: 'Learn essential financial planning strategies for small businesses. Topics include budgeting, cash flow management, and tax preparation. Led by certified accountants.',
+    category: 'Business & Networking',
+    location: 'Riverside Business Center',
+    organizer: 'Riverside Chamber of Commerce',
+    startDate: 2025-08-11T23:04:15.724Z,
+    endDate: 2025-08-12T02:04:15.724Z,
+    startTime: '1:00 PM',
+    endTime: '4:00 PM',
+    attendees: 28,
+    imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'chamber-commerce'
+  },
+  {
+    title: 'Portland Tech Startup Showcase',
+    description: 'Local tech startups present their innovations to investors and community members. Networking reception follows. Great opportunity to see emerging technology.',
+    category: 'Business & Networking',
+    location: 'Portland Innovation Hub',
+    organizer: 'Portland Chamber of Commerce',
+    startDate: 2025-08-17T23:04:15.724Z,
+    endDate: 2025-08-18T03:04:15.724Z,
+    startTime: '6:00 PM',
+    endTime: '10:00 PM',
+    attendees: 125,
+    imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'chamber-commerce'
+  },
+  {
+    title: 'City Council Meeting',
+    description: 'Monthly city council meeting open to the public. Topics include budget review, infrastructure updates, and community development initiatives.',
+    category: 'Community & Social',
+    location: 'Springfield City Hall Council Chambers',
+    organizer: 'City of Springfield',
+    startDate: 2025-08-07T23:04:15.724Z,
+    endDate: 2025-08-08T01:04:15.724Z,
+    startTime: '7:00 PM',
+    endTime: '9:00 PM',
+    attendees: 45,
+    imageUrl: 'https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'parks-rec'
+  },
+  {
+    title: 'Community Safety Workshop',
+    description: 'Learn about emergency preparedness, home security, and neighborhood watch programs. Presented by local police department.',
+    category: 'Education & Learning',
+    location: 'Riverside Community Center Main Hall',
+    organizer: 'Riverside Police Department',
+    startDate: 2025-08-09T23:04:15.724Z,
+    endDate: 2025-08-10T00:34:15.724Z,
+    startTime: '10:00 AM',
+    endTime: '11:30 AM',
+    attendees: 67,
+    imageUrl: 'https://images.unsplash.com/photo-1560472355-a9a0593b6e80?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'parks-rec'
+  },
+  {
+    title: 'Madison Farmers Market',
+    description: 'Weekly farmers market featuring local produce, artisan goods, live music, and food trucks. Support local businesses and enjoy fresh, seasonal products.',
+    category: 'Food & Dining',
+    location: 'Downtown Madison Square',
+    organizer: 'Madison Parks Department',
+    startDate: 2025-08-05T23:04:15.724Z,
+    endDate: 2025-08-06T03:04:15.724Z,
+    startTime: '8:00 AM',
+    endTime: '12:00 PM',
+    attendees: 156,
+    imageUrl: 'https://images.unsplash.com/photo-1488459716781-31db52582fe9?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'parks-rec'
+  },
+  {
+    title: 'Oakland Art Festival',
+    description: 'Annual outdoor art festival featuring local artists, live performances, food vendors, and interactive art installations for all ages.',
+    category: 'Arts & Culture',
+    location: 'Oakland Central Park',
+    organizer: 'Oakland Arts Council',
+    startDate: 2025-08-11T23:04:15.724Z,
+    endDate: 2025-08-12T05:04:15.724Z,
+    startTime: '10:00 AM',
+    endTime: '4:00 PM',
+    attendees: 289,
+    imageUrl: 'https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'parks-rec'
+  },
+  {
+    title: 'Author Reading: Local History',
+    description: "Join us for a reading and book signing with local historian Dr. Sarah Miller discussing her new book 'Springfield Through the Decades'.",
+    category: 'Arts & Culture',
+    location: 'Springfield Main Library',
+    organizer: 'Springfield Library System',
+    startDate: 2025-08-12T23:04:15.724Z,
+    endDate: 2025-08-13T00:34:15.724Z,
+    startTime: '2:00 PM',
+    endTime: '3:30 PM',
+    attendees: 42,
+    imageUrl: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'library-system'
+  },
+  {
+    title: "Children's Story Time",
+    description: 'Weekly story time for children ages 3-7. This week featuring spring-themed stories and a craft activity. Parents welcome to stay.',
+    category: 'Family & Kids',
+    location: "Springfield Main Library Children's Section",
+    organizer: 'Springfield Library System',
+    startDate: 2025-08-04T23:04:15.724Z,
+    endDate: 2025-08-04T23:49:15.724Z,
+    startTime: '10:00 AM',
+    endTime: '10:45 AM',
+    attendees: 18,
+    imageUrl: 'https://images.unsplash.com/photo-1544962503-4f6aebb8ecda?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'library-system'
+  }
+]
+Existing Events in Storage: [
+  {
+    title: 'Holiday Market Opening',
+    description: 'Join us for the grand opening of our annual holiday market featuring local vendors, festive food, and holiday entertainment for the whole family.',
+    category: 'Community & Social',
+    location: 'Downtown Plaza',
+    organizer: 'City Parks Department',
+    startDate: 2024-12-10T09:00:00.000Z,
+    endDate: 2024-12-10T18:00:00.000Z,
+    startTime: '9:00 AM',
+    endTime: '6:00 PM',
+    attendees: 234,
+    imageUrl: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-website',
+    id: 'd08c3064-70dd-4f66-a793-d2211a98fb59'
+  },
+  {
+    title: 'Holiday Tree Lighting Ceremony',
+    description: 'Annual tree lighting ceremony with carolers, hot cocoa, and a special appearance by Santa Claus. Family-friendly event with activities for children.',
+    category: 'Holiday',
+    location: 'City Hall Square',
+    organizer: "Mayor's Office",
+    startDate: 2024-12-10T14:00:00.000Z,
+    endDate: 2024-12-10T16:00:00.000Z,
+    startTime: '2:00 PM',
+    endTime: '4:00 PM',
+    attendees: 456,
+    imageUrl: 'https://images.unsplash.com/photo-1544962503-4f6aebb8ecda?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-website',
+    id: '50908a3f-f4be-468b-a037-3763070fe183'
+  },
+  {
+    title: 'Winter Jazz Concert',
+    description: 'Enjoy an evening of smooth jazz featuring the City Jazz Ensemble. Warm beverages and light refreshments available for purchase.',
+    category: 'Music & Concerts',
+    location: 'Community Center Auditorium',
+    organizer: 'Community Arts Center',
+    startDate: 2024-12-10T18:30:00.000Z,
+    endDate: 2024-12-10T21:00:00.000Z,
+    startTime: '6:30 PM',
+    endTime: '9:00 PM',
+    attendees: 89,
+    imageUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'community-center',
+    id: '8ae8914d-ab3d-478b-af4b-3b90a6d35b8d'
+  },
+  {
+    title: 'Winter Festival',
+    description: 'Celebrate winter with ice sculptures, hot chocolate, and winter activities for all ages.',
+    category: 'Community & Social',
+    location: 'Central Park',
+    organizer: 'Parks & Recreation',
+    startDate: 2024-12-01T10:00:00.000Z,
+    endDate: 2024-12-01T20:00:00.000Z,
+    startTime: '10:00 AM',
+    endTime: '8:00 PM',
+    attendees: 312,
+    imageUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?ixlib=rb-4.0.3',
+    isFree: 'true',
+    source: 'city-website',
+    id: 'ac2224d4-cf56-4cc3-8b71-97feaf038151'
+  },
+  {
+    title: 'Yoga Class',
+    description: 'Morning yoga session for all skill levels. Bring your own mat or rent one at the venue.',
+    category: 'Health & Wellness',
+    location: 'Community Center',
+    organizer: 'Wellness Center',
+    startDate: 2024-12-03T07:00:00.000Z,
+    endDate: 2024-12-03T08:00:00.000Z,
+    startTime: '7:00 AM',
+    endTime: '8:00 AM',
+    attendees: 25,
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'wellness-center',
+    id: '81d3c3ee-eb3f-48b8-b020-4fef31ec6f85'
+  },
+  {
+    title: 'Art Workshop',
+    description: 'Learn watercolor painting techniques with local artist Maria Santos. All materials provided.',
+    category: 'Arts & Culture',
+    location: 'Art Studio Downtown',
+    organizer: 'Downtown Art Collective',
+    startDate: 2024-12-03T14:00:00.000Z,
+    endDate: 2024-12-03T16:00:00.000Z,
+    startTime: '2:00 PM',
+    endTime: '4:00 PM',
+    attendees: 18,
+    imageUrl: 'https://images.unsplash.com/photo-1541961017774-22349e4a1262?ixlib=rb-4.0.3',
+    isFree: 'false',
+    source: 'art-collective',
+    id: '7bc2efae-3387-4ed9-b3f4-a3fa706097a6'
+  }
+]
+Unique Event: City Council Meeting - San Francisco on Mon Aug 04 2025 06:37:08 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - San Francisco on Tue Aug 05 2025 09:00:17 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - San Francisco on Wed Aug 06 2025 03:42:49 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Los Angeles on Mon Aug 04 2025 00:47:56 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Los Angeles on Tue Aug 05 2025 02:37:26 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Los Angeles on Wed Aug 06 2025 06:40:36 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - San Diego on Mon Aug 04 2025 01:39:23 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - San Diego on Tue Aug 05 2025 02:25:56 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - San Diego on Wed Aug 06 2025 00:29:45 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Austin on Mon Aug 04 2025 07:31:02 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Austin on Tue Aug 05 2025 09:46:00 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Austin on Wed Aug 06 2025 00:48:45 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Houston on Mon Aug 04 2025 01:33:43 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Houston on Tue Aug 05 2025 09:28:08 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Houston on Wed Aug 06 2025 10:17:55 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Dallas on Mon Aug 04 2025 08:35:57 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Dallas on Tue Aug 05 2025 10:31:30 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Dallas on Wed Aug 06 2025 04:31:30 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - New York on Mon Aug 04 2025 03:21:44 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - New York on Tue Aug 05 2025 01:19:14 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - New York on Wed Aug 06 2025 10:28:22 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Miami on Mon Aug 04 2025 09:47:52 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Miami on Tue Aug 05 2025 06:31:10 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Miami on Wed Aug 06 2025 04:57:45 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Orlando on Mon Aug 04 2025 06:45:16 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Orlando on Mon Aug 04 2025 23:27:37 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Orlando on Wed Aug 06 2025 08:42:03 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Chicago on Mon Aug 04 2025 08:54:59 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Chicago on Tue Aug 05 2025 06:10:12 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Chicago on Wed Aug 06 2025 08:52:12 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Chicago on Sun Aug 03 2025 23:51:52 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Chicago on Tue Aug 05 2025 04:35:20 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Chicago on Wed Aug 06 2025 08:59:20 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Seattle on Mon Aug 04 2025 08:26:43 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Seattle on Tue Aug 05 2025 03:26:31 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Seattle on Wed Aug 06 2025 09:59:54 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Denver on Mon Aug 04 2025 03:57:25 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Denver on Tue Aug 05 2025 04:24:36 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Denver on Wed Aug 06 2025 02:26:20 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Atlanta on Mon Aug 04 2025 07:57:46 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Atlanta on Tue Aug 05 2025 05:46:33 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Atlanta on Wed Aug 06 2025 06:32:03 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Phoenix on Mon Aug 04 2025 01:37:40 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Phoenix on Tue Aug 05 2025 01:42:40 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Phoenix on Wed Aug 06 2025 01:31:43 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting - Philadelphia on Mon Aug 04 2025 00:33:55 GMT+0000 (Coordinated Universal Time)
+Unique Event: Public Library Story Time - Philadelphia on Tue Aug 05 2025 02:42:11 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Event - Philadelphia on Wed Aug 06 2025 03:08:07 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting on Thu Aug 07 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Community Safety Workshop on Sat Aug 09 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Madison Farmers Market on Tue Aug 05 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Oakland Art Festival on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Spring Science Fair on Thu Aug 14 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Parent-Teacher Conference Night on Sun Aug 10 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Madison Middle School Drama Performance on Fri Aug 08 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Business Networking Breakfast on Wed Aug 06 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Small Business Workshop: Financial Planning on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Portland Tech Startup Showcase on Sun Aug 17 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: City Council Meeting on Thu Aug 07 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Community Safety Workshop on Sat Aug 09 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Madison Farmers Market on Tue Aug 05 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Oakland Art Festival on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Author Reading: Local History on Tue Aug 12 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Unique Event: Children's Story Time on Mon Aug 04 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - San Francisco on Mon Aug 04 2025 06:37:08 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - San Francisco on Tue Aug 05 2025 09:00:17 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - San Francisco on Wed Aug 06 2025 03:42:49 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Los Angeles on Mon Aug 04 2025 00:47:56 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Los Angeles on Tue Aug 05 2025 02:37:26 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Los Angeles on Wed Aug 06 2025 06:40:36 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - San Diego on Mon Aug 04 2025 01:39:23 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - San Diego on Tue Aug 05 2025 02:25:56 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - San Diego on Wed Aug 06 2025 00:29:45 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Austin on Mon Aug 04 2025 07:31:02 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Austin on Tue Aug 05 2025 09:46:00 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Austin on Wed Aug 06 2025 00:48:45 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Houston on Mon Aug 04 2025 01:33:43 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Houston on Tue Aug 05 2025 09:28:08 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Houston on Wed Aug 06 2025 10:17:55 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Dallas on Mon Aug 04 2025 08:35:57 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Dallas on Tue Aug 05 2025 10:31:30 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Dallas on Wed Aug 06 2025 04:31:30 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - New York on Mon Aug 04 2025 03:21:44 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - New York on Tue Aug 05 2025 01:19:14 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - New York on Wed Aug 06 2025 10:28:22 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Miami on Mon Aug 04 2025 09:47:52 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Miami on Tue Aug 05 2025 06:31:10 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Miami on Wed Aug 06 2025 04:57:45 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Orlando on Mon Aug 04 2025 06:45:16 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Orlando on Mon Aug 04 2025 23:27:37 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Orlando on Wed Aug 06 2025 08:42:03 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Chicago on Mon Aug 04 2025 08:54:59 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Chicago on Tue Aug 05 2025 06:10:12 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Chicago on Wed Aug 06 2025 08:52:12 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Chicago on Sun Aug 03 2025 23:51:52 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Chicago on Tue Aug 05 2025 04:35:20 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Chicago on Wed Aug 06 2025 08:59:20 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Seattle on Mon Aug 04 2025 08:26:43 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Seattle on Tue Aug 05 2025 03:26:31 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Seattle on Wed Aug 06 2025 09:59:54 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Denver on Mon Aug 04 2025 03:57:25 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Denver on Tue Aug 05 2025 04:24:36 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Denver on Wed Aug 06 2025 02:26:20 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Atlanta on Mon Aug 04 2025 07:57:46 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Atlanta on Tue Aug 05 2025 05:46:33 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Atlanta on Wed Aug 06 2025 06:32:03 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Phoenix on Mon Aug 04 2025 01:37:40 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Phoenix on Tue Aug 05 2025 01:42:40 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Phoenix on Wed Aug 06 2025 01:31:43 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting - Philadelphia on Mon Aug 04 2025 00:33:55 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Public Library Story Time - Philadelphia on Tue Aug 05 2025 02:42:11 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Event - Philadelphia on Wed Aug 06 2025 03:08:07 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting on Thu Aug 07 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Community Safety Workshop on Sat Aug 09 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Madison Farmers Market on Tue Aug 05 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Oakland Art Festival on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Spring Science Fair on Thu Aug 14 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Parent-Teacher Conference Night on Sun Aug 10 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Madison Middle School Drama Performance on Fri Aug 08 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Business Networking Breakfast on Wed Aug 06 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Small Business Workshop: Financial Planning on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Portland Tech Startup Showcase on Sun Aug 17 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: City Council Meeting on Thu Aug 07 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Community Safety Workshop on Sat Aug 09 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Madison Farmers Market on Tue Aug 05 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Oakland Art Festival on Mon Aug 11 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Author Reading: Local History on Tue Aug 12 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+Added Unique Event: Children's Story Time on Mon Aug 04 2025 23:04:15 GMT+0000 (Coordinated Universal Time)
+64 new unique events added to storage.
+11:04:15 PM [express] Successfully initialized with 64 events from multiple sources
+Real feed unavailable for Phoenix City Events, using fallback data
+Real feed unavailable for Metro Atlanta Chamber, using fallback data
+Real feed unavailable for School District of Philadelphia, using fallback data
+✓ Collected 3 events from Metro Atlanta Chamber, Atlanta, GA
+✓ Collected 3 events from Phoenix City Events, Phoenix, AZ
+✓ Collected 3 events from School District of Philadelphia, Philadelphia, PA
+Total events collected: 48 from 18 sources
+Collecting events from City of Springfield Events...
+Successfully collected 4 events from City of Springfield Events
+Collecting events from Springfield School District...
+Successfully collected 3 events from Springfield School District
+Collecting events from Springfield Chamber of Commerce...
+Successfully collected 3 events from Springfield Chamber of Commerce
+Collecting events from Parks and Recreation...
+Successfully collected 4 events from Parks and Recreation
+Collecting events from Springfield Library System...
+Successfully collected 2 events from Springfield Library System
+Total events collected: 64 (48 from national sources, 16 from local sources)
+New Events Collected: [

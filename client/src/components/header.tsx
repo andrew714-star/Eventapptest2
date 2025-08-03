@@ -63,7 +63,7 @@ export function Header() {
                 disabled={syncMutation.isPending}
               >
                 <RefreshCw className={`mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} size={16} />
-                {syncMutation.isPending ? 'Syncing...' : 'Sync Events'}
+                {syncMutation.isPending ? 'Reloding...' : 'Reload Events'}
               </Button>
               <LocationSelector />
               <CalendarSourcesModal />

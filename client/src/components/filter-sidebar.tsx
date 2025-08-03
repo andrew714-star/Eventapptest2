@@ -3,8 +3,6 @@ import { Search } from "lucide-react";
 import { EventFilter, categories } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -28,22 +26,44 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     setLocalFilters(prev => ({ ...prev, search: value || undefined }));
   };
 
-  const handleCategoryChange = (category: string, checked: boolean) => {
-    setLocalFilters(prev => {
-      const currentCategories = prev.categories || [];
-      if (checked) {
-        return { ...prev, categories: [...currentCategories, category] };
-      } else {
-        return { ...prev, categories: currentCategories.filter(c => c !== category) };
-      }
-    });
+  const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedCategory = event.target.value;
+    setLocalFilters(prev => ({ ...prev, categories: selectedCategory ? [selectedCategory] : [] }));
   };
 
   const handleLocationChange = (location: string) => {
     setLocalFilters(prev => ({ ...prev, location: location || undefined }));
+
+    // Discover feeds automatically when the location is changed
+    if (location) {
+      // Split the location into city and state
+      const parts = location.split(',').map(p => p.trim());
+      if (parts.length === 2) {
+        const [city, state] = parts;
+
+        // Call the discover feeds mutation
+        discoverFeedsMutation.mutate({ city, state }, {
+          onSuccess: async (data) => {
+            // Add discovered feeds
+            for (const feed of data.discoveredFeeds) {
+              await addFeedMutation.mutateAsync(feed.source);
+            }
+            toast({
+              title: "Feed Discovery Complete",
+              description: `Found ${data.count} potential calendar feeds for ${data.location.city}, ${data.location.state}`,
+            });
+          },
+          onError: () => {
+            toast({
+              title: "Discovery Failed",
+              description: "Could not discover feeds for this location. Please try another city.",
+              variant: "destructive",
+            });
+          },
+        });
+      }
+    }
   };
-
-
 
   const clearFilters = () => {
     setLocalFilters({});
@@ -57,50 +77,44 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
       <CardContent className="space-y-6">
         {/* Search */}
         <div className="space-y-2">
-          <Label>Search Events</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <Input
-              placeholder="Search by title, location, or keywords..."
-              className="pl-10"
-              value={localFilters.search || ""}
-              onChange={(e) => handleSearchChange(e.target.value)}
-            />
-          </div>
-        </div>
+          <div className="flex space-x-4 items-center">
+            <div className="relative flex-1">
+              <Label>Search Events</Label>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/4 text-gray-400 h-10" size={16} />
+              <Input
+                placeholder="Search by title, location, or keywords..."
+                className="pl-10 h-10" // Ensure same height for input
+                value={localFilters.search || ""}
+                onChange={(e) => handleSearchChange(e.target.value)}
+              />
+            </div>
 
+            <div className="flex-1">
+              <Label>Categories</Label>
+              <select
+                value={localFilters.categories?.[0] || ""}
+                onChange={handleCategoryChange}
+                className="w-full border rounded-md h-10 p-2" // Ensure same height for dropdown
+              >
+                <option value="">Select a category...</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-
-        {/* Categories */}
-        <div className="space-y-3">
-          <Label>Categories</Label>
-          <div className="space-y-2">
-            {categories.map((category) => (
-              <div key={category} className="flex items-center space-x-3 hover:bg-gray-50 rounded p-1">
-                <Checkbox
-                  id={category}
-                  checked={localFilters.categories?.includes(category) || false}
-                  onCheckedChange={(checked) => handleCategoryChange(category, !!checked)}
-                />
-                <Label htmlFor={category} className="text-sm cursor-pointer flex-1">
-                  {category}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* City Search */}
-        <div className="space-y-2">
-          <Label>City</Label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            <Input
-              placeholder="Search by city name..."
-              className="pl-10"
-              value={localFilters.location || ""}
-              onChange={(e) => handleLocationChange(e.target.value)}
-            />
+            <div className="relative flex-1">
+              <Label>City</Label>
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/4 text-gray-400 h-10" size={16} />
+              <Input
+                placeholder="Search by city name..."
+                className="pl-10 h-10" // Ensure same height for input
+                value={localFilters.location || ""}
+                onChange={(e) => handleLocationChange(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

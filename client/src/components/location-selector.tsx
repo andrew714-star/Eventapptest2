@@ -73,12 +73,12 @@ export function LocationSelector() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ city, state })
       });
-      
+
       if (!response.ok) {
         throw new Error('Failed to discover feeds');
       }
-      
-      return response.json() as Promise<DiscoveryResponse>;
+
+      return response.json();
     },
     onSuccess: (data) => {
       setDiscoveredFeeds(data.discoveredFeeds);
@@ -95,7 +95,6 @@ export function LocationSelector() {
       });
     },
   });
-
   const addFeedMutation = useMutation({
     mutationFn: async (source: CalendarSource) => {
       const response = await fetch('/api/add-discovered-feed', {
@@ -129,7 +128,7 @@ export function LocationSelector() {
     },
   });
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     const location = searchLocation.trim();
     if (!location) return;
 
@@ -148,8 +147,27 @@ export function LocationSelector() {
     setIsDiscovering(true);
     setDiscoveredFeeds([]);
     setAddedFeeds(new Set());
-    
-    discoverFeedsMutation.mutate({ city, state });
+
+    discoverFeedsMutation.mutate({ city, state }, {
+      onSuccess: async (data) => {
+        // Automatically add the discovered feeds
+        for (const feed of data.discoveredFeeds) {
+          await addFeedMutation.mutateAsync(feed.source);
+        }
+        setDiscoveredFeeds(data.discoveredFeeds);
+        toast({
+          title: "Feed Discovery Complete",
+          description: `Found ${data.count} potential calendar feeds for ${data.location.city}, ${data.location.state}`,
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Discovery Failed",
+          description: "Could not discover feeds for this location. Please try another city.",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleAddFeed = (feed: DiscoveredFeed) => {
@@ -175,7 +193,7 @@ export function LocationSelector() {
           Add Location
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto overflow-hidden">
         <DialogHeader>
           <DialogTitle>Discover Local Government Feeds</DialogTitle>
           <p className="text-sm text-muted-foreground">

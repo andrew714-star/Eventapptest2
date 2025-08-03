@@ -110,7 +110,7 @@ export function CalendarSourcesModal() {
           Data Sources
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh]">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto overflow-hidden">
         <DialogHeader>
           <DialogTitle>Real Calendar Feed Sources</DialogTitle>
           <p className="text-sm text-muted-foreground">

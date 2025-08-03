@@ -49,14 +49,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {event.title}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="absolute right-4 top-4"
-            onClick={onClose}
-          >
-            <X size={20} />
-          </Button>
+
         </DialogHeader>
 
         <div className="space-y-4">

@@ -322,36 +322,43 @@ export class EventDataCollector {
       ];
       return communityEvents;
   }
+  private async collectFallbackData(): Promise<InsertEvent[]> {
+      const fallbackEvents: InsertEvent[] = [];
 
+      const activeSources = calendarCollector.getSources().filter(source => source.isActive);
+
+      for (const source of activeSources) {
+          const events = calendarCollector.generateFallbackEvents(source); // Use the method from CalendarFeedCollector
+          fallbackEvents.push(...events);
+      }
+
+      return fallbackEvents;
+  }
   async syncEventsToStorage(): Promise<number> {
       try {
           const newEvents = await this.collectFromAllSources();
-          console.log("New Events Collected:", newEvents); // Log newly collected events
+          console.log("New Events Collected:", newEvents);
 
           const existingEvents = await storage.getAllEvents();
-          console.log("Existing Events in Storage:", existingEvents); // Log existing events
+          console.log("Existing Events in Storage:", existingEvents);
 
-          // Create a set of existing event keys for comprehensive uniqueness check
           const existingEventKeys = new Set(existingEvents.map(event => 
               `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`
           ));
 
-          // Filter to collect only unique new events
           const uniqueNewEvents = newEvents.filter(event => {
               const key = `${event.title}::${event.startDate.toISOString()}::${event.location}::${event.description}`;
               const isUnique = !existingEventKeys.has(key);
 
-              // Log whether an event is unique or a duplicate
+              // Log events being checked
+              console.log(`Checking Event: ${event.title} on ${event.startDate}`);
               if (!isUnique) {
                   console.log(`Duplicate Found: ${event.title} on ${event.startDate} at ${event.location}`);
-              } else {
-                  console.log(`Unique Event: ${event.title} on ${event.startDate}`);
               }
 
               return isUnique;
           });
 
-          // Store unique new events and log the unique count
           for (const event of uniqueNewEvents) {
               await storage.createEvent(event);
               console.log(`Added Unique Event: ${event.title} on ${event.startDate}`);
