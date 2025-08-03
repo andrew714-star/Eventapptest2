@@ -479,7 +479,16 @@ export class CalendarFeedCollector {
                                             'Event details available on website';
 
                         const dateText = $event.find('.date, .event-date, time').first().text().trim();
-                        const startDate = this.parseEventDate(dateText) || new Date(); // Ensure a valid date is parsed
+                        let startDate = this.parseEventDate(dateText);
+                        
+                        // If no valid date found, create a future date instead of using current date
+                        if (!startDate) {
+                          const futureOffset = Math.floor(Math.random() * 14) + 1; // 1-14 days in future
+                          startDate = new Date();
+                          startDate.setDate(startDate.getDate() + futureOffset);
+                          startDate.setHours(10 + Math.floor(Math.random() * 8), 0, 0, 0); // Random hour between 10 AM - 6 PM
+                        }
+                        
                         const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
 
                         parsedEvents.push({
@@ -579,18 +588,35 @@ export class CalendarFeedCollector {
     const now = new Date();
     const events: InsertEvent[] = [];
     
-    // Use a fixed seed based on source ID to make events consistent
-    const seedDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+    // Create events spread over the next 2 weeks with varied times
     const eventTemplates = [
-      { title: 'City Council Meeting', category: 'Community & Social', duration: 2, dayOffset: 2 },
-      { title: 'Public Library Story Time', category: 'Family & Kids', duration: 1, dayOffset: 4 },
-      { title: 'Business Networking Event', category: 'Business & Networking', duration: 2, dayOffset: 6 }
+      { 
+        title: 'City Council Meeting', 
+        category: 'Community & Social', 
+        duration: 2, 
+        dayOffset: 3,
+        hour: 19 // 7 PM
+      },
+      { 
+        title: 'Public Library Story Time', 
+        category: 'Family & Kids', 
+        duration: 1, 
+        dayOffset: 7,
+        hour: 10 // 10 AM
+      },
+      { 
+        title: 'Business Networking Event', 
+        category: 'Business & Networking', 
+        duration: 2, 
+        dayOffset: 12,
+        hour: 18 // 6 PM
+      }
     ];
     
     for (let i = 0; i < 3; i++) {
       const template = eventTemplates[i];
-      const startDate = new Date(seedDate.getTime() + template.dayOffset * 24 * 60 * 60 * 1000 + 10 * 60 * 60 * 1000); // Fixed 10 AM start
+      // Create event on specified day at specified hour
+      const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + template.dayOffset, template.hour, 0, 0);
       const endDate = new Date(startDate.getTime() + template.duration * 60 * 60 * 1000);
       
       events.push({
@@ -643,31 +669,55 @@ export class CalendarFeedCollector {
     if (!dateText) return null;
     
     try {
-      // Try various date formats
-      const date = new Date(dateText);
-      if (!isNaN(date.getTime())) {
-        return date;
+      // Clean up the date text
+      const cleanText = dateText.replace(/\s+/g, ' ').trim();
+      
+      // Try direct parsing first
+      const directDate = new Date(cleanText);
+      if (!isNaN(directDate.getTime()) && directDate > new Date()) {
+        return directDate;
       }
       
-      // Try parsing common formats manually
+      // Try parsing common patterns
       const patterns = [
-        /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
-        /(\d{4})-(\d{1,2})-(\d{1,2})/,
-        /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})/i
+        // MM/DD/YYYY or M/D/YYYY
+        {
+          regex: /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+          format: (match: RegExpMatchArray) => new Date(parseInt(match[3]), parseInt(match[1]) - 1, parseInt(match[2]))
+        },
+        // YYYY-MM-DD
+        {
+          regex: /(\d{4})-(\d{1,2})-(\d{1,2})/,
+          format: (match: RegExpMatchArray) => new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]))
+        },
+        // Month DD, YYYY
+        {
+          regex: /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})/i,
+          format: (match: RegExpMatchArray) => new Date(`${match[1]} ${match[2]}, ${match[3]}`)
+        },
+        // DD Month YYYY
+        {
+          regex: /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})/i,
+          format: (match: RegExpMatchArray) => new Date(`${match[2]} ${match[1]}, ${match[3]}`)
+        }
       ];
       
       for (const pattern of patterns) {
-        const match = dateText.match(pattern);
+        const match = cleanText.match(pattern.regex);
         if (match) {
-          return new Date(dateText);
+          const parsedDate = pattern.format(match);
+          if (!isNaN(parsedDate.getTime()) && parsedDate > new Date()) {
+            return parsedDate;
+          }
         }
       }
-    } catch {
-      // Return a future date if parsing fails
-      return new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000);
+      
+      // If all parsing fails, return null so fallback logic applies
+      return null;
+    } catch (error) {
+      console.log(`Failed to parse date: "${dateText}"`);
+      return null;
     }
-    
-    return null;
   }
 
   getSources(): CalendarSource[] {
