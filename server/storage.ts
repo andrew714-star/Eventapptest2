@@ -158,6 +158,30 @@ export class MemStorage implements IStorage {
       );
     }
 
+    if (filters.jurisdiction) {
+      let jurisdictionPattern = '';
+      switch (filters.jurisdiction) {
+        case 'city':
+          jurisdictionPattern = '%city%';
+          break;
+        case 'county':
+          jurisdictionPattern = '%county%';
+          break;
+        case 'congressional':
+          jurisdictionPattern = '%congressional%';
+          break;
+        case 'senate':
+          jurisdictionPattern = '%senate%';
+          break;
+        case 'state':
+          jurisdictionPattern = '%state%';
+          break;
+      }
+      if (jurisdictionPattern) {
+        events = events.filter(event => event.source.toLowerCase().includes(jurisdictionPattern.replace(/%/g, '')));
+      }
+    }
+
     if (filters.startDate) {
       const startDate = new Date(filters.startDate);
       events = events.filter(event => new Date(event.startDate) >= startDate);
@@ -200,7 +224,7 @@ export class MemStorage implements IStorage {
   async getEventsByDateRange(startDate: string, endDate: string): Promise<Event[]> {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     return Array.from(this.events.values()).filter(event => {
       const eventDate = new Date(event.startDate);
       return eventDate >= start && eventDate <= end;

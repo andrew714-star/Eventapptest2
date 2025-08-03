@@ -5,9 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-
 interface FilterSidebarProps {
   filters: EventFilter;
   onFiltersChange: (filters: EventFilter) => void;
@@ -15,44 +12,6 @@ interface FilterSidebarProps {
 
 export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) {
   const [localFilters, setLocalFilters] = useState<EventFilter>(filters);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const discoverFeedsMutation = useMutation({
-    mutationFn: async ({ city, state }: { city: string; state: string }) => {
-      const response = await fetch('/api/discover-feeds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ city, state })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to discover feeds');
-      }
-
-      return response.json();
-    },
-  });
-
-  const addFeedMutation = useMutation({
-    mutationFn: async (source: any) => {
-      const response = await fetch('/api/add-discovered-feed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: { ...source, isActive: true } })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to add feed');
-      }
-      
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
-    },
-  });
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -73,36 +32,6 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
 
   const handleLocationChange = (location: string) => {
     setLocalFilters(prev => ({ ...prev, location: location || undefined }));
-
-    // Discover feeds automatically when the location is changed
-    if (location) {
-      // Split the location into city and state
-      const parts = location.split(',').map(p => p.trim());
-      if (parts.length === 2) {
-        const [city, state] = parts;
-
-        // Call the discover feeds mutation
-        discoverFeedsMutation.mutate({ city, state }, {
-          onSuccess: async (data) => {
-            // Add discovered feeds
-            for (const feed of data.discoveredFeeds) {
-              await addFeedMutation.mutateAsync(feed.source);
-            }
-            toast({
-              title: "Feed Discovery Complete",
-              description: `Found ${data.count} potential calendar feeds for ${data.location.city}, ${data.location.state}`,
-            });
-          },
-          onError: () => {
-            toast({
-              title: "Discovery Failed",
-              description: "Could not discover feeds for this location. Please try another city.",
-              variant: "destructive",
-            });
-          },
-        });
-      }
-    }
   };
 
   const clearFilters = () => {
@@ -154,6 +83,22 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                 value={localFilters.location || ""}
                 onChange={(e) => handleLocationChange(e.target.value)}
               />
+            </div>
+
+            <div className="flex-1">
+              <Label>Jurisdiction</Label>
+              <select
+                value={localFilters.jurisdiction || ""}
+                onChange={(e) => setLocalFilters(prev => ({ ...prev, jurisdiction: e.target.value || undefined }))}
+                className="w-full border rounded-md h-10 p-2" // Ensure same height for dropdown
+              >
+                <option value="">All Jurisdictions</option>
+                <option value="city">City Government</option>
+                <option value="county">County Government</option>
+                <option value="congressional">US Congressional District</option>
+                <option value="senate">US Senate District</option>
+                <option value="state">State Government</option>
+              </select>
             </div>
           </div>
         </div>
