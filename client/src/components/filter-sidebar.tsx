@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface FilterSidebarProps {
   filters: EventFilter;
@@ -13,6 +15,44 @@ interface FilterSidebarProps {
 
 export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) {
   const [localFilters, setLocalFilters] = useState<EventFilter>(filters);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const discoverFeedsMutation = useMutation({
+    mutationFn: async ({ city, state }: { city: string; state: string }) => {
+      const response = await fetch('/api/discover-feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city, state })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to discover feeds');
+      }
+
+      return response.json();
+    },
+  });
+
+  const addFeedMutation = useMutation({
+    mutationFn: async (source: any) => {
+      const response = await fetch('/api/add-discovered-feed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: { ...source, isActive: true } })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to add feed');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+    },
+  });
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
