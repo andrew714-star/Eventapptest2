@@ -32,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events/date-range", async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
-      
+
       if (!startDate || !endDate) {
         res.status(400).json({ message: "Start date and end date are required" });
         return;
@@ -61,7 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const event = await storage.getEvent(id);
-      
+
       if (!event) {
         res.status(404).json({ message: "Event not found" });
         return;
@@ -90,7 +90,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const updateData = insertEventSchema.partial().parse(req.body);
       const event = await storage.updateEvent(id, updateData);
-      
+
       if (!event) {
         res.status(404).json({ message: "Event not found" });
         return;
@@ -107,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteEvent(id);
-      
+
       if (!deleted) {
         res.status(404).json({ message: "Event not found" });
         return;
@@ -163,7 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sources = calendarCollector.getSources();
       const activeSources = sources.filter(s => s.isActive);
-      
+
       res.json({
         sources,
         activeCount: activeSources.length,
@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/discover-feeds", async (req, res) => {
     try {
       const { city, state } = req.body;
-      
+
       if (!city || !state) {
         res.status(400).json({ message: "City and state are required" });
         return;
@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Discovering feeds for ${city}, ${state}...`);
       const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city, state);
-      
+
       res.json({
         location: { city, state },
         discoveredFeeds: discoveredFeeds.map(df => ({
@@ -239,27 +239,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/add-discovered-feed", async (req, res) => {
     try {
       const { source } = req.body;
-      
-      if (!source || !source.feedUrl) {
-        res.status(400).json({ message: "Valid source with feedUrl is required" });
-        return;
+
+      if (!source) {
+        return res.status(400).json({ error: "Source is required" });
       }
 
-      // Add the discovered source to the calendar collector
-      const success = calendarCollector.addSource(source);
-      
+      // Add the source to the collector's sources
+      const success = await dataCollector.addCalendarSource(source);
+
       if (success) {
+        // Trigger a sync to collect events from this new source
+        await dataCollector.syncEventsToStorage();
+
         res.json({ 
-          message: "Feed added successfully",
-          sourceId: source.id,
-          isActive: source.isActive
+          success: true, 
+          message: `Added calendar source: ${source.name}` 
         });
       } else {
-        res.status(400).json({ message: "Failed to add feed - may already exist" });
+        res.status(400).json({ error: "Failed to add calendar source" });
       }
     } catch (error) {
-      console.error("Failed to add discovered feed:", error);
-      res.status(500).json({ message: "Failed to add discovered feed" });
+      console.error("Add discovered feed error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/discover-regional-feeds", async (req, res) => {
+    try {
+      const { regions } = req.body;
+
+      if (!regions || !Array.isArray(regions) || regions.length === 0) {
+        return res.status(400).json({ error: "Regions array is required" });
+      }
+
+      const discoveredFeeds = [];
+
+      // Regional mapping of major cities by state
+      const regionalCities = {
+        "California": ["Los Angeles", "San Francisco", "San Diego", "Sacramento", "Fresno"],
+        "Texas": ["Houston", "Dallas", "Austin", "San Antonio", "Fort Worth"],
+        "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville", "Tallahassee"],
+        "New York": ["New York City", "Buffalo", "Albany", "Rochester", "Syracuse"],
+        "Illinois": ["Chicago", "Springfield", "Rockford", "Peoria", "Aurora"],
+        "Washington": ["Seattle", "Spokane", "Tacoma", "Vancouver", "Bellevue"],
+        "Colorado": ["Denver", "Boulder", "Colorado Springs", "Fort Collins", "Pueblo"],
+        "Georgia": ["Atlanta", "Savannah", "Augusta", "Columbus", "Macon"]
+      };
+
+      for (const region of regions) {
+        const cities = regionalCities[region] || [];
+
+        for (const city of cities) {
+          // Discover feeds for each city in the region
+          const cityFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city, region);
+          discoveredFeeds.push(...cityFeeds);
+        }
+      }
+
+      // Remove duplicates based on source URL
+      const uniqueFeeds = discoveredFeeds.filter((feed, index, self) => 
+        index === self.findIndex(f => f.source.feedUrl === feed.source.feedUrl)
+      );
+
+      res.json({
+        regions,
+        discoveredFeeds: uniqueFeeds,
+        count: uniqueFeeds.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Regional feed discovery error:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
   });
 
