@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useRef } from "react";
-import { Search, Map, Pencil, Square } from "lucide-react";
+import { Search, Map, Pencil, Square, ZoomIn, ZoomOut, Move } from "lucide-react";
 import { EventFilter, categories } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,12 +71,19 @@ interface USMapWithDrawingProps {
 
 function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [drawMode, setDrawMode] = useState<'select' | 'draw'>('select');
+  const [isPanning, setIsPanning] = useState(false);
+  const [drawMode, setDrawMode] = useState<'select' | 'draw' | 'pan'>('select');
   const [currentPath, setCurrentPath] = useState<string>("");
   const [drawnPaths, setDrawnPaths] = useState<string[]>([]);
+  const [zoom, setZoom] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
 
-  const handleStateClick = (stateName: string) => {
+  const handleStateClick = (stateName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (drawMode === 'select') {
       if (selectedRegions.includes(stateName)) {
         onRegionChange(selectedRegions.filter(r => r !== stateName));
@@ -85,26 +93,38 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
     }
   };
 
+  const getMousePosition = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    
+    const x = ((e.clientX - rect.left) / rect.width) * 1000 / zoom - panX;
+    const y = ((e.clientY - rect.top) / rect.height) * 600 / zoom - panY;
+    return { x, y };
+  };
+
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    const pos = getMousePosition(e);
+    
     if (drawMode === 'draw') {
       setIsDrawing(true);
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (rect) {
-        const x = ((e.clientX - rect.left) / rect.width) * 1000;
-        const y = ((e.clientY - rect.top) / rect.height) * 600;
-        setCurrentPath(`M${x},${y}`);
-      }
+      setCurrentPath(`M${pos.x},${pos.y}`);
+    } else if (drawMode === 'pan') {
+      setIsPanning(true);
+      setLastPanPoint({ x: e.clientX, y: e.clientY });
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (isDrawing && drawMode === 'draw') {
-      const rect = svgRef.current?.getBoundingClientRect();
-      if (rect) {
-        const x = ((e.clientX - rect.left) / rect.width) * 1000;
-        const y = ((e.clientY - rect.top) / rect.height) * 600;
-        setCurrentPath(prev => `${prev} L${x},${y}`);
-      }
+      const pos = getMousePosition(e);
+      setCurrentPath(prev => `${prev} L${pos.x},${pos.y}`);
+    } else if (isPanning && drawMode === 'pan' && lastPanPoint) {
+      const deltaX = e.clientX - lastPanPoint.x;
+      const deltaY = e.clientY - lastPanPoint.y;
+      
+      setPanX(prev => prev + deltaX / zoom);
+      setPanY(prev => prev + deltaY / zoom);
+      setLastPanPoint({ x: e.clientX, y: e.clientY });
     }
   };
 
@@ -117,7 +137,6 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
         
         // Find states that intersect with drawn path
         const intersectingStates = US_STATES.filter(state => {
-          // Simple intersection check - if any point of the state is within drawn area
           return isStateIntersectingPath(state, closedPath);
         });
         
@@ -125,13 +144,42 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
         onRegionChange(newSelectedRegions);
         setCurrentPath("");
       }
+    } else if (isPanning) {
+      setIsPanning(false);
+      setLastPanPoint(null);
     }
   };
 
   const isStateIntersectingPath = (state: any, drawnPath: string): boolean => {
-    // Simplified intersection detection
-    // In a real implementation, you'd use proper polygon intersection algorithms
-    return Math.random() > 0.7; // Placeholder logic
+    // Simple bounding box intersection for demo
+    // In production, you'd use proper polygon intersection algorithms
+    const pathData = state.path.match(/M(\d+)\s(\d+).*?(\d+)\s(\d+)/);
+    const drawnData = drawnPath.match(/M(\d+\.?\d*),(\d+\.?\d*).*?(\d+\.?\d*),(\d+\.?\d*)/);
+    
+    if (!pathData || !drawnData) return false;
+    
+    const stateX = parseInt(pathData[1]);
+    const stateY = parseInt(pathData[2]);
+    const drawnX = parseFloat(drawnData[1]);
+    const drawnY = parseFloat(drawnData[2]);
+    
+    // Simple distance-based intersection
+    const distance = Math.sqrt(Math.pow(stateX - drawnX, 2) + Math.pow(stateY - drawnY, 2));
+    return distance < 100; // Threshold for intersection
+  };
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev * 1.5, 5));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev / 1.5, 0.5));
+  };
+
+  const resetView = () => {
+    setZoom(1);
+    setPanX(0);
+    setPanY(0);
   };
 
   const clearDrawing = () => {
@@ -139,111 +187,189 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
     onRegionChange([]);
   };
 
+  const getCursor = () => {
+    switch (drawMode) {
+      case 'draw': return 'crosshair';
+      case 'pan': return isPanning ? 'grabbing' : 'grab';
+      default: return 'default';
+    }
+  };
+
   return (
-    <div className="relative">
-      {/* Drawing Controls */}
-      <div className="absolute top-2 left-2 z-10 flex gap-2 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md">
-        <Button
-          size="sm"
-          variant={drawMode === 'select' ? 'default' : 'outline'}
-          onClick={() => setDrawMode('select')}
-        >
-          <Square className="h-4 w-4 mr-1" />
-          Select
-        </Button>
-        <Button
-          size="sm"
-          variant={drawMode === 'draw' ? 'default' : 'outline'}
-          onClick={() => setDrawMode('draw')}
-        >
-          <Pencil className="h-4 w-4 mr-1" />
-          Draw
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={clearDrawing}
-          disabled={drawnPaths.length === 0 && selectedRegions.length === 0}
-        >
-          Clear
-        </Button>
+    <div className="relative" ref={containerRef}>
+      {/* Map Controls */}
+      <div className="absolute top-2 left-2 z-10 flex flex-col gap-2">
+        {/* Drawing Controls */}
+        <div className="flex gap-2 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md">
+          <Button
+            size="sm"
+            variant={drawMode === 'select' ? 'default' : 'outline'}
+            onClick={() => setDrawMode('select')}
+          >
+            <Square className="h-4 w-4 mr-1" />
+            Select
+          </Button>
+          <Button
+            size="sm"
+            variant={drawMode === 'draw' ? 'default' : 'outline'}
+            onClick={() => setDrawMode('draw')}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            Draw
+          </Button>
+          <Button
+            size="sm"
+            variant={drawMode === 'pan' ? 'default' : 'outline'}
+            onClick={() => setDrawMode('pan')}
+          >
+            <Move className="h-4 w-4 mr-1" />
+            Pan
+          </Button>
+        </div>
+
+        {/* Zoom Controls */}
+        <div className="flex flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleZoomIn}
+            disabled={zoom >= 5}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <div className="text-xs text-center px-2 py-1 text-gray-600">
+            {Math.round(zoom * 100)}%
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleZoomOut}
+            disabled={zoom <= 0.5}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Reset and Clear */}
+        <div className="flex flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={resetView}
+          >
+            Reset View
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={clearDrawing}
+            disabled={drawnPaths.length === 0 && selectedRegions.length === 0}
+          >
+            Clear
+          </Button>
+        </div>
       </div>
 
       {/* Map */}
-      <svg
-        ref={svgRef}
-        viewBox="0 0 1000 600"
-        className="w-full h-full cursor-crosshair"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => setIsDrawing(false)}
-      >
-        {/* US States */}
-        {US_STATES.map((state) => (
-          <path
-            key={state.name}
-            d={state.path}
-            fill={selectedRegions.includes(state.name) ? "#3b82f6" : "#e5e7eb"}
-            stroke="#9ca3af"
-            strokeWidth="1"
-            className={`transition-colors ${drawMode === 'select' ? 'cursor-pointer hover:fill-blue-200' : 'pointer-events-none'}`}
-            onClick={() => handleStateClick(state.name)}
-          />
-        ))}
+      <div className="overflow-hidden rounded-lg border">
+        <svg
+          ref={svgRef}
+          viewBox="0 0 1000 600"
+          className="w-full h-full"
+          style={{ 
+            cursor: getCursor(),
+            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
+            transformOrigin: 'center'
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={() => {
+            setIsDrawing(false);
+            setIsPanning(false);
+            setLastPanPoint(null);
+          }}
+        >
+          {/* Background */}
+          <rect width="1000" height="600" fill="#f0f9ff" />
 
-        {/* State Labels */}
-        {US_STATES.map((state) => {
-          // Calculate center point for label (simplified)
-          const pathData = state.path.match(/M(\d+)\s(\d+)/);
-          if (pathData) {
-            const x = parseInt(pathData[1]) + 30;
-            const y = parseInt(pathData[2]) + 20;
-            return (
-              <text
-                key={`${state.name}-label`}
-                x={x}
-                y={y}
-                textAnchor="middle"
-                className="text-xs font-medium pointer-events-none select-none"
-                fill={selectedRegions.includes(state.name) ? "white" : "#374151"}
-              >
-                {state.name.length > 8 ? state.name.substring(0, 6) + '...' : state.name}
-              </text>
-            );
-          }
-          return null;
-        })}
+          {/* US States */}
+          {US_STATES.map((state) => (
+            <path
+              key={state.name}
+              d={state.path}
+              fill={selectedRegions.includes(state.name) ? "#3b82f6" : "#e5e7eb"}
+              stroke="#9ca3af"
+              strokeWidth="1"
+              className={`transition-colors ${
+                drawMode === 'select' 
+                  ? 'cursor-pointer hover:fill-blue-200' 
+                  : 'pointer-events-none'
+              }`}
+              onClick={(e) => handleStateClick(state.name, e)}
+            />
+          ))}
 
-        {/* Drawn Paths */}
-        {drawnPaths.map((path, index) => (
-          <path
-            key={`drawn-${index}`}
-            d={path}
-            fill="rgba(59, 130, 246, 0.3)"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            strokeDasharray="5,5"
-            className="pointer-events-none"
-          />
-        ))}
+          {/* State Labels */}
+          {zoom > 0.8 && US_STATES.map((state) => {
+            const pathData = state.path.match(/M(\d+)\s(\d+)/);
+            if (pathData) {
+              const x = parseInt(pathData[1]) + 30;
+              const y = parseInt(pathData[2]) + 20;
+              return (
+                <text
+                  key={`${state.name}-label`}
+                  x={x}
+                  y={y}
+                  textAnchor="middle"
+                  className="text-xs font-medium pointer-events-none select-none"
+                  fill={selectedRegions.includes(state.name) ? "white" : "#374151"}
+                  style={{ fontSize: Math.max(10, 12 / zoom) }}
+                >
+                  {zoom > 1.5 ? state.name : state.name.substring(0, 2)}
+                </text>
+              );
+            }
+            return null;
+          })}
 
-        {/* Current Drawing Path */}
-        {currentPath && (
-          <path
-            d={currentPath}
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            strokeDasharray="5,5"
-            className="pointer-events-none"
-          />
-        )}
-      </svg>
+          {/* Drawn Paths */}
+          {drawnPaths.map((path, index) => (
+            <path
+              key={`drawn-${index}`}
+              d={path}
+              fill="rgba(59, 130, 246, 0.3)"
+              stroke="#3b82f6"
+              strokeWidth={2 / zoom}
+              strokeDasharray={`${5 / zoom},${5 / zoom}`}
+              className="pointer-events-none"
+            />
+          ))}
+
+          {/* Current Drawing Path */}
+          {currentPath && (
+            <path
+              d={currentPath}
+              fill="none"
+              stroke="#3b82f6"
+              strokeWidth={2 / zoom}
+              strokeDasharray={`${5 / zoom},${5 / zoom}`}
+              className="pointer-events-none"
+            />
+          )}
+        </svg>
+      </div>
 
       {/* Drawing Instructions */}
-      <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md text-xs text-gray-600">
-        {drawMode === 'select' ? 'Click states to select them' : 'Click and drag to draw a selection area'}
+      <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md text-xs text-gray-600 max-w-xs">
+        {drawMode === 'select' && 'Click states to select them'}
+        {drawMode === 'draw' && 'Click and drag to draw a selection area'}
+        {drawMode === 'pan' && 'Click and drag to pan around the map'}
+      </div>
+
+      {/* Zoom Level Display */}
+      <div className="absolute bottom-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md text-xs text-gray-600">
+        Zoom: {Math.round(zoom * 100)}%
       </div>
     </div>
   );
@@ -387,14 +513,6 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     setLocalFilters({});
   };
 
-  const handleRegionClick = (regionName: string) => {
-    setSelectedRegions(prev => 
-      prev.includes(regionName) 
-        ? prev.filter(r => r !== regionName)
-        : [...prev, regionName]
-    );
-  };
-
   const handleDiscoverRegionalFeeds = () => {
     if (selectedRegions.length === 0) {
       toast({
@@ -421,7 +539,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/4 text-gray-400 h-10" size={16} />
               <Input
                 placeholder="Search by title, location, or keywords..."
-                className="pl-10 h-10" // Ensure same height for input
+                className="pl-10 h-10"
                 value={localFilters.search || ""}
                 onChange={(e) => handleSearchChange(e.target.value)}
               />
@@ -432,7 +550,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
               <select
                 value={localFilters.categories?.[0] || ""}
                 onChange={handleCategoryChange}
-                className="w-full border rounded-md h-10 p-2" // Ensure same height for dropdown
+                className="w-full border rounded-md h-10 p-2"
               >
                 <option value="">Select a category...</option>
                 {categories.map((category) => (
@@ -463,17 +581,17 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                       <Map size={16} className="text-gray-400 hover:text-gray-600" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh]">
+                  <DialogContent className="max-w-5xl max-h-[90vh]">
                     <DialogHeader>
-                      <DialogTitle>Select Regions for Event Discovery</DialogTitle>
+                      <DialogTitle>Interactive Regional Map</DialogTitle>
                       <p className="text-sm text-muted-foreground">
-                        Click on regions to select them. Events from cities, school districts, and chambers of commerce in selected areas will be added.
+                        Use zoom, pan, and drawing tools to select specific areas. Events from cities, school districts, and chambers of commerce in selected areas will be added.
                       </p>
                     </DialogHeader>
                     
                     <div className="space-y-4">
-                      {/* Interactive US Map with Drawing */}
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 h-96 relative overflow-hidden">
+                      {/* Interactive US Map */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg h-[500px] relative overflow-hidden">
                         <USMapWithDrawing
                           selectedRegions={selectedRegions}
                           onRegionChange={setSelectedRegions}
