@@ -358,13 +358,13 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
   const [panY, setPanY] = useState(0);
   const [lastPanPoint, setLastPanPoint] = useState<{ x: number; y: number } | null>(null);
 
-  const handleStateClick = (stateName: string, e: React.MouseEvent) => {
+  const handleCityClick = (cityName: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (drawMode === 'select') {
-      if (selectedRegions.includes(stateName)) {
-        onRegionChange(selectedRegions.filter(r => r !== stateName));
+      if (selectedRegions.includes(cityName)) {
+        onRegionChange(selectedRegions.filter(r => r !== cityName));
       } else {
-        onRegionChange([...selectedRegions, stateName]);
+        onRegionChange([...selectedRegions, cityName]);
       }
     }
   };
@@ -411,18 +411,13 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
         const closedPath = currentPath + " Z";
         setDrawnPaths(prev => [...prev, closedPath]);
         
-        // Find states and cities that intersect with drawn path
-        const intersectingStates = US_STATES.filter(state => {
-          return isStateIntersectingPath(state, closedPath);
-        });
-        
+        // Find cities that intersect with drawn path
         const intersectingCities = US_CITIES.filter(city => {
           return isCityIntersectingPath(city, closedPath);
         });
         
         const newSelectedRegions = [...new Set([
           ...selectedRegions, 
-          ...intersectingStates.map(s => s.name),
           ...intersectingCities.map(c => c.name)
         ])];
         onRegionChange(newSelectedRegions);
@@ -576,7 +571,7 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
       </div>
 
       {/* Map */}
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-hidden rounded-lg border-2 shadow-lg bg-white">
         <svg
           ref={svgRef}
           viewBox="0 0 1000 600"
@@ -595,62 +590,102 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
             setLastPanPoint(null);
           }}
         >
-          {/* Background */}
-          <rect width="1000" height="600" fill="#f0f9ff" />
+          {/* Background - Google Maps style */}
+          <rect width="1000" height="600" fill="#f2f1ec" />
 
-          {/* US States */}
+          {/* US States - Google Maps style (no selection, just borders) */}
           {US_STATES.map((state) => (
             <path
               key={state.name}
               d={state.path}
-              fill={selectedRegions.includes(state.name) ? "#3b82f6" : "#e5e7eb"}
-              stroke="#9ca3af"
-              strokeWidth="1"
-              className={`transition-colors ${
-                drawMode === 'select' 
-                  ? 'cursor-pointer hover:fill-blue-200' 
-                  : 'pointer-events-none'
-              }`}
-              onClick={(e) => handleStateClick(state.name, e)}
+              fill="#f8f7f1"
+              stroke="#d4d2c7"
+              strokeWidth="0.8"
+              className="pointer-events-none"
             />
           ))}
 
-          {/* US Cities */}
-          {US_CITIES.map((city) => (
-            <circle
-              key={city.name}
-              cx={city.x}
-              cy={city.y}
-              r={Math.max(2, 4 / zoom)}
-              fill={selectedRegions.includes(city.name) ? "#ef4444" : "#f59e0b"}
-              stroke="#ffffff"
-              strokeWidth={Math.max(0.5, 1 / zoom)}
-              className={`transition-colors ${
-                drawMode === 'select' 
-                  ? 'cursor-pointer hover:fill-red-400' 
-                  : 'pointer-events-none'
-              }`}
-              onClick={(e) => handleStateClick(city.name, e)}
-            />
-          ))}
+          {/* Major Water Bodies for realism */}
+          <circle cx="580" cy="180" r="25" fill="#a8c8ec" opacity="0.6" />
+          <circle cx="520" cy="150" r="30" fill="#a8c8ec" opacity="0.6" />
+          <circle cx="750" cy="120" r="15" fill="#a8c8ec" opacity="0.6" />
 
-          {/* City Labels - only show when zoomed in */}
-          {zoom > 1.2 && US_CITIES.map((city) => (
-            <text
-              key={`${city.name}-label`}
-              x={city.x + 8}
-              y={city.y + 3}
-              textAnchor="start"
-              className="text-xs font-medium pointer-events-none select-none"
-              fill="#374151"
-              style={{ fontSize: Math.max(8, 10 / zoom) }}
-            >
-              {city.name.split(',')[0]}
-            </text>
-          ))}
+          {/* US Cities - Google Maps pin style */}
+          {US_CITIES.map((city) => {
+            const isSelected = selectedRegions.includes(city.name);
+            const pinSize = Math.max(3, 6 / zoom);
+            
+            return (
+              <g key={city.name}>
+                {/* City Pin */}
+                <circle
+                  cx={city.x}
+                  cy={city.y}
+                  r={pinSize}
+                  fill={isSelected ? "#ea4335" : "#4285f4"}
+                  stroke="#ffffff"
+                  strokeWidth={Math.max(1, 2 / zoom)}
+                  className={`transition-all duration-200 ${
+                    drawMode === 'select' 
+                      ? 'cursor-pointer hover:r-[8] drop-shadow-lg' 
+                      : 'pointer-events-none'
+                  }`}
+                  onClick={(e) => handleCityClick(city.name, e)}
+                  style={{
+                    filter: isSelected ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))'
+                  }}
+                />
+                {/* Selected indicator */}
+                {isSelected && (
+                  <circle
+                    cx={city.x}
+                    cy={city.y}
+                    r={pinSize + 3}
+                    fill="none"
+                    stroke="#ea4335"
+                    strokeWidth={Math.max(1, 2 / zoom)}
+                    opacity="0.4"
+                    className="animate-pulse pointer-events-none"
+                  />
+                )}
+              </g>
+            );
+          })}
 
-          {/* State Labels */}
-          {zoom > 0.8 && US_STATES.map((state) => {
+          {/* City Labels - Google Maps style */}
+          {zoom > 1.5 && US_CITIES.map((city) => {
+            const isSelected = selectedRegions.includes(city.name);
+            return (
+              <g key={`${city.name}-label`}>
+                {/* Label background */}
+                <rect
+                  x={city.x + 10}
+                  y={city.y - 8}
+                  width={city.name.split(',')[0].length * 6}
+                  height={14}
+                  fill="rgba(255, 255, 255, 0.9)"
+                  stroke="rgba(0, 0, 0, 0.1)"
+                  strokeWidth="0.5"
+                  rx="2"
+                  className="pointer-events-none"
+                />
+                {/* Label text */}
+                <text
+                  x={city.x + 12}
+                  y={city.y + 2}
+                  textAnchor="start"
+                  className="text-xs font-medium pointer-events-none select-none"
+                  fill={isSelected ? "#ea4335" : "#5f6368"}
+                  style={{ fontSize: Math.max(9, 11 / zoom) }}
+                >
+                  {city.name.split(',')[0]}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* State Labels - subtle */}
+          {zoom > 0.8 && zoom < 2 && US_STATES.map((state) => {
             const pathData = state.path.match(/M(\d+)\s(\d+)/);
             if (pathData) {
               const x = parseInt(pathData[1]) + 30;
@@ -661,27 +696,30 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
                   x={x}
                   y={y}
                   textAnchor="middle"
-                  className="text-xs font-medium pointer-events-none select-none"
-                  fill={selectedRegions.includes(state.name) ? "white" : "#374151"}
+                  className="text-xs font-light pointer-events-none select-none opacity-60"
+                  fill="#9aa0a6"
                   style={{ fontSize: Math.max(10, 12 / zoom) }}
                 >
-                  {zoom > 1.5 ? state.name : state.name.substring(0, 2)}
+                  {state.name.length > 12 ? state.name.substring(0, 2) : state.name}
                 </text>
               );
             }
             return null;
           })}
 
-          {/* Drawn Paths */}
+          {/* Drawn Paths - Google Maps style */}
           {drawnPaths.map((path, index) => (
             <path
               key={`drawn-${index}`}
               d={path}
-              fill="rgba(59, 130, 246, 0.3)"
-              stroke="#3b82f6"
-              strokeWidth={2 / zoom}
-              strokeDasharray={`${5 / zoom},${5 / zoom}`}
+              fill="rgba(66, 133, 244, 0.2)"
+              stroke="#4285f4"
+              strokeWidth={3 / zoom}
+              strokeDasharray="none"
               className="pointer-events-none"
+              style={{
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+              }}
             />
           ))}
 
@@ -690,19 +728,19 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
             <path
               d={currentPath}
               fill="none"
-              stroke="#3b82f6"
-              strokeWidth={2 / zoom}
-              strokeDasharray={`${5 / zoom},${5 / zoom}`}
-              className="pointer-events-none"
+              stroke="#4285f4"
+              strokeWidth={3 / zoom}
+              strokeDasharray={`${8 / zoom},${4 / zoom}`}
+              className="pointer-events-none animate-pulse"
             />
           )}
         </svg>
       </div>
 
       {/* Drawing Instructions */}
-      <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md text-xs text-gray-600 max-w-xs">
-        {drawMode === 'select' && 'Click states (gray) or cities (orange dots) to select them'}
-        {drawMode === 'draw' && 'Click and drag to draw a selection area over cities and states'}
+      <div className="absolute bottom-2 left-2 z-10 bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-md text-xs text-gray-700 max-w-xs border">
+        {drawMode === 'select' && 'Click blue pins to select cities. Red pins are selected.'}
+        {drawMode === 'draw' && 'Click and drag to draw a selection area over cities'}
         {drawMode === 'pan' && 'Click and drag to pan around the map'}
       </div>
 
@@ -924,7 +962,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                     <DialogHeader>
                       <DialogTitle>Interactive Regional Map</DialogTitle>
                       <p className="text-sm text-muted-foreground">
-                        Use zoom, pan, and drawing tools to select specific areas. Events from cities, school districts, and chambers of commerce in selected areas will be added.
+                        Select cities by clicking the blue pins or draw areas to select multiple cities at once. Events from selected cities will be automatically added to your calendar.
                       </p>
                     </DialogHeader>
                     
