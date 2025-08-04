@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { CalendarSource } from './calendar-collector';
+import { cityDiscoverer, US_CITIES_DATABASE } from './us-cities-database';
 
 interface LocationInfo {
   city: string;
@@ -13,6 +14,12 @@ interface DiscoveredFeed {
   source: CalendarSource;
   confidence: number; // 0-1 score indicating feed reliability
   lastChecked: Date;
+}
+
+interface RegionalDiscoveryRequest {
+  regions: string[]; // Array of city names like "Portland, OR"
+  includeAllTypes?: boolean;
+  populationRange?: { min: number; max: number };
 }
 
 export class LocationFeedDiscoverer {
@@ -315,6 +322,185 @@ export class LocationFeedDiscoverer {
     }
 
     return feeds;
+  }
+
+  // Enhanced method to discover feeds for multiple regions
+  async discoverFeedsForRegions(request: RegionalDiscoveryRequest): Promise<{
+    discoveredFeeds: DiscoveredFeed[];
+    regions: LocationInfo[];
+    count: number;
+    summary: string;
+  }> {
+    console.log(`Discovering feeds for ${request.regions.length} regions...`);
+    
+    const allFeeds: DiscoveredFeed[] = [];
+    const processedRegions: LocationInfo[] = [];
+    
+    for (const regionName of request.regions) {
+      try {
+        // Parse region name (e.g., "Portland, OR" or "New York, NY")
+        const [cityName, stateCode] = regionName.split(',').map(s => s.trim());
+        
+        if (!cityName || !stateCode) {
+          console.log(`Invalid region format: ${regionName}`);
+          continue;
+        }
+
+        // Find city in database
+        const cityData = cityDiscoverer.getCityByName(cityName, stateCode);
+        
+        if (cityData) {
+          // Use database information for accurate discovery
+          const location: LocationInfo = {
+            city: cityData.name,
+            state: cityData.stateCode,
+            county: cityData.county,
+            type: 'city'
+          };
+
+          const feeds = await this.discoverFeedsForLocation(location);
+          allFeeds.push(...feeds);
+          processedRegions.push(location);
+          
+          console.log(`✓ Discovered ${feeds.length} feeds for ${cityData.name}, ${cityData.stateCode}`);
+        } else {
+          // Fallback to original discovery method
+          const location: LocationInfo = {
+            city: cityName,
+            state: this.getStateAbbreviation(stateCode),
+            type: 'city'
+          };
+
+          const feeds = await this.discoverFeedsForLocation(location);
+          allFeeds.push(...feeds);
+          processedRegions.push(location);
+          
+          console.log(`✓ Discovered ${feeds.length} feeds for ${cityName}, ${stateCode} (fallback)`);
+        }
+
+        // Add delay between requests to be respectful
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`Failed to discover feeds for ${regionName}:`, error);
+      }
+    }
+
+    // Remove duplicates based on feed URL
+    const uniqueFeeds = allFeeds.filter((feed, index, self) => 
+      index === self.findIndex(f => f.source.feedUrl === feed.source.feedUrl)
+    );
+
+    return {
+      discoveredFeeds: uniqueFeeds,
+      regions: processedRegions,
+      count: uniqueFeeds.length,
+      summary: `Discovered ${uniqueFeeds.length} calendar feeds across ${processedRegions.length} regions`
+    };
+  }
+
+  // Discover feeds for all cities in a state
+  async discoverFeedsForState(stateCode: string, options?: {
+    populationRange?: { min: number; max: number };
+    cityTypes?: ('major' | 'medium' | 'small' | 'town')[];
+    limit?: number;
+  }): Promise<{
+    discoveredFeeds: DiscoveredFeed[];
+    cities: string[];
+    count: number;
+  }> {
+    console.log(`Discovering feeds for all cities in ${stateCode}...`);
+    
+    let cities = cityDiscoverer.getCitiesByState(stateCode);
+    
+    // Apply filters
+    if (options?.populationRange) {
+      cities = cities.filter(city => 
+        city.population >= options.populationRange!.min && 
+        city.population <= options.populationRange!.max
+      );
+    }
+    
+    if (options?.cityTypes) {
+      cities = cities.filter(city => options.cityTypes!.includes(city.type));
+    }
+    
+    if (options?.limit) {
+      cities = cities.slice(0, options.limit);
+    }
+
+    const regionNames = cities.map(city => `${city.name}, ${city.stateCode}`);
+    const result = await this.discoverFeedsForRegions({ regions: regionNames });
+    
+    return {
+      discoveredFeeds: result.discoveredFeeds,
+      cities: regionNames,
+      count: result.count
+    };
+  }
+
+  // Discover feeds for cities by population size
+  async discoverFeedsByPopulation(
+    minPopulation: number, 
+    maxPopulation: number = Infinity,
+    limit: number = 100
+  ): Promise<{
+    discoveredFeeds: DiscoveredFeed[];
+    cities: string[];
+    count: number;
+  }> {
+    console.log(`Discovering feeds for cities with population ${minPopulation} - ${maxPopulation}...`);
+    
+    const cities = cityDiscoverer.getCitiesByPopulation(minPopulation, maxPopulation)
+      .slice(0, limit);
+    
+    const regionNames = cities.map(city => `${city.name}, ${city.stateCode}`);
+    const result = await this.discoverFeedsForRegions({ regions: regionNames });
+    
+    return {
+      discoveredFeeds: result.discoveredFeeds,
+      cities: regionNames,
+      count: result.count
+    };
+  }
+
+  // Get comprehensive city suggestions for autocomplete
+  getCitySuggestions(query: string, limit: number = 20): string[] {
+    if (!query || query.length < 2) return [];
+    
+    const results = cityDiscoverer.searchCities(query)
+      .slice(0, limit)
+      .map(city => `${city.name}, ${city.stateCode}`);
+      
+    return results;
+  }
+
+  // Get all cities with potential calendar sources
+  getAllCitiesWithCalendarPotential(): string[] {
+    return US_CITIES_DATABASE
+      .filter(city => city.potentialSources.length > 0)
+      .map(city => `${city.name}, ${city.stateCode}`);
+  }
+
+  // Discover feeds for top cities by population
+  async discoverFeedsForTopCities(count: number = 50): Promise<{
+    discoveredFeeds: DiscoveredFeed[];
+    cities: string[];
+    totalCount: number;
+  }> {
+    console.log(`Discovering feeds for top ${count} US cities by population...`);
+    
+    const topCities = [...US_CITIES_DATABASE]
+      .sort((a, b) => b.population - a.population)
+      .slice(0, count);
+    
+    const regionNames = topCities.map(city => `${city.name}, ${city.stateCode}`);
+    const result = await this.discoverFeedsForRegions({ regions: regionNames });
+    
+    return {
+      discoveredFeeds: result.discoveredFeeds,
+      cities: regionNames,
+      totalCount: result.count
+    };
   }
 
   private getStateAbbreviation(stateName: string): string {

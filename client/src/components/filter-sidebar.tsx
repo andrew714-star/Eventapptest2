@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Map, Pencil, Square, ZoomIn, ZoomOut, Move } from "lucide-react";
+import { Search, Map, Pencil, Square, ZoomIn, ZoomOut, Move, MapPin } from "lucide-react";
 import { EventFilter, categories } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -761,6 +761,8 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
   const [localFilters, setLocalFilters] = useState<EventFilter>(filters);
   const [mapOpen, setMapOpen] = useState(false);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -855,6 +857,20 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
   const handleLocationChange = (location: string) => {
     setLocalFilters(prev => ({ ...prev, location: location || undefined }));
 
+    // Fetch city suggestions as user types
+    if (location && location.length >= 2) {
+      fetch(`/api/city-suggestions?q=${encodeURIComponent(location)}&limit=10`)
+        .then(res => res.json())
+        .then(data => {
+          setCitySuggestions(data.suggestions || []);
+          setShowSuggestions(data.suggestions?.length > 0);
+        })
+        .catch(err => console.error('Failed to fetch city suggestions:', err));
+    } else {
+      setCitySuggestions([]);
+      setShowSuggestions(false);
+    }
+
     // Discover feeds automatically when the location is changed
     if (location) {
       // Split the location into city and state
@@ -885,6 +901,84 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
       }
     }
   };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setLocalFilters(prev => ({ ...prev, location: suggestion }));
+    setShowSuggestions(false);
+    setCitySuggestions([]);
+    
+    // Trigger discovery for selected suggestion
+    const parts = suggestion.split(',').map(p => p.trim());
+    if (parts.length === 2) {
+      handleLocationChange(suggestion);
+    }
+  };
+
+  const discoverTopCitiesMutation = useMutation({
+    mutationFn: async (count: number) => {
+      const response = await fetch('/api/discover-top-cities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to discover top cities');
+      }
+
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      // Add all discovered feeds automatically
+      for (const feed of data.discoveredFeeds) {
+        await addFeedMutation.mutateAsync(feed.source);
+      }
+      toast({
+        title: "Top Cities Discovery Complete",
+        description: `Found ${data.totalCount} calendar feeds across ${data.cities.length} major cities`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Discovery Failed",
+        description: "Could not discover feeds for top cities. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const discoverStateFeedsMutation = useMutation({
+    mutationFn: async (stateCode: string) => {
+      const response = await fetch(`/api/discover-state-feeds/${stateCode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 25 }) // Limit to 25 cities per state
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to discover state feeds');
+      }
+
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      // Add all discovered feeds automatically
+      for (const feed of data.discoveredFeeds) {
+        await addFeedMutation.mutateAsync(feed.source);
+      }
+      toast({
+        title: "State Discovery Complete",
+        description: `Found ${data.count} calendar feeds across ${data.cities.length} cities in ${data.state}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "State Discovery Failed",
+        description: "Could not discover feeds for the selected state. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const clearFilters = () => {
     setLocalFilters({});
@@ -943,11 +1037,37 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <Input
-                  placeholder="Search by city name..."
+                  placeholder="Type city name (e.g., Austin, TX)..."
                   className="pl-10 pr-10 h-10"
                   value={localFilters.location || ""}
                   onChange={(e) => handleLocationChange(e.target.value)}
+                  onFocus={() => {
+                    if (citySuggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding suggestions to allow clicking
+                    setTimeout(() => setShowSuggestions(false), 150);
+                  }}
                 />
+                
+                {/* City Suggestions Dropdown */}
+                {showSuggestions && citySuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
+                    {citySuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-100 flex items-center gap-2"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                      >
+                        <MapPin size={14} className="text-gray-400" />
+                        <span className="text-sm">{suggestion}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <Dialog open={mapOpen} onOpenChange={setMapOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -1010,6 +1130,32 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                 </Dialog>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Bulk Discovery Options */}
+        <div className="space-y-2">
+          <Label>Bulk Discovery</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => discoverTopCitiesMutation.mutate(50)}
+              disabled={discoverTopCitiesMutation.isPending}
+            >
+              {discoverTopCitiesMutation.isPending ? 'Discovering...' : 'Top 50 Cities'}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => discoverTopCitiesMutation.mutate(100)}
+              disabled={discoverTopCitiesMutation.isPending}
+            >
+              {discoverTopCitiesMutation.isPending ? 'Discovering...' : 'Top 100 Cities'}
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            Discover calendar feeds from major US cities automatically
           </div>
         </div>
 

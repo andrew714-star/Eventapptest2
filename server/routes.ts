@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { eventFilterSchema, insertEventSchema } from "@shared/schema";
 import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
-import { feedDiscoverer } from "./location-feed-discoverer";
+import { feedDiscoverer } from './location-feed-discoverer';
+import { cityDiscoverer } from './us-cities-database';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events
@@ -231,8 +232,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error("Feed discovery failed:", error);
-      res.status(500).json({ message: "Failed to discover feeds for location" });
+      console.error('Feed discovery error:', error);
+      res.status(500).json({ message: "Failed to discover feeds" });
+    }
+  });
+
+  // Comprehensive regional feed discovery
+  app.post("/api/discover-regional-feeds", async (req, res) => {
+    try {
+      const { regions } = req.body;
+
+      if (!regions || !Array.isArray(regions) || regions.length === 0) {
+        res.status(400).json({ message: "Regions array is required" });
+        return;
+      }
+
+      console.log(`Discovering feeds for ${regions.length} regions...`);
+      const result = await feedDiscoverer.discoverFeedsForRegions({ regions });
+
+      res.json({
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Regional feed discovery error:', error);
+      res.status(500).json({ message: "Failed to discover regional feeds" });
+    }
+  });
+
+  // Discover feeds for entire state
+  app.post("/api/discover-state-feeds/:stateCode", async (req, res) => {
+    try {
+      const { stateCode } = req.params;
+      const { populationRange, cityTypes, limit } = req.body;
+
+      console.log(`Discovering feeds for state: ${stateCode}`);
+      const result = await feedDiscoverer.discoverFeedsForState(stateCode, {
+        populationRange,
+        cityTypes,
+        limit: limit || 50
+      });
+
+      res.json({
+        state: stateCode,
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('State feed discovery error:', error);
+      res.status(500).json({ message: "Failed to discover state feeds" });
+    }
+  });
+
+  // Discover feeds by population range
+  app.post("/api/discover-population-feeds", async (req, res) => {
+    try {
+      const { minPopulation, maxPopulation, limit } = req.body;
+
+      if (!minPopulation) {
+        res.status(400).json({ message: "minPopulation is required" });
+        return;
+      }
+
+      console.log(`Discovering feeds for cities with population ${minPopulation} - ${maxPopulation || 'unlimited'}`);
+      const result = await feedDiscoverer.discoverFeedsByPopulation(
+        minPopulation, 
+        maxPopulation, 
+        limit || 100
+      );
+
+      res.json({
+        populationRange: { min: minPopulation, max: maxPopulation || 'unlimited' },
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Population-based discovery error:', error);
+      res.status(500).json({ message: "Failed to discover feeds by population" });
+    }
+  });
+
+  // Get city suggestions for autocomplete
+  app.get("/api/city-suggestions", async (req, res) => {
+    try {
+      const { q: query, limit } = req.query;
+
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({ message: "Query parameter 'q' is required" });
+        return;
+      }
+
+      const suggestions = feedDiscoverer.getCitySuggestions(query, parseInt(limit as string) || 20);
+
+      res.json({
+        query,
+        suggestions,
+        count: suggestions.length
+      });
+    } catch (error) {
+      console.error('City suggestions error:', error);
+      res.status(500).json({ message: "Failed to get city suggestions" });
+    }
+  });
+
+  // Discover feeds for top cities by population
+  app.post("/api/discover-top-cities", async (req, res) => {
+    try {
+      const { count } = req.body;
+
+      console.log(`Discovering feeds for top ${count || 50} cities...`);
+      const result = await feedDiscoverer.discoverFeedsForTopCities(count || 50);
+
+      res.json({
+        ...result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Top cities discovery error:', error);
+      res.status(500).json({ message: "Failed to discover feeds for top cities" });
+    }
+  });
+
+  // Get all cities with calendar potential
+  app.get("/api/cities-with-calendar-potential", async (req, res) => {
+    try {
+      const cities = feedDiscoverer.getAllCitiesWithCalendarPotential();
+
+      res.json({
+        cities,
+        count: cities.length
+      });
+    } catch (error) {
+      console.error('Cities with calendar potential error:', error);
+      res.status(500).json({ message: "Failed to get cities with calendar potential" });
     }
   });
 
