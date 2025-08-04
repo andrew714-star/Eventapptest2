@@ -64,6 +64,282 @@ const US_STATES = [
   { name: "Wyoming", path: "M300 170 L380 180 L390 240 L310 230 Z" }
 ];
 
+// Major US Cities with coordinates (approximate positions on the map)
+const US_CITIES = [
+  // California
+  { name: "Los Angeles, CA", x: 85, y: 320, state: "California" },
+  { name: "San Francisco, CA", x: 55, y: 270, state: "California" },
+  { name: "San Diego, CA", x: 90, y: 360, state: "California" },
+  { name: "Sacramento, CA", x: 65, y: 250, state: "California" },
+  { name: "San Jose, CA", x: 60, y: 280, state: "California" },
+  { name: "Fresno, CA", x: 75, y: 300, state: "California" },
+  
+  // Texas
+  { name: "Houston, TX", x: 440, y: 410, state: "Texas" },
+  { name: "Dallas, TX", x: 420, y: 380, state: "Texas" },
+  { name: "Austin, TX", x: 410, y: 400, state: "Texas" },
+  { name: "San Antonio, TX", x: 400, y: 420, state: "Texas" },
+  { name: "Fort Worth, TX", x: 415, y: 375, state: "Texas" },
+  { name: "El Paso, TX", x: 330, y: 400, state: "Texas" },
+  
+  // Florida
+  { name: "Miami, FL", x: 700, y: 500, state: "Florida" },
+  { name: "Tampa, FL", x: 675, y: 470, state: "Florida" },
+  { name: "Orlando, FL", x: 685, y: 465, state: "Florida" },
+  { name: "Jacksonville, FL", x: 670, y: 430, state: "Florida" },
+  { name: "Tallahassee, FL", x: 655, y: 440, state: "Florida" },
+  
+  // New York
+  { name: "New York, NY", x: 720, y: 170, state: "New York" },
+  { name: "Buffalo, NY", x: 685, y: 155, state: "New York" },
+  { name: "Rochester, NY", x: 690, y: 150, state: "New York" },
+  { name: "Syracuse, NY", x: 700, y: 155, state: "New York" },
+  { name: "Albany, NY", x: 730, y: 160, state: "New York" },
+  
+  // Illinois
+  { name: "Chicago, IL", x: 530, y: 220, state: "Illinois" },
+  { name: "Springfield, IL", x: 520, y: 250, state: "Illinois" },
+  { name: "Rockford, IL", x: 525, y: 210, state: "Illinois" },
+  { name: "Peoria, IL", x: 515, y: 235, state: "Illinois" },
+  
+  // Pennsylvania
+  { name: "Philadelphia, PA", x: 710, y: 210, state: "Pennsylvania" },
+  { name: "Pittsburgh, PA", x: 650, y: 205, state: "Pennsylvania" },
+  { name: "Harrisburg, PA", x: 680, y: 205, state: "Pennsylvania" },
+  { name: "Scranton, PA", x: 695, y: 195, state: "Pennsylvania" },
+  
+  // Ohio
+  { name: "Columbus, OH", x: 615, y: 230, state: "Ohio" },
+  { name: "Cleveland, OH", x: 620, y: 210, state: "Ohio" },
+  { name: "Cincinnati, OH", x: 605, y: 250, state: "Ohio" },
+  { name: "Toledo, OH", x: 610, y: 210, state: "Ohio" },
+  { name: "Akron, OH", x: 625, y: 215, state: "Ohio" },
+  
+  // Georgia
+  { name: "Atlanta, GA", x: 630, y: 370, state: "Georgia" },
+  { name: "Augusta, GA", x: 640, y: 380, state: "Georgia" },
+  { name: "Savannah, GA", x: 655, y: 390, state: "Georgia" },
+  { name: "Columbus, GA", x: 625, y: 385, state: "Georgia" },
+  
+  // North Carolina
+  { name: "Charlotte, NC", x: 650, y: 310, state: "North Carolina" },
+  { name: "Raleigh, NC", x: 670, y: 300, state: "North Carolina" },
+  { name: "Greensboro, NC", x: 655, y: 295, state: "North Carolina" },
+  { name: "Durham, NC", x: 675, y: 295, state: "North Carolina" },
+  { name: "Winston-Salem, NC", x: 650, y: 290, state: "North Carolina" },
+  
+  // Michigan
+  { name: "Detroit, MI", x: 580, y: 190, state: "Michigan" },
+  { name: "Grand Rapids, MI", x: 570, y: 185, state: "Michigan" },
+  { name: "Lansing, MI", x: 575, y: 185, state: "Michigan" },
+  { name: "Ann Arbor, MI", x: 575, y: 195, state: "Michigan" },
+  
+  // Virginia
+  { name: "Virginia Beach, VA", x: 685, y: 270, state: "Virginia" },
+  { name: "Norfolk, VA", x: 680, y: 275, state: "Virginia" },
+  { name: "Richmond, VA", x: 670, y: 260, state: "Virginia" },
+  { name: "Newport News, VA", x: 675, y: 270, state: "Virginia" },
+  
+  // Washington
+  { name: "Seattle, WA", x: 100, y: 100, state: "Washington" },
+  { name: "Spokane, WA", x: 135, y: 110, state: "Washington" },
+  { name: "Tacoma, WA", x: 95, y: 105, state: "Washington" },
+  { name: "Vancouver, WA", x: 105, y: 120, state: "Washington" },
+  
+  // Arizona
+  { name: "Phoenix, AZ", x: 240, y: 380, state: "Arizona" },
+  { name: "Tucson, AZ", x: 250, y: 400, state: "Arizona" },
+  { name: "Mesa, AZ", x: 245, y: 385, state: "Arizona" },
+  { name: "Chandler, AZ", x: 242, y: 390, state: "Arizona" },
+  
+  // Tennessee
+  { name: "Nashville, TN", x: 570, y: 305, state: "Tennessee" },
+  { name: "Memphis, TN", x: 520, y: 315, state: "Tennessee" },
+  { name: "Knoxville, TN", x: 600, y: 300, state: "Tennessee" },
+  { name: "Chattanooga, TN", x: 590, y: 315, state: "Tennessee" },
+  
+  // Massachusetts
+  { name: "Boston, MA", x: 750, y: 180, state: "Massachusetts" },
+  { name: "Worcester, MA", x: 740, y: 185, state: "Massachusetts" },
+  { name: "Springfield, MA", x: 730, y: 185, state: "Massachusetts" },
+  
+  // Maryland
+  { name: "Baltimore, MD", x: 700, y: 230, state: "Maryland" },
+  { name: "Annapolis, MD", x: 705, y: 235, state: "Maryland" },
+  
+  // Wisconsin
+  { name: "Milwaukee, WI", x: 520, y: 170, state: "Wisconsin" },
+  { name: "Madison, WI", x: 515, y: 175, state: "Wisconsin" },
+  { name: "Green Bay, WI", x: 525, y: 160, state: "Wisconsin" },
+  
+  // Minnesota
+  { name: "Minneapolis, MN", x: 480, y: 160, state: "Minnesota" },
+  { name: "St. Paul, MN", x: 485, y: 165, state: "Minnesota" },
+  { name: "Duluth, MN", x: 475, y: 145, state: "Minnesota" },
+  
+  // Colorado
+  { name: "Denver, CO", x: 360, y: 280, state: "Colorado" },
+  { name: "Colorado Springs, CO", x: 365, y: 300, state: "Colorado" },
+  { name: "Aurora, CO", x: 365, y: 285, state: "Colorado" },
+  { name: "Fort Collins, CO", x: 355, y: 270, state: "Colorado" },
+  
+  // Alabama
+  { name: "Birmingham, AL", x: 590, y: 400, state: "Alabama" },
+  { name: "Montgomery, AL", x: 600, y: 415, state: "Alabama" },
+  { name: "Mobile, AL", x: 585, y: 430, state: "Alabama" },
+  { name: "Huntsville, AL", x: 595, y: 385, state: "Alabama" },
+  
+  // South Carolina
+  { name: "Charleston, SC", x: 665, y: 350, state: "South Carolina" },
+  { name: "Columbia, SC", x: 655, y: 340, state: "South Carolina" },
+  { name: "Greenville, SC", x: 645, y: 335, state: "South Carolina" },
+  
+  // Louisiana
+  { name: "New Orleans, LA", x: 520, y: 400, state: "Louisiana" },
+  { name: "Baton Rouge, LA", x: 515, y: 395, state: "Louisiana" },
+  { name: "Shreveport, LA", x: 495, y: 385, state: "Louisiana" },
+  
+  // Kentucky
+  { name: "Louisville, KY", x: 580, y: 290, state: "Kentucky" },
+  { name: "Lexington, KY", x: 590, y: 295, state: "Kentucky" },
+  { name: "Bowling Green, KY", x: 575, y: 300, state: "Kentucky" },
+  
+  // Oregon
+  { name: "Portland, OR", x: 105, y: 180, state: "Oregon" },
+  { name: "Salem, OR", x: 110, y: 190, state: "Oregon" },
+  { name: "Eugene, OR", x: 115, y: 200, state: "Oregon" },
+  
+  // Oklahoma
+  { name: "Oklahoma City, OK", x: 430, y: 330, state: "Oklahoma" },
+  { name: "Tulsa, OK", x: 440, y: 320, state: "Oklahoma" },
+  { name: "Norman, OK", x: 435, y: 335, state: "Oklahoma" },
+  
+  // Connecticut
+  { name: "Hartford, CT", x: 760, y: 190, state: "Connecticut" },
+  { name: "New Haven, CT", x: 765, y: 195, state: "Connecticut" },
+  { name: "Bridgeport, CT", x: 770, y: 200, state: "Connecticut" },
+  
+  // Iowa
+  { name: "Des Moines, IA", x: 475, y: 230, state: "Iowa" },
+  { name: "Cedar Rapids, IA", x: 485, y: 225, state: "Iowa" },
+  { name: "Davenport, IA", x: 495, y: 235, state: "Iowa" },
+  
+  // Arkansas
+  { name: "Little Rock, AR", x: 515, y: 345, state: "Arkansas" },
+  { name: "Fort Smith, AR", x: 500, y: 340, state: "Arkansas" },
+  { name: "Fayetteville, AR", x: 495, y: 335, state: "Arkansas" },
+  
+  // Mississippi
+  { name: "Jackson, MS", x: 545, y: 380, state: "Mississippi" },
+  { name: "Gulfport, MS", x: 540, y: 400, state: "Mississippi" },
+  { name: "Hattiesburg, MS", x: 545, y: 395, state: "Mississippi" },
+  
+  // Kansas
+  { name: "Wichita, KS", x: 420, y: 295, state: "Kansas" },
+  { name: "Topeka, KS", x: 430, y: 285, state: "Kansas" },
+  { name: "Kansas City, KS", x: 450, y: 280, state: "Kansas" },
+  
+  // Utah
+  { name: "Salt Lake City, UT", x: 280, y: 250, state: "Utah" },
+  { name: "West Valley City, UT", x: 285, y: 255, state: "Utah" },
+  { name: "Provo, UT", x: 285, y: 265, state: "Utah" },
+  
+  // Nevada
+  { name: "Las Vegas, NV", x: 190, y: 300, state: "Nevada" },
+  { name: "Reno, NV", x: 170, y: 240, state: "Nevada" },
+  { name: "Henderson, NV", x: 195, y: 305, state: "Nevada" },
+  
+  // New Mexico
+  { name: "Albuquerque, NM", x: 315, y: 340, state: "New Mexico" },
+  { name: "Las Cruces, NM", x: 325, y: 365, state: "New Mexico" },
+  { name: "Santa Fe, NM", x: 320, y: 325, state: "New Mexico" },
+  
+  // West Virginia
+  { name: "Charleston, WV", x: 635, y: 250, state: "West Virginia" },
+  { name: "Huntington, WV", x: 625, y: 260, state: "West Virginia" },
+  { name: "Morgantown, WV", x: 645, y: 240, state: "West Virginia" },
+  
+  // Nebraska
+  { name: "Omaha, NE", x: 415, y: 225, state: "Nebraska" },
+  { name: "Lincoln, NE", x: 420, y: 235, state: "Nebraska" },
+  { name: "Grand Island, NE", x: 405, y: 230, state: "Nebraska" },
+  
+  // Idaho
+  { name: "Boise, ID", x: 270, y: 160, state: "Idaho" },
+  { name: "Nampa, ID", x: 265, y: 165, state: "Idaho" },
+  { name: "Pocatello, ID", x: 280, y: 180, state: "Idaho" },
+  
+  // Hawaii
+  { name: "Honolulu, HI", x: 225, y: 490, state: "Hawaii" },
+  { name: "Pearl City, HI", x: 220, y: 485, state: "Hawaii" },
+  { name: "Hilo, HI", x: 235, y: 495, state: "Hawaii" },
+  
+  // New Hampshire
+  { name: "Manchester, NH", x: 755, y: 155, state: "New Hampshire" },
+  { name: "Nashua, NH", x: 750, y: 160, state: "New Hampshire" },
+  { name: "Concord, NH", x: 760, y: 150, state: "New Hampshire" },
+  
+  // Maine
+  { name: "Portland, ME", x: 785, y: 130, state: "Maine" },
+  { name: "Lewiston, ME", x: 780, y: 135, state: "Maine" },
+  { name: "Bangor, ME", x: 790, y: 120, state: "Maine" },
+  
+  // Rhode Island
+  { name: "Providence, RI", x: 770, y: 185, state: "Rhode Island" },
+  { name: "Warwick, RI", x: 775, y: 190, state: "Rhode Island" },
+  { name: "Cranston, RI", x: 772, y: 187, state: "Rhode Island" },
+  
+  // Montana
+  { name: "Billings, MT", x: 350, y: 130, state: "Montana" },
+  { name: "Missoula, MT", x: 320, y: 120, state: "Montana" },
+  { name: "Great Falls, MT", x: 340, y: 115, state: "Montana" },
+  
+  // North Dakota
+  { name: "Fargo, ND", x: 415, y: 130, state: "North Dakota" },
+  { name: "Bismarck, ND", x: 400, y: 125, state: "North Dakota" },
+  { name: "Grand Forks, ND", x: 425, y: 120, state: "North Dakota" },
+  
+  // South Dakota
+  { name: "Sioux Falls, SD", x: 425, y: 175, state: "South Dakota" },
+  { name: "Rapid City, SD", x: 395, y: 165, state: "South Dakota" },
+  { name: "Aberdeen, SD", x: 410, y: 170, state: "South Dakota" },
+  
+  // Delaware
+  { name: "Wilmington, DE", x: 725, y: 230, state: "Delaware" },
+  { name: "Dover, DE", x: 730, y: 235, state: "Delaware" },
+  { name: "Newark, DE", x: 720, y: 225, state: "Delaware" },
+  
+  // Vermont
+  { name: "Burlington, VT", x: 735, y: 150, state: "Vermont" },
+  { name: "Montpelier, VT", x: 740, y: 155, state: "Vermont" },
+  { name: "Rutland, VT", x: 730, y: 160, state: "Vermont" },
+  
+  // Wyoming
+  { name: "Cheyenne, WY", x: 345, y: 220, state: "Wyoming" },
+  { name: "Casper, WY", x: 340, y: 200, state: "Wyoming" },
+  { name: "Laramie, WY", x: 350, y: 215, state: "Wyoming" },
+  
+  // Alaska
+  { name: "Anchorage, AK", x: 115, y: 480, state: "Alaska" },
+  { name: "Fairbanks, AK", x: 125, y: 465, state: "Alaska" },
+  { name: "Juneau, AK", x: 140, y: 490, state: "Alaska" },
+  
+  // Indiana
+  { name: "Indianapolis, IN", x: 575, y: 235, state: "Indiana" },
+  { name: "Fort Wayne, IN", x: 585, y: 225, state: "Indiana" },
+  { name: "Evansville, IN", x: 570, y: 255, state: "Indiana" },
+  
+  // Missouri
+  { name: "Kansas City, MO", x: 455, y: 275, state: "Missouri" },
+  { name: "St. Louis, MO", x: 485, y: 285, state: "Missouri" },
+  { name: "Springfield, MO", x: 465, y: 295, state: "Missouri" },
+  
+  // New Jersey
+  { name: "Newark, NJ", x: 715, y: 215, state: "New Jersey" },
+  { name: "Jersey City, NJ", x: 720, y: 220, state: "New Jersey" },
+  { name: "Paterson, NJ", x: 710, y: 210, state: "New Jersey" }
+];
+
 interface USMapWithDrawingProps {
   selectedRegions: string[];
   onRegionChange: (regions: string[]) => void;
@@ -135,12 +411,20 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
         const closedPath = currentPath + " Z";
         setDrawnPaths(prev => [...prev, closedPath]);
         
-        // Find states that intersect with drawn path
+        // Find states and cities that intersect with drawn path
         const intersectingStates = US_STATES.filter(state => {
           return isStateIntersectingPath(state, closedPath);
         });
         
-        const newSelectedRegions = [...new Set([...selectedRegions, ...intersectingStates.map(s => s.name)])];
+        const intersectingCities = US_CITIES.filter(city => {
+          return isCityIntersectingPath(city, closedPath);
+        });
+        
+        const newSelectedRegions = [...new Set([
+          ...selectedRegions, 
+          ...intersectingStates.map(s => s.name),
+          ...intersectingCities.map(c => c.name)
+        ])];
         onRegionChange(newSelectedRegions);
         setCurrentPath("");
       }
@@ -166,6 +450,27 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
     // Simple distance-based intersection
     const distance = Math.sqrt(Math.pow(stateX - drawnX, 2) + Math.pow(stateY - drawnY, 2));
     return distance < 100; // Threshold for intersection
+  };
+
+  const isCityIntersectingPath = (city: any, drawnPath: string): boolean => {
+    // Extract all points from the drawn path to create a bounding box
+    const pathPoints = drawnPath.match(/(\d+\.?\d*),(\d+\.?\d*)/g);
+    if (!pathPoints || pathPoints.length < 3) return false;
+    
+    // Parse all points
+    const points = pathPoints.map(point => {
+      const [x, y] = point.split(',').map(Number);
+      return { x, y };
+    });
+    
+    // Create bounding box from drawn path
+    const minX = Math.min(...points.map(p => p.x));
+    const maxX = Math.max(...points.map(p => p.x));
+    const minY = Math.min(...points.map(p => p.y));
+    const maxY = Math.max(...points.map(p => p.y));
+    
+    // Check if city is within bounding box
+    return city.x >= minX && city.x <= maxX && city.y >= minY && city.y <= maxY;
   };
 
   const handleZoomIn = () => {
@@ -310,6 +615,40 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
             />
           ))}
 
+          {/* US Cities */}
+          {US_CITIES.map((city) => (
+            <circle
+              key={city.name}
+              cx={city.x}
+              cy={city.y}
+              r={Math.max(2, 4 / zoom)}
+              fill={selectedRegions.includes(city.name) ? "#ef4444" : "#f59e0b"}
+              stroke="#ffffff"
+              strokeWidth={Math.max(0.5, 1 / zoom)}
+              className={`transition-colors ${
+                drawMode === 'select' 
+                  ? 'cursor-pointer hover:fill-red-400' 
+                  : 'pointer-events-none'
+              }`}
+              onClick={(e) => handleStateClick(city.name, e)}
+            />
+          ))}
+
+          {/* City Labels - only show when zoomed in */}
+          {zoom > 1.2 && US_CITIES.map((city) => (
+            <text
+              key={`${city.name}-label`}
+              x={city.x + 8}
+              y={city.y + 3}
+              textAnchor="start"
+              className="text-xs font-medium pointer-events-none select-none"
+              fill="#374151"
+              style={{ fontSize: Math.max(8, 10 / zoom) }}
+            >
+              {city.name.split(',')[0]}
+            </text>
+          ))}
+
           {/* State Labels */}
           {zoom > 0.8 && US_STATES.map((state) => {
             const pathData = state.path.match(/M(\d+)\s(\d+)/);
@@ -362,8 +701,8 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
 
       {/* Drawing Instructions */}
       <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow-md text-xs text-gray-600 max-w-xs">
-        {drawMode === 'select' && 'Click states to select them'}
-        {drawMode === 'draw' && 'Click and drag to draw a selection area'}
+        {drawMode === 'select' && 'Click states (gray) or cities (orange dots) to select them'}
+        {drawMode === 'draw' && 'Click and drag to draw a selection area over cities and states'}
         {drawMode === 'pan' && 'Click and drag to pan around the map'}
       </div>
 
