@@ -83,7 +83,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
 
     // Add navigation control
     map.current.addControl(new NavigationControl(), 'top-right');
-    
+
     // Add geolocate control
     map.current.addControl(
       new GeolocateControl({
@@ -103,23 +103,28 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
     // Handle map clicks
     map.current.on('click', async (e) => {
       const { lng, lat } = e.lngLat;
-      
+
       try {
-        // Reverse geocoding to get location information
+        // Reverse geocoding using free Nominatim API
         const response = await fetch(
-          `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${apiKey}`
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+          {
+            headers: {
+              'User-Agent': 'EventCalendarApp/1.0'
+            }
+          }
         );
         const data = await response.json();
-        
+
         if (data.features && data.features.length > 0) {
           const feature = data.features[0];
           const place = feature.place_name || '';
           const context = feature.context || [];
-          
+
           // Extract city and state information
           let city = '';
           let state = '';
-          
+
           // Look for city in the place name or context
           if (feature.place_type?.includes('place') || feature.place_type?.includes('locality')) {
             city = feature.text || '';
@@ -130,13 +135,13 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
               city = cityContext.text;
             }
           }
-          
+
           // Look for state in context
           const stateContext = context.find((c: any) => c.id?.startsWith('region.'));
           if (stateContext) {
             state = stateContext.short_code?.replace('US-', '') || stateContext.text;
           }
-          
+
           if (city && state) {
             onLocationSelect(city, state, [lng, lat]);
           } else if (place) {
@@ -145,6 +150,15 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
             if (parts.length >= 2) {
               onLocationSelect(parts[0], parts[1], [lng, lat]);
             }
+          }
+        } else if (data.address) {
+          // Handle response from Nominatim directly if it has an 'address' field
+          const address = data.address;
+          const city = address.city || address.town || address.village || '';
+          const state = address.state || '';
+
+          if (city && state) {
+            onLocationSelect(city, state, [lng, lat]);
           }
         }
       } catch (error) {
@@ -222,7 +236,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         const feature = e.features[0];
         const properties = feature.properties;
         const coordinates = (feature.geometry as any).coordinates;
-        
+
         if (properties) {
           onLocationSelect(properties.name, properties.state, coordinates);
         }
