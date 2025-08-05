@@ -312,11 +312,11 @@ export class EventDataCollector {
           console.log("Existing Events in Storage:", existingEvents);
 
           const existingEventKeys = new Set(existingEvents.map(event => 
-              `${event.title}::${event.location}::${event.organizer}::${event.source}`
+              `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
           ));
 
           const uniqueNewEvents = newEvents.filter(event => {
-              const key = `${event.title}::${event.location}::${event.organizer}::${event.source}`;
+              const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
               const isUnique = !existingEventKeys.has(key);
 
               // Log events being checked
