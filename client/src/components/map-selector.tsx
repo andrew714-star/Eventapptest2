@@ -1,7 +1,7 @@
+
 import { useEffect, useRef, useState } from 'react';
-import { Map as MapLibreMap, NavigationControl, GeolocateControl, LngLatLike } from '@maptiler/sdk';
-import '@maptiler/sdk/dist/maptiler-sdk.css';
-import { getMapTilerApiKey } from '@/lib/env';
+import maplibregl, { Map as MapLibreMap, NavigationControl, GeolocateControl, LngLatLike } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapSelectorProps {
   onLocationSelect: (city: string, state: string, coordinates: [number, number]) => void;
@@ -57,26 +57,35 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [isLoadingKey, setIsLoadingKey] = useState(true);
 
   useEffect(() => {
-    // Load API key first
-    getMapTilerApiKey().then((key) => {
-      setApiKey(key);
-      setIsLoadingKey(false);
-    }).catch(() => {
-      setIsLoadingKey(false);
-    });
-  }, []);
+    if (!mapContainer.current || map.current) return;
 
-  useEffect(() => {
-    if (!mapContainer.current || map.current || !apiKey || isLoadingKey) return;
-
-    // Initialize the map
+    // Initialize the map with OpenStreetMap style
     map.current = new MapLibreMap({
       container: mapContainer.current,
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${apiKey}`,
+      style: {
+        version: 8,
+        sources: {
+          'osm': {
+            type: 'raster',
+            tiles: [
+              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+            ],
+            tileSize: 256,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }
+        },
+        layers: [
+          {
+            id: 'osm',
+            type: 'raster',
+            source: 'osm'
+          }
+        ]
+      },
       center: [-98.5795, 39.8283] as LngLatLike, // Center of US
       zoom: 4,
     });
@@ -116,43 +125,8 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         );
         const data = await response.json();
 
-        if (data.features && data.features.length > 0) {
-          const feature = data.features[0];
-          const place = feature.place_name || '';
-          const context = feature.context || [];
-
-          // Extract city and state information
-          let city = '';
-          let state = '';
-
-          // Look for city in the place name or context
-          if (feature.place_type?.includes('place') || feature.place_type?.includes('locality')) {
-            city = feature.text || '';
-          } else {
-            // Try to find city in context
-            const cityContext = context.find((c: any) => c.id?.startsWith('place.'));
-            if (cityContext) {
-              city = cityContext.text;
-            }
-          }
-
-          // Look for state in context
-          const stateContext = context.find((c: any) => c.id?.startsWith('region.'));
-          if (stateContext) {
-            state = stateContext.short_code?.replace('US-', '') || stateContext.text;
-          }
-
-          if (city && state) {
-            onLocationSelect(city, state, [lng, lat]);
-          } else if (place) {
-            // Fallback: use the place name as is
-            const parts = place.split(', ');
-            if (parts.length >= 2) {
-              onLocationSelect(parts[0], parts[1], [lng, lat]);
-            }
-          }
-        } else if (data.address) {
-          // Handle response from Nominatim directly if it has an 'address' field
+        if (data.address) {
+          // Handle response from Nominatim
           const address = data.address;
           const city = address.city || address.town || address.village || '';
           const state = address.state || '';
@@ -172,7 +146,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         map.current = null;
       }
     };
-  }, [onLocationSelect, apiKey]);
+  }, [onLocationSelect]);
 
   const addCityMarkers = () => {
     if (!map.current) return;
@@ -218,7 +192,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       source: 'cities',
       layout: {
         'text-field': ['get', 'label'],
-        'text-font': ['Open Sans Regular'],
+        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
         'text-offset': [0, 1.5],
         'text-anchor': 'top',
         'text-size': 12
@@ -260,7 +234,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   return (
     <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200 relative">
       <div ref={mapContainer} className="w-full h-full" />
-      {(isLoadingKey || !isLoaded) && (
+      {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
