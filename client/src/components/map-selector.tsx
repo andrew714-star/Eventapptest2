@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react';
-import maplibregl, { Map as MapLibreMap, NavigationControl, GeolocateControl, LngLatLike } from 'maplibre-gl';
+import maplibregl, { Map as MapLibreMap, NavigationControl, LngLatLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapSelectorProps {
@@ -66,30 +66,21 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       container: mapContainer.current,
       style: {
         version: 8,
-        name: 'OpenStreetMap',
-        metadata: {},
         sources: {
           'osm': {
             type: 'raster',
-            tiles: [
-              'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-              'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-            ],
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '© OpenStreetMap contributors'
           }
         },
         layers: [
           {
             id: 'osm',
             type: 'raster',
-            source: 'osm',
-            minzoom: 0,
-            maxzoom: 18
+            source: 'osm'
           }
-        ],
-        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
+        ]
       },
       center: [-98.5795, 39.8283] as LngLatLike, // Center of US
       zoom: 4,
@@ -97,17 +88,6 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
 
     // Add navigation control
     map.current.addControl(new NavigationControl(), 'top-right');
-
-    // Add geolocate control
-    map.current.addControl(
-      new GeolocateControl({
-        positionOptions: {
-          enableHighAccuracy: true
-        },
-        trackUserLocation: true
-      }),
-      'top-right'
-    );
 
     map.current.on('load', () => {
       setIsLoaded(true);
@@ -190,14 +170,13 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       }
     });
 
-    // Add city labels layer
+    // Add city labels layer (simplified without custom fonts)
     map.current.addLayer({
       id: 'city-labels',
       type: 'symbol',
       source: 'cities',
       layout: {
         'text-field': ['get', 'label'],
-        'text-font': ['Noto Sans Regular'],
         'text-offset': [0, 1.5],
         'text-anchor': 'top',
         'text-size': 12
