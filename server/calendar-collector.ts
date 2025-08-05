@@ -481,31 +481,28 @@ export class CalendarFeedCollector {
                         const dateText = $event.find('.date, .event-date, time').first().text().trim();
                         let startDate = this.parseEventDate(dateText);
                         
-                        // If no valid date found, create a future date instead of using current date
-                        if (!startDate) {
-                          const futureOffset = Math.floor(Math.random() * 14) + 1; // 1-14 days in future
-                          startDate = new Date();
-                          startDate.setDate(startDate.getDate() + futureOffset);
-                          startDate.setHours(10 + Math.floor(Math.random() * 8), 0, 0, 0); // Random hour between 10 AM - 6 PM
+                        // Only add events with valid, future dates to ensure authentic data
+                        if (startDate && startDate > new Date()) {
+                            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
+                            
+                            parsedEvents.push({
+                                title: this.cleanText(title),
+                                description: this.cleanText(description.substring(0, 300)),
+                                category: this.categorizeEvent(title, description),
+                                location: `${source.city}, ${source.state}`,
+                                organizer: source.name,
+                                startDate,
+                                endDate,
+                                startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                                endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                                attendees: 0,
+                                imageUrl: null,
+                                isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
+                                source: source.id
+                            });
+                        } else {
+                            console.log(`Skipping event "${title}" - no valid future date found`);
                         }
-                        
-                        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
-
-                        parsedEvents.push({
-                            title: this.cleanText(title),
-                            description: this.cleanText(description.substring(0, 300)),
-                            category: this.categorizeEvent(title, description),
-                            location: `${source.city}, ${source.state}`,
-                            organizer: source.name,
-                            startDate,
-                            endDate,
-                            startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            attendees: 0,
-                            imageUrl: null,
-                            isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
-                            source: source.id
-                        });
                     }
                 });
                 if (parsedEvents.length > 0) break; // Stop if events are found with this selector
@@ -520,59 +517,9 @@ export class CalendarFeedCollector {
 }
 
   public generateFallbackEvents(source: CalendarSource): InsertEvent[] {
-    // Generate realistic fallback events when real feeds are unavailable
-    const now = new Date();
-    const events: InsertEvent[] = [];
-    
-    // Create events spread over the next 2 weeks with varied times
-    const eventTemplates = [
-      { 
-        title: 'City Council Meeting', 
-        category: 'Community & Social', 
-        duration: 2, 
-        dayOffset: 3,
-        hour: 19 // 7 PM
-      },
-      { 
-        title: 'Public Library Story Time', 
-        category: 'Family & Kids', 
-        duration: 1, 
-        dayOffset: 7,
-        hour: 10 // 10 AM
-      },
-      { 
-        title: 'Business Networking Event', 
-        category: 'Business & Networking', 
-        duration: 2, 
-        dayOffset: 12,
-        hour: 18 // 6 PM
-      }
-    ];
-    
-    for (let i = 0; i < 3; i++) {
-      const template = eventTemplates[i];
-      // Create event on specified day at specified hour
-      const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + template.dayOffset, template.hour, 0, 0);
-      const endDate = new Date(startDate.getTime() + template.duration * 60 * 60 * 1000);
-      
-      events.push({
-        title: `${template.title} - ${source.city}`,
-        description: `Join us for this community event in ${source.city}, ${source.state}. Event details and registration available on our website.`,
-        category: template.category,
-        location: `${source.city}, ${source.state}`,
-        organizer: source.name,
-        startDate,
-        endDate,
-        startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-        endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-        attendees: 50 + (i * 25), // Fixed attendee count
-        imageUrl: null,
-        isFree: i % 2 === 0 ? 'true' : 'false', // Alternating free/paid
-        source: source.id
-      });
-    }
-    
-    return events;
+    // NO SYNTHETIC DATA - Return empty array to ensure only authentic feeds are used
+    console.log(`Skipping fallback event generation for ${source.name} - using authentic data only`);
+    return [];
   }
 
   private categorizeEvent(title: string, description: string): string {

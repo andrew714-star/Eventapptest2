@@ -63,56 +63,20 @@ export class EventDataCollector {
   ];
 
   async collectFromAllSources(): Promise<InsertEvent[]> {
-    console.log('Starting event synchronization from all sources...');
+    console.log('Starting event synchronization from authentic calendar feeds only...');
     
-    // Collect from real calendar feeds across the US
+    // Collect ONLY from real calendar feeds across the US - no synthetic data
     const realEvents = await calendarCollector.collectFromAllSources();
     
-    // Also collect from local Springfield sources for additional coverage
-    const localEvents: InsertEvent[] = [];
-    for (const source of this.sources.filter(s => s.isActive)) {
-      try {
-        console.log(`Collecting events from ${source.name}...`);
-        const events = await this.collectFromSource(source);
-        localEvents.push(...events);
-        
-        // Update last sync date
-        source.lastSyncDate = new Date();
-        console.log(`Successfully collected ${events.length} events from ${source.name}`);
-      } catch (error) {
-        console.error(`Failed to collect from ${source.name}:`, error);
-      }
-    }
-
-    const allEvents = [...realEvents, ...localEvents];
-    console.log(`Total events collected: ${allEvents.length} (${realEvents.length} from national sources, ${localEvents.length} from local sources)`);
+    console.log(`Total authentic events collected: ${realEvents.length} from verified calendar feeds`);
     
-    return allEvents;
+    return realEvents;
   }
 
   private async collectFromSource(source: DataSource): Promise<InsertEvent[]> {
-    // In a real implementation, this would make HTTP requests to scrape or use APIs
-    // For now, we'll simulate different types of events based on the source type
-    
-    const events: InsertEvent[] = [];
-    const currentDate = new Date();
-
-    switch (source.type) {
-      case 'city':
-        events.push(...this.generateCityEvents(source, currentDate));
-        break;
-      case 'school':
-        events.push(...this.generateSchoolEvents(source, currentDate));
-        break;
-      case 'chamber':
-        events.push(...this.generateChamberEvents(source, currentDate));
-        break;
-      case 'community':
-        events.push(...this.generateCommunityEvents(source, currentDate));
-        break;
-    }
-
-    return events;
+    // NO SYNTHETIC DATA - This method should not generate fake events
+    console.log(`Skipping synthetic data generation for ${source.name} - using authentic feeds only`);
+    return [];
   }
 
   private generateCityEvents(source: DataSource, baseDate: Date): InsertEvent[] {
@@ -323,16 +287,9 @@ export class EventDataCollector {
       return communityEvents;
   }
   private async collectFallbackData(): Promise<InsertEvent[]> {
-      const fallbackEvents: InsertEvent[] = [];
-
-      const activeSources = calendarCollector.getSources().filter(source => source.isActive);
-
-      for (const source of activeSources) {
-          const events = calendarCollector.generateFallbackEvents(source); // Use the method from CalendarFeedCollector
-          fallbackEvents.push(...events);
-      }
-
-      return fallbackEvents;
+      // NO FALLBACK DATA - Return empty array to ensure only authentic data
+      console.log('Skipping fallback data generation - using authentic calendar feeds only');
+      return [];
   }
   async syncEventsToStorage(): Promise<number> {
       try {
