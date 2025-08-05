@@ -968,7 +968,216 @@ export class CalendarFeedCollector {
     // Add the new source
     this.sources.push(source);
     console.log(`Added new calendar source: ${source.name} (${source.city}, ${source.state})`);
+    
+    // Apply feed prioritization after adding
+    this.prioritizeFeeds(source);
+    
     return true;
+  }
+
+  /**
+   * Prioritize feeds by automatically disabling lower-priority feeds from the same domain/organization
+   * when a higher-priority feed is working
+   */
+  private prioritizeFeeds(newSource: CalendarSource): void {
+    const domain = this.extractDomain(newSource.feedUrl || newSource.websiteUrl || '');
+    if (!domain) return;
+
+    // Find all sources from the same domain
+    const sameDomainSources = this.sources.filter(s => {
+      const sourceDomain = this.extractDomain(s.feedUrl || s.websiteUrl || '');
+      return sourceDomain === domain && s.id !== newSource.id;
+    });
+
+    if (sameDomainSources.length === 0) return;
+
+    // Define feed type priority (higher number = higher priority)
+    const feedTypePriority: Record<string, number> = {
+      'ical': 5,    // Highest priority - structured calendar data
+      'webcal': 4,  // High priority - calendar specific
+      'rss': 3,     // Medium priority - structured but not calendar specific
+      'json': 2,    // Lower priority - depends on structure
+      'html': 1     // Lowest priority - requires scraping
+    };
+
+    const newSourcePriority = feedTypePriority[newSource.feedType] || 0;
+    
+    // Check if the new source is higher priority and test if it's working
+    this.testFeedWorking(newSource).then(isWorking => {
+      if (isWorking) {
+        console.log(`New feed ${newSource.name} is working, checking for lower priority feeds to disable...`);
+        
+        // Disable lower priority feeds from the same domain
+        sameDomainSources.forEach(existingSource => {
+          const existingPriority = feedTypePriority[existingSource.feedType] || 0;
+          
+          if (existingPriority < newSourcePriority) {
+            console.log(`Disabling lower priority feed: ${existingSource.name} (${existingSource.feedType}) in favor of ${newSource.name} (${newSource.feedType})`);
+            existingSource.isActive = false;
+          } else if (existingPriority === newSourcePriority) {
+            // Same priority - test both and keep the working one
+            this.testFeedWorking(existingSource).then(existingWorking => {
+              if (!existingWorking) {
+                console.log(`Disabling non-working feed: ${existingSource.name} in favor of working ${newSource.name}`);
+                existingSource.isActive = false;
+              }
+            });
+          }
+        });
+      } else {
+        console.log(`New feed ${newSource.name} is not working, keeping existing feeds active`);
+        // If new source doesn't work, disable it
+        newSource.isActive = false;
+      }
+    }).catch(error => {
+      console.error(`Error testing new feed ${newSource.name}:`, error);
+      newSource.isActive = false;
+    });
+  }
+
+  /**
+   * Test if a calendar feed is working by attempting to fetch and parse it
+   */
+  private async testFeedWorking(source: CalendarSource): Promise<boolean> {
+    if (!source.feedUrl) return false;
+    
+    try {
+      console.log(`Testing feed: ${source.name} - ${source.feedUrl}`);
+      
+      const response = await axios.get(source.feedUrl, {
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'CityWide Events Calendar Test 1.0',
+          'Accept': 'text/calendar, application/calendar, text/plain, application/rss+xml, application/xml, application/json, text/html, */*'
+        },
+        validateStatus: (status) => status < 400
+      });
+      
+      if (response.status >= 400) {
+        console.log(`Feed test failed for ${source.name}: HTTP ${response.status}`);
+        return false;
+      }
+      
+      // Test basic parsing based on feed type
+      switch (source.feedType) {
+        case 'ical':
+          const hasIcalData = response.data.includes('BEGIN:VCALENDAR') || response.data.includes('BEGIN:VEVENT');
+          console.log(`iCal feed test for ${source.name}: ${hasIcalData ? 'PASS' : 'FAIL'}`);
+          return hasIcalData;
+          
+        case 'rss':
+          const hasRssData = response.data.includes('<rss') || response.data.includes('<feed') || response.data.includes('<item') || response.data.includes('<entry');
+          console.log(`RSS feed test for ${source.name}: ${hasRssData ? 'PASS' : 'FAIL'}`);
+          return hasRssData;
+          
+        case 'json':
+          try {
+            const jsonData = JSON.parse(response.data);
+            const hasJsonEvents = jsonData.events || jsonData.items || jsonData.data || Array.isArray(jsonData);
+            console.log(`JSON feed test for ${source.name}: ${hasJsonEvents ? 'PASS' : 'FAIL'}`);
+            return !!hasJsonEvents;
+          } catch {
+            console.log(`JSON feed test for ${source.name}: FAIL (invalid JSON)`);
+            return false;
+          }
+          
+        case 'html':
+          const hasHtmlContent = response.data.length > 100 && response.data.includes('<');
+          console.log(`HTML feed test for ${source.name}: ${hasHtmlContent ? 'PASS' : 'FAIL'}`);
+          return hasHtmlContent;
+          
+        default:
+          console.log(`Unknown feed type for ${source.name}, assuming working`);
+          return true;
+      }
+    } catch (error) {
+      console.log(`Feed test error for ${source.name}:`, error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Extract domain from URL for grouping related feeds
+   */
+  private extractDomain(url: string): string | null {
+    if (!url) return null;
+    
+    try {
+      const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
+      return urlObj.hostname.toLowerCase();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Re-prioritize all feeds (useful for periodic maintenance)
+   */
+  async reprioritizeAllFeeds(): Promise<void> {
+    console.log('Re-prioritizing all calendar feeds...');
+    
+    // Group sources by domain
+    const domainGroups: Record<string, CalendarSource[]> = {};
+    
+    this.sources.forEach(source => {
+      const domain = this.extractDomain(source.feedUrl || source.websiteUrl || '');
+      if (domain) {
+        if (!domainGroups[domain]) {
+          domainGroups[domain] = [];
+        }
+        domainGroups[domain].push(source);
+      }
+    });
+    
+    // Process each domain group
+    for (const [domain, sources] of Object.entries(domainGroups)) {
+      if (sources.length <= 1) continue;
+      
+      console.log(`Processing ${sources.length} feeds for domain: ${domain}`);
+      
+      // Test all feeds in parallel
+      const feedTests = await Promise.allSettled(
+        sources.map(async source => ({
+          source,
+          isWorking: await this.testFeedWorking(source)
+        }))
+      );
+      
+      // Get successful tests
+      const workingFeeds = feedTests
+        .filter(result => result.status === 'fulfilled')
+        .map(result => (result as any).value)
+        .filter(test => test.isWorking);
+      
+      if (workingFeeds.length === 0) {
+        console.log(`No working feeds found for domain: ${domain}`);
+        continue;
+      }
+      
+      // Sort by priority (highest first)
+      const feedTypePriority: Record<string, number> = {
+        'ical': 5, 'webcal': 4, 'rss': 3, 'json': 2, 'html': 1
+      };
+      
+      workingFeeds.sort((a, b) => {
+        const priorityA = feedTypePriority[a.source.feedType] || 0;
+        const priorityB = feedTypePriority[b.source.feedType] || 0;
+        return priorityB - priorityA;
+      });
+      
+      // Enable the highest priority working feed, disable others
+      sources.forEach(source => {
+        const isTopPriority = source.id === workingFeeds[0]?.source.id;
+        const wasActive = source.isActive;
+        source.isActive = isTopPriority;
+        
+        if (wasActive !== source.isActive) {
+          console.log(`${source.isActive ? 'Enabled' : 'Disabled'} feed: ${source.name} (${source.feedType})`);
+        }
+      });
+    }
+    
+    console.log('Feed re-prioritization complete');
   }
 
   removeSource(sourceId: string): boolean {

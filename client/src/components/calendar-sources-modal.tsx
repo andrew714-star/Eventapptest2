@@ -65,6 +65,8 @@ const getFeedTypeColor = (feedType: string) => {
   }
 };
 
+const getOrganizationIcon = getTypeIcon; // Alias for clarity in the changes
+
 export function CalendarSourcesModal() {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -77,6 +79,18 @@ export function CalendarSourcesModal() {
   const toggleSourceMutation = useMutation({
     mutationFn: async (sourceId: string) => {
       const response = await fetch(`/api/calendar-sources/${sourceId}/toggle`, {
+        method: 'POST',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+    },
+  });
+
+  const reprioritizeMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/api/calendar-sources/reprioritize', {
         method: 'POST',
       });
       return response.json();
@@ -112,13 +126,17 @@ export function CalendarSourcesModal() {
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Real Calendar Feed Sources</DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            Events are automatically collected from {sourcesData?.totalCount || 0} real calendar feeds across the US. 
-            {sourcesData && (
-              <span> {sourcesData.activeCount} sources are currently active.</span>
-            )}
-          </p>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Calendar Sources ({sourcesData?.sources.length || 0})</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reprioritizeMutation.mutate()}
+              disabled={reprioritizeMutation.isPending}
+            >
+              {reprioritizeMutation.isPending ? "Prioritizing..." : "Re-prioritize Feeds"}
+            </Button>
+          </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (

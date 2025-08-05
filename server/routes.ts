@@ -419,6 +419,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Re-prioritize all calendar feeds
+  app.post("/api/reprioritize-feeds", async (req, res) => {
+    try {
+      console.log("Manual feed re-prioritization requested");
+      await calendarCollector.reprioritizeAllFeeds();
+      
+      res.json({ 
+        success: true, 
+        message: "Feed prioritization complete",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Feed re-prioritization error:", error);
+      res.status(500).json({ error: "Failed to re-prioritize feeds" });
+    }
+  });
+
+  // Get feed prioritization status
+  app.get("/api/feed-priorities", async (req, res) => {
+    try {
+      const sources = calendarCollector.getSources();
+      
+      // Group by domain for priority analysis
+      const domainGroups: Record<string, any[]> = {};
+      
+      sources.forEach(source => {
+        const domain = source.websiteUrl ? new URL(source.websiteUrl).hostname : 'unknown';
+        if (!domainGroups[domain]) {
+          domainGroups[domain] = [];
+        }
+        domainGroups[domain].push({
+          id: source.id,
+          name: source.name,
+          feedType: source.feedType,
+          isActive: source.isActive,
+          city: source.city,
+          state: source.state
+        });
+      });
+      
+      res.json({
+        domainGroups,
+        totalSources: sources.length,
+        activeSources: sources.filter(s => s.isActive).length
+      });
+    } catch (error) {
+      console.error("Feed priorities error:", error);
+      res.status(500).json({ error: "Failed to get feed priorities" });
+    }
+  });
+
   app.post("/api/discover-regional-feeds", async (req, res) => {
     try {
       const { regions } = req.body;
