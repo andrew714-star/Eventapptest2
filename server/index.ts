@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes, setupRoutes } from "./routes";
 import { serveStatic, log } from "./vite";
 import { dataCollector } from "./data-collector";
-import { Storage } from './storage';
+import { MemStorage } from './storage';
 import { CalendarFeedCollector } from './calendar-collector';
 
 const app = express();
@@ -60,8 +60,7 @@ app.use((req, res, next) => {
   }
 
   // Initialize storage
-  const storage = new Storage();
-  await storage.initialize();
+  const storage = new MemStorage();
 
 
   // Initialize calendar collector (but don't start automatic collection)
