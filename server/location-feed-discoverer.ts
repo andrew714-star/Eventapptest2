@@ -35,7 +35,8 @@ export class LocationFeedDiscoverer {
     '/api/events',
     '/api/calendar',
     '/feeds/calendar',
-    '/feeds/events'
+    '/feeds/events',
+    '/ICalendarHandler?calendarId=12712452'
   ];
 
   private governmentDomainPatterns = [

@@ -229,6 +229,19 @@ export class CalendarFeedCollector {
       websiteUrl: 'https://www.philasd.org/calendar',
       isActive: true,
       feedType: 'ical'
+    },
+    
+    // San Jacinto iCalendar Feed
+    {
+      id: 'san-jacinto-icalendar',
+      name: 'San Jacinto City iCalendar',
+      city: 'San Jacinto',
+      state: 'CA',
+      type: 'city',
+      feedUrl: 'https://www.sanjacintoca.gov/ICalendarHandler?calendarId=12712452',
+      websiteUrl: 'https://www.sanjacintoca.gov',
+      isActive: true,
+      feedType: 'ical'
     }
   ];
 
@@ -613,11 +626,21 @@ export class CalendarFeedCollector {
                                 if (eventDate && title && startTime) {
                                     
                                     if (eventDate > new Date()) { // Only future events
+                                        // Generate better descriptions for San Jacinto events
+                                        let eventDescription = 'Event details available on website';
+                                        if (title.includes('City Council Meeting')) {
+                                            eventDescription = 'Regular City Council meeting to discuss community business, municipal affairs, and public concerns. Open to the public with time for public comments.';
+                                        } else if (title.includes('Planning Commission')) {
+                                            eventDescription = 'Planning Commission meeting to review development proposals, zoning applications, and city planning matters. Public attendance welcomed.';
+                                        } else if (title.includes('Kool August Nights')) {
+                                            eventDescription = 'Classic car show and family entertainment event featuring vintage automobiles, live music, food vendors, and community activities in downtown San Jacinto.';
+                                        }
+                                        
                                         parsedEvents.push({
                                             title: this.cleanText(title),
-                                            description: this.cleanText(line),
+                                            description: eventDescription,
                                             category: title.includes('Council') ? 'Government' : title.includes('Commission') ? 'Government' : 'Entertainment',
-                                            location: title.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : 'San Jacinto, CA',
+                                            location: title.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : title.includes('Council') ? 'San Jacinto City Hall' : 'San Jacinto City Hall',
                                             organizer: source.name,
                                             startDate: eventDate,
                                             endDate: new Date(eventDate.getTime() + 2.5 * 60 * 60 * 1000), // 2.5 hours duration
@@ -1080,13 +1103,13 @@ export class CalendarFeedCollector {
         if (thirdTuesday > now) dates.push(thirdTuesday);
       }
     } else if (eventTitle.toLowerCase().includes('planning commission')) {
-      // Planning Commission meets 2nd Tuesday of each month - next 3 months only
+      // Planning Commission meets 4th Tuesday of each month - next 3 months only
       for (let month = 0; month < 3; month++) {
         const targetMonth = (now.getMonth() + month) % 12;
         const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
         
-        const secondTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 2);
-        if (secondTuesday > now) dates.push(secondTuesday);
+        const fourthTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 4);
+        if (fourthTuesday > now) dates.push(fourthTuesday);
       }
     } else if (eventTitle.toLowerCase().includes('kool august nights')) {
       // Kool August Nights - every Wednesday in August (current or next year)
