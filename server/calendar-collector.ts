@@ -53,7 +53,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'ical'
     },
-    
+
     // Texas Sources
     {
       id: 'austin-city',
@@ -88,7 +88,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'ical'
     },
-    
+
     // New York Sources
     {
       id: 'nyc-events',
@@ -112,7 +112,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'rss'
     },
-    
+
     // Florida Sources
     {
       id: 'miami-city',
@@ -136,7 +136,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'rss'
     },
-    
+
     // Illinois Sources
     {
       id: 'chicago-city',
@@ -160,7 +160,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'rss'
     },
-    
+
     // Washington Sources
     {
       id: 'seattle-city',
@@ -184,7 +184,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'rss'
     },
-    
+
     // Additional Major Cities
     {
       id: 'denver-city',
@@ -230,7 +230,7 @@ export class CalendarFeedCollector {
       isActive: true,
       feedType: 'ical'
     },
-    
+
     // San Jacinto iCalendar Feed
     {
       id: 'san-jacinto-icalendar',
@@ -248,15 +248,15 @@ export class CalendarFeedCollector {
   async collectFromAllSources(): Promise<InsertEvent[]> {
     const allEvents: InsertEvent[] = [];
     const activeSources = this.sources.filter(s => s.isActive);
-    
+
     console.log(`Collecting events from ${activeSources.length} real calendar sources across the US...`);
-    
+
     // Process sources in batches to avoid overwhelming servers
     const batchSize = 5;
     for (let i = 0; i < activeSources.length; i += batchSize) {
       const batch = activeSources.slice(i, i + batchSize);
       const batchPromises = batch.map(source => this.collectFromSource(source));
-      
+
       try {
         const batchResults = await Promise.allSettled(batchPromises);
         batchResults.forEach((result, index) => {
@@ -272,20 +272,20 @@ export class CalendarFeedCollector {
       } catch (error) {
         console.error('Batch collection error:', error);
       }
-      
+
       // Add delay between batches to be respectful
       if (i + batchSize < activeSources.length) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
-    
+
     console.log(`Total events collected: ${allEvents.length} from ${activeSources.length} sources`);
     return allEvents;
   }
 
   private async collectFromSource(source: CalendarSource): Promise<InsertEvent[]> {
     console.log(`Collecting from ${source.name} (${source.feedType}): ${source.feedUrl}`);
-    
+
     try {
       switch (source.feedType) {
         case 'ical':
@@ -313,7 +313,7 @@ export class CalendarFeedCollector {
       }
     } catch (error) {
       console.error(`Failed to collect from ${source.name} (${source.feedType}):`, error);
-      
+
       // For iCal feeds, try alternative parsing methods
       if (source.feedType === 'ical' && source.feedUrl) {
         console.log(`Attempting alternative parsing for iCal feed: ${source.name}`);
@@ -323,7 +323,7 @@ export class CalendarFeedCollector {
           console.error(`Fallback HTML scraping also failed for ${source.name}:`, fallbackError);
         }
       }
-      
+
       // No fallback data - return empty array to ensure only authentic data
       console.log(`No fallback data for ${source.name} - using authentic feeds only`);
       return [];
@@ -332,10 +332,10 @@ export class CalendarFeedCollector {
 
   private async parseICalFeed(source: CalendarSource): Promise<InsertEvent[]> {
     if (!source.feedUrl) return [];
-    
+
     try {
       console.log(`Attempting to parse iCal feed: ${source.feedUrl}`);
-      
+
       const response = await axios.get(source.feedUrl, {
         timeout: 10000,
         headers: {
@@ -343,28 +343,28 @@ export class CalendarFeedCollector {
           'Accept': 'text/calendar, application/calendar, text/plain, */*'
         }
       });
-      
+
       console.log(`iCal Response Status: ${response.status}, Content-Type: ${response.headers['content-type']}`);
       console.log(`iCal Response Data (first 500 chars): ${response.data.substring(0, 500)}`);
-      
+
       // Check if response is actually iCalendar format
       if (!response.data.includes('BEGIN:VCALENDAR') && !response.data.includes('BEGIN:VEVENT')) {
         console.log(`Response doesn't appear to be iCalendar format for ${source.feedUrl}`);
         throw new Error('Response is not in iCalendar format');
       }
-      
+
       const events = ical.parseICS(response.data);
       const parsedEvents: InsertEvent[] = [];
-      
+
       console.log(`Parsed ${Object.keys(events).length} calendar objects from ${source.feedUrl}`);
-      
+
       for (const [key, event] of Object.entries(events)) {
         console.log(`Processing event: ${key}, type: ${event.type}, summary: ${event.summary}`);
-        
+
         if (event.type === 'VEVENT' && event.start && event.summary) {
           const startDate = new Date(event.start);
           const endDate = event.end ? new Date(event.end) : new Date(startDate.getTime() + 60 * 60 * 1000);
-          
+
           // Only include future events
           if (startDate > new Date()) {
             parsedEvents.push({
@@ -382,7 +382,7 @@ export class CalendarFeedCollector {
               isFree: event.description?.toLowerCase().includes('free') ? 'true' : 'false',
               source: source.id
             });
-            
+
             console.log(`✓ Added iCal event: ${event.summary} on ${startDate.toDateString()}`);
           } else {
             console.log(`Skipped past event: ${event.summary} on ${startDate.toDateString()}`);
@@ -391,7 +391,7 @@ export class CalendarFeedCollector {
           console.log(`Skipped calendar object: type=${event.type}, hasStart=${!!event.start}, hasSummary=${!!event.summary}`);
         }
       }
-      
+
       console.log(`Successfully parsed ${parsedEvents.length} future events from iCal feed: ${source.feedUrl}`);
       return parsedEvents.slice(0, 10); // Limit to 10 events per source
     } catch (error) {
@@ -402,7 +402,7 @@ export class CalendarFeedCollector {
 
   private async parseRSSFeed(source: CalendarSource): Promise<InsertEvent[]> {
     if (!source.feedUrl) return [];
-    
+
     try {
       const response = await axios.get(source.feedUrl, {
         timeout: 10000,
@@ -410,25 +410,25 @@ export class CalendarFeedCollector {
           'User-Agent': 'CityWide Events Aggregator 1.0'
         }
       });
-      
+
       return new Promise((resolve, reject) => {
         parseString(response.data, (err: any, result: any) => {
           if (err) {
             reject(err);
             return;
           }
-          
+
           const parsedEvents: InsertEvent[] = [];
           const items = result.rss?.channel?.[0]?.item || result.feed?.entry || [];
-          
+
           for (const item of items.slice(0, 10)) {
             const title = item.title?.[0] || item.title?._ || 'Untitled Event';
             const description = item.description?.[0] || item.summary?.[0] || 'Event details available on website';
             const pubDate = item.pubDate?.[0] || item.published?.[0] || new Date().toISOString();
-            
+
             const startDate = new Date(pubDate);
             const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default
-            
+
             parsedEvents.push({
               title: this.cleanText(title),
               description: this.cleanText(description),
@@ -445,7 +445,7 @@ export class CalendarFeedCollector {
               source: source.id
             });
           }
-          
+
           resolve(parsedEvents);
         });
       });
@@ -456,7 +456,7 @@ export class CalendarFeedCollector {
 
   private async parseJSONFeed(source: CalendarSource): Promise<InsertEvent[]> {
     if (!source.feedUrl) return [];
-    
+
     try {
       const response = await axios.get(source.feedUrl, {
         timeout: 10000,
@@ -464,16 +464,16 @@ export class CalendarFeedCollector {
           'User-Agent': 'CityWide Events Aggregator 1.0'
         }
       });
-      
+
       const data = response.data;
       const parsedEvents: InsertEvent[] = [];
-      
+
       const events = data.events || data.items || data.data || [];
-      
+
       for (const event of events.slice(0, 10)) {
         const startDate = new Date(event.start_date || event.date || new Date());
         const endDate = new Date(event.end_date || event.date || startDate.getTime() + 2 * 60 * 60 * 1000);
-        
+
         parsedEvents.push({
           title: event.title || event.name || 'Untitled Event',
           description: event.description || event.summary || 'Event details available on website',
@@ -490,7 +490,7 @@ export class CalendarFeedCollector {
           source: source.id
         });
       }
-      
+
       return parsedEvents;
     } catch (error) {
       throw new Error(`Failed to parse JSON feed: ${error}`);
@@ -507,7 +507,7 @@ export class CalendarFeedCollector {
     // Use feedUrl as fallback if websiteUrl is not available
     const targetUrl = source.websiteUrl || source.feedUrl;
     if (!targetUrl) return [];
-    
+
     try {
         console.log(`scrapeHTMLEvents called for ${source.name} with URL: ${targetUrl}`);
         const response = await axios.get(targetUrl, {
@@ -529,45 +529,45 @@ export class CalendarFeedCollector {
         // San Jacinto calendar requires special handling - look for calendar table structure
         if (source.feedUrl?.includes('sanjacintoca.gov')) {
             console.log(`Parsing San Jacinto calendar - searching entire page for event patterns`);
-            
+
             const fullPageText = $.text();
             console.log(`Full page contains "City Council": ${fullPageText.includes('City Council Meeting')}`);
             console.log(`Full page contains "Kool August": ${fullPageText.includes('Kool August Nights')}`);
             console.log(`Full page contains "Planning Commission": ${fullPageText.includes('Planning Commission')}`);
-            
+
             // Try different selectors - look for any text containing event names
             const eventPatterns = ['City Council Meeting', 'Kool August Nights', 'Planning Commission'];
             const processedEventTypes = new Set<string>(); // Track which event types we've already processed
-            
+
             for (const pattern of eventPatterns) {
                 // Skip if we've already processed this event type
                 if (processedEventTypes.has(pattern)) {
                     console.log(`Skipping ${pattern} - already processed`);
                     continue;
                 }
-                
+
                 // Find all elements containing the pattern
                 const elements = $(`*:contains("${pattern}")`);
                 console.log(`Found ${elements.length} elements containing "${pattern}"`);
-                
+
                 // Only process the first occurrence of each event type
                 let foundValidEvent = false;
                 elements.each((_, element) => {
                     if (foundValidEvent) return; // Skip additional occurrences
                     const $element = $(element);
                     const elementText = $element.text();
-                    
+
                     if (elementText.includes(pattern) && elementText.length < 200) { // Avoid large containers
                         console.log(`Event element text: "${elementText}"`);
-                        
+
                         // Enhanced date extraction - look for various date patterns in the text
                         let eventDate = this.extractComprehensiveDate(elementText, $element);
-                        
+
                         // Look for time patterns in the text
                         const timeMatch = elementText.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*(?:to|-)\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
                         let startTime = '7:00 PM';
                         let endTime = '9:30 PM';
-                        
+
                         if (timeMatch) {
                             startTime = timeMatch[1];
                             endTime = timeMatch[2];
@@ -575,11 +575,11 @@ export class CalendarFeedCollector {
                         } else {
                             console.log(`No time pattern found, using default times`);
                         }
-                        
+
                         // If we found a specific date, use it
                         if (eventDate) {
                             console.log(`Extracted specific event date: ${eventDate.toDateString()} for ${pattern}`);
-                            
+
                             parsedEvents.push({
                                 title: this.cleanText(pattern),
                                 description: this.cleanText(elementText),
@@ -595,13 +595,13 @@ export class CalendarFeedCollector {
                                 isFree: 'true',
                                 source: source.id
                             });
-                            
+
                             console.log(`✓ Successfully created San Jacinto event: ${pattern} on ${eventDate.toDateString()}`);
                         } else {
                             // If no specific date found, create multiple recurring instances
                             console.log(`No specific date found for ${pattern}, creating recurring instances`);
                             const recurringDates = this.getRecurringEventDates(pattern);
-                            
+
                             for (const recurringDate of recurringDates) {
                                 parsedEvents.push({
                                     title: this.cleanText(pattern),
@@ -618,34 +618,34 @@ export class CalendarFeedCollector {
                                     isFree: 'true',
                                     source: source.id
                                 });
-                                
+
                                 console.log(`✓ Created recurring San Jacinto event: ${pattern} on ${recurringDate.toDateString()}`);
                             }
                         }
-                        
+
                         // Mark this event type as processed
                         foundValidEvent = true;
                         processedEventTypes.add(pattern);
                     }
                 });
             }
-            
+
             console.log(`San Jacinto parser found ${parsedEvents.length} events using comprehensive search`);
-            
+
             // Fallback: For San Jacinto calendar page, find calendar table events if comprehensive search failed  
             if (parsedEvents.length === 0) {
                 console.log(`No events found via comprehensive search, trying table cell extraction...`);
-                
+
                 $('table td').each((_, cell) => {
                     const $cell = $(cell);
                     const cellText = $cell.text();
-                    
+
                     // Look for cells that contain event information
                     if (cellText.includes('City Council Meeting') || cellText.includes('Kool August Nights') || cellText.includes('Planning Commission')) {
                         console.log(`Found San Jacinto event cell: ${cellText}`);
                         // Extract event details from cell text
                     const lines = cellText.split('\n').map(l => l.trim()).filter(l => l);
-                    
+
                     for (const line of lines) {
                         if (line.includes('City Council Meeting') || line.includes('Kool August Nights') || line.includes('Planning Commission')) {
                             // Parse the event line which contains title and time
@@ -654,10 +654,10 @@ export class CalendarFeedCollector {
                                 const title = eventMatch[1].replace(/Event\s+/, '').trim();
                                 const startTime = eventMatch[2];
                                 const endTime = eventMatch[3];
-                                
+
                                 // Try to extract proper date from cell context
                                 let eventDate = this.extractDateFromText($cell.text(), $cell);
-                                
+
                                 // If no date found, try to get from table structure
                                 if (!eventDate) {
                                     const dayNumber = $cell.find('a').first().text().trim() || $cell.text().match(/\b(\d{1,2})\b/)?.[1];
@@ -667,14 +667,14 @@ export class CalendarFeedCollector {
                                         eventDate = this.constructDateFromDayAndMonth(parseInt(dayNumber), monthContext);
                                     }
                                 }
-                                
+
                                 // Final fallback for recurring events
                                 if (!eventDate) {
                                     eventDate = this.getNextOccurrenceDate(title);
                                 }
-                                
+
                                 if (eventDate && title && startTime) {
-                                    
+
                                     if (eventDate > new Date()) { // Only future events
                                         // Generate better descriptions for San Jacinto events
                                         let eventDescription = 'Event details available on website';
@@ -685,7 +685,7 @@ export class CalendarFeedCollector {
                                         } else if (title.includes('Kool August Nights')) {
                                             eventDescription = 'Classic car show and family entertainment event featuring vintage automobiles, live music, food vendors, and community activities in downtown San Jacinto.';
                                         }
-                                        
+
                                         parsedEvents.push({
                                             title: this.cleanText(title),
                                             description: eventDescription,
@@ -710,7 +710,7 @@ export class CalendarFeedCollector {
                     }
                 });
             }
-            
+
             if (parsedEvents.length > 0) {
                 return parsedEvents; // Return early for San Jacinto calendar if events found
             }
@@ -731,20 +731,20 @@ export class CalendarFeedCollector {
             if (events.length > 0) {
                 events.each((_, element) => {
                     const $event = $(element);
-                    
+
                     // Extract title more precisely - avoid concatenated data
                     let title = $event.find('h1, h2, h3, .title, .event-title').first().text().trim();
                     if (!title) {
                         title = $event.find('a').first().text().trim();
                     }
-                    
+
                     // Clean title - remove date/time patterns that got mixed in
                     title = title.replace(/\d{1,2}:\d{2}\s*(AM|PM)/gi, '').trim();
                     title = title.replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\d{1,2}/gi, '').trim();
                     title = title.replace(/\d{1,2}\/\d{1,2}\/?\d*/, '').trim();
                     title = title.replace(/\s+-\s+\d{1,2}:\d{2}\s*(AM|PM)/gi, '').trim();
                     title = title.replace(/[a-z]$/, '').trim(); // Remove trailing single letters
-                    
+
                     if (!title || title.length <= 3 || title === 'Community Event') {
                         return; // Skip this event if no valid title
                     }
@@ -761,14 +761,14 @@ export class CalendarFeedCollector {
                             const dateMatch = fullText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{1,2}|\d{1,2}\/\d{1,2}\/?\d*|\w+\s+\d{1,2}\s+\d{4}/i);
                             dateText = dateMatch ? dateMatch[0] : '';
                         }
-                        
+
                         // Check for date in event titles or descriptions that contain dates
                         if (!dateText) {
                             const titleText = title + ' ' + description;
                             const titleDateMatch = titleText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{1,2}|\d{1,2}\/\d{1,2}\/?\d*|\w+\s+\d{1,2}\s+\d{4}/i);
                             dateText = titleDateMatch ? titleDateMatch[0] : '';
                         }
-                        
+
                         // For San Jacinto calendar: Look for date patterns in parent table cell or surrounding context
                         if (!dateText) {
                             const parentTd = $event.closest('td');
@@ -782,13 +782,13 @@ export class CalendarFeedCollector {
                                 }
                             }
                         }
-                        
+
                         let startDate = this.parseEventDate(dateText);
-                        
+
                         // Only add events with valid, future dates to ensure authentic data
                         if (startDate && startDate > new Date()) {
                             const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
-                            
+
                             parsedEvents.push({
                                 title: this.cleanText(title),
                                 description: this.cleanText(description.substring(0, 300)),
@@ -828,7 +828,7 @@ export class CalendarFeedCollector {
 
   private categorizeEvent(title: string, description: string): string {
     const text = (title + ' ' + description).toLowerCase();
-    
+
     if (text.includes('council') || text.includes('meeting') || text.includes('public')) return 'Community & Social';
     if (text.includes('school') || text.includes('education') || text.includes('class')) return 'Education & Learning';
     if (text.includes('business') || text.includes('networking') || text.includes('chamber')) return 'Business & Networking';
@@ -839,7 +839,7 @@ export class CalendarFeedCollector {
     if (text.includes('health') || text.includes('wellness') || text.includes('fitness')) return 'Health & Wellness';
     if (text.includes('family') || text.includes('kids') || text.includes('children')) return 'Family & Kids';
     if (text.includes('holiday') || text.includes('celebration') || text.includes('festival')) return 'Holiday';
-    
+
     return 'Community & Social';
   }
 
@@ -854,20 +854,20 @@ export class CalendarFeedCollector {
 
   private parseEventDate(dateText: string): Date | null {
     if (!dateText) return null;
-    
+
     try {
       // Clean up the date text - remove extra spaces and unwanted characters
       let cleanText = dateText.replace(/\s+/g, ' ').trim();
-      
+
       // Handle formats like "Aug05" -> "Aug 05"
       cleanText = cleanText.replace(/([A-Za-z]+)(\d+)/, '$1 $2');
-      
+
       // Try direct parsing first
       const directDate = new Date(cleanText);
       if (!isNaN(directDate.getTime()) && directDate > new Date()) {
         return directDate;
       }
-      
+
       // Try parsing common patterns with current year if missing
       const currentYear = new Date().getFullYear();
       const patterns = [
@@ -907,7 +907,7 @@ export class CalendarFeedCollector {
           format: (match: RegExpMatchArray) => new Date(`${match[2]} ${match[1]}, ${currentYear}`)
         }
       ];
-      
+
       for (const pattern of patterns) {
         const match = cleanText.match(pattern.regex);
         if (match) {
@@ -926,7 +926,7 @@ export class CalendarFeedCollector {
           }
         }
       }
-      
+
       return null;
     } catch (error) {
       console.log(`Failed to parse date: "${dateText}"`);
@@ -960,19 +960,19 @@ export class CalendarFeedCollector {
     const existingSource = this.sources.find(s => 
       s.feedUrl === source.feedUrl || s.id === source.id
     );
-    
+
     if (existingSource) {
       return false; // Source already exists
     }
 
-    // Check if there are already working feeds from the same domain/city
+    // Check if there are already working feeds from the same domain/organization
     const domain = this.extractDomain(source.feedUrl || source.websiteUrl || '');
     const sameCityFeeds = this.sources.filter(s => 
       s.city.toLowerCase() === source.city.toLowerCase() && 
       s.state === source.state && 
       s.isActive
     );
-    
+
     // If there are already active feeds for this city, disable this one by default
     if (sameCityFeeds.length > 0) {
       console.log(`Found ${sameCityFeeds.length} existing active feeds for ${source.city}, ${source.state}. New feed will be disabled by default.`);
@@ -982,10 +982,10 @@ export class CalendarFeedCollector {
     // Add the new source
     this.sources.push(source);
     console.log(`Added new calendar source: ${source.name} (${source.city}, ${source.state}) - Active: ${source.isActive}`);
-    
+
     // Apply feed prioritization after adding
     this.prioritizeFeeds(source);
-    
+
     return true;
   }
 
@@ -1013,7 +1013,7 @@ export class CalendarFeedCollector {
     };
 
     const newSourcePriority = feedTypePriority[newSource.feedType] || 0;
-    
+
     // Find the highest priority active feed for this city
     const activeFeeds = sameCityFeeds.filter(s => s.isActive);
     const highestPriorityActiveFeed = activeFeeds.reduce((highest, current) => {
@@ -1037,11 +1037,11 @@ export class CalendarFeedCollector {
       this.testFeedWorking(newSource).then(isWorking => {
         if (isWorking) {
           console.log(`New feed ${newSource.name} is working and has highest priority, disabling lower priority feeds...`);
-          
+
           // Disable lower priority feeds from the same city
           sameCityFeeds.forEach(existingSource => {
             const existingPriority = feedTypePriority[existingSource.feedType] || 0;
-            
+
             if (existingPriority < newSourcePriority && existingSource.isActive) {
               console.log(`Disabling lower priority feed: ${existingSource.name} (${existingSource.feedType}) in favor of ${newSource.name} (${newSource.feedType})`);
               existingSource.isActive = false;
@@ -1063,10 +1063,10 @@ export class CalendarFeedCollector {
    */
   private async testFeedWorking(source: CalendarSource): Promise<boolean> {
     if (!source.feedUrl) return false;
-    
+
     try {
       console.log(`Testing feed: ${source.name} - ${source.feedUrl}`);
-      
+
       const response = await axios.get(source.feedUrl, {
         timeout: 5000,
         headers: {
@@ -1075,24 +1075,24 @@ export class CalendarFeedCollector {
         },
         validateStatus: (status) => status < 400
       });
-      
+
       if (response.status >= 400) {
         console.log(`Feed test failed for ${source.name}: HTTP ${response.status}`);
         return false;
       }
-      
+
       // Test basic parsing based on feed type
       switch (source.feedType) {
         case 'ical':
           const hasIcalData = response.data.includes('BEGIN:VCALENDAR') || response.data.includes('BEGIN:VEVENT');
           console.log(`iCal feed test for ${source.name}: ${hasIcalData ? 'PASS' : 'FAIL'}`);
           return hasIcalData;
-          
+
         case 'rss':
           const hasRssData = response.data.includes('<rss') || response.data.includes('<feed') || response.data.includes('<item') || response.data.includes('<entry');
           console.log(`RSS feed test for ${source.name}: ${hasRssData ? 'PASS' : 'FAIL'}`);
           return hasRssData;
-          
+
         case 'json':
           try {
             const jsonData = JSON.parse(response.data);
@@ -1103,12 +1103,12 @@ export class CalendarFeedCollector {
             console.log(`JSON feed test for ${source.name}: FAIL (invalid JSON)`);
             return false;
           }
-          
+
         case 'html':
           const hasHtmlContent = response.data.length > 100 && response.data.includes('<');
           console.log(`HTML feed test for ${source.name}: ${hasHtmlContent ? 'PASS' : 'FAIL'}`);
           return hasHtmlContent;
-          
+
         default:
           console.log(`Unknown feed type for ${source.name}, assuming working`);
           return true;
@@ -1124,7 +1124,7 @@ export class CalendarFeedCollector {
    */
   private extractDomain(url: string): string | null {
     if (!url) return null;
-    
+
     try {
       const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
       return urlObj.hostname.toLowerCase();
@@ -1138,10 +1138,10 @@ export class CalendarFeedCollector {
    */
   async reprioritizeAllFeeds(): Promise<void> {
     console.log('Re-prioritizing all calendar feeds...');
-    
+
     // Group sources by domain
     const domainGroups: Record<string, CalendarSource[]> = {};
-    
+
     this.sources.forEach(source => {
       const domain = this.extractDomain(source.feedUrl || source.websiteUrl || '');
       if (domain) {
@@ -1151,13 +1151,13 @@ export class CalendarFeedCollector {
         domainGroups[domain].push(source);
       }
     });
-    
+
     // Process each domain group
     for (const [domain, sources] of Object.entries(domainGroups)) {
       if (sources.length <= 1) continue;
-      
+
       console.log(`Processing ${sources.length} feeds for domain: ${domain}`);
-      
+
       // Test all feeds in parallel
       const feedTests = await Promise.allSettled(
         sources.map(async source => ({
@@ -1165,41 +1165,41 @@ export class CalendarFeedCollector {
           isWorking: await this.testFeedWorking(source)
         }))
       );
-      
+
       // Get successful tests
       const workingFeeds = feedTests
         .filter(result => result.status === 'fulfilled')
         .map(result => (result as any).value)
         .filter(test => test.isWorking);
-      
+
       if (workingFeeds.length === 0) {
         console.log(`No working feeds found for domain: ${domain}`);
         continue;
       }
-      
+
       // Sort by priority (highest first)
       const feedTypePriority: Record<string, number> = {
         'ical': 5, 'webcal': 4, 'rss': 3, 'json': 2, 'html': 1
       };
-      
+
       workingFeeds.sort((a, b) => {
         const priorityA = feedTypePriority[a.source.feedType] || 0;
         const priorityB = feedTypePriority[b.source.feedType] || 0;
         return priorityB - priorityA;
       });
-      
+
       // Enable the highest priority working feed, disable others
       sources.forEach(source => {
         const isTopPriority = source.id === workingFeeds[0]?.source.id;
         const wasActive = source.isActive;
         source.isActive = isTopPriority;
-        
+
         if (wasActive !== source.isActive) {
           console.log(`${source.isActive ? 'Enabled' : 'Disabled'} feed: ${source.name} (${source.feedType})`);
         }
       });
     }
-    
+
     console.log('Feed re-prioritization complete');
   }
 
@@ -1218,26 +1218,26 @@ export class CalendarFeedCollector {
    */
   private extractComprehensiveDate(text: string, $element?: any): Date | null {
     if (!text) return null;
-    
+
     console.log(`Attempting comprehensive date extraction from: "${text}"`);
-    
+
     // Try multiple approaches to find dates
-    
+
     // 1. Look for explicit date patterns in the text
     const datePatterns = [
       // Full date patterns
       /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4}/i,
       /\d{1,2}\/\d{1,2}\/\d{4}/,
       /\d{4}-\d{1,2}-\d{1,2}/,
-      
+
       // Month and day only (will add current/next year)
       /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
       /\d{1,2}\/\d{1,2}(?!\d)/,
-      
+
       // Day patterns with context
       /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
     ];
-    
+
     for (const pattern of datePatterns) {
       const match = text.match(pattern);
       if (match) {
@@ -1249,7 +1249,7 @@ export class CalendarFeedCollector {
         }
       }
     }
-    
+
     // 2. Check element attributes if available
     if ($element) {
       const dateAttrs = ['data-date', 'datetime', 'data-event-date', 'title', 'data-start-date'];
@@ -1265,7 +1265,7 @@ export class CalendarFeedCollector {
         }
       }
     }
-    
+
     // 3. Look for calendar context (table cell dates)
     if ($element) {
       const calendarDate = this.extractCalendarCellDate($element);
@@ -1274,7 +1274,7 @@ export class CalendarFeedCollector {
         return calendarDate;
       }
     }
-    
+
     console.log(`No date found in comprehensive extraction for: "${text}"`);
     return null;
   }
@@ -1284,12 +1284,12 @@ export class CalendarFeedCollector {
    */
   private extractDateFromText(text: string, $element?: any): Date | null {
     if (!text) return null;
-    
+
     try {
       // First try the existing parseEventDate method
       const parsedDate = this.parseEventDate(text);
       if (parsedDate) return parsedDate;
-      
+
       // If element is provided, check for date attributes
       if ($element) {
         const dateAttrs = ['data-date', 'datetime', 'data-event-date', 'title'];
@@ -1301,7 +1301,7 @@ export class CalendarFeedCollector {
           }
         }
       }
-      
+
       return null;
     } catch (error) {
       console.log(`Failed to extract date from text: "${text}"`);
@@ -1321,7 +1321,7 @@ export class CalendarFeedCollector {
         const monthMatch = headerText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i);
         if (monthMatch) return monthMatch[1];
       }
-      
+
       // Look for month in parent elements
       let $parent = $cell.parent();
       while ($parent.length && $parent.prop('tagName') !== 'BODY') {
@@ -1330,7 +1330,7 @@ export class CalendarFeedCollector {
         if (monthMatch) return monthMatch[1];
         $parent = $parent.parent();
       }
-      
+
       return null;
     } catch (error) {
       return null;
@@ -1342,12 +1342,12 @@ export class CalendarFeedCollector {
    */
   private constructDateFromDayAndMonth(day: number, monthContext: string | null): Date | null {
     if (!monthContext || day < 1 || day > 31) return null;
-    
+
     try {
       const currentYear = new Date().getFullYear();
       const dateString = `${monthContext} ${day}, ${currentYear}`;
       const constructedDate = new Date(dateString);
-      
+
       if (!isNaN(constructedDate.getTime())) {
         // If date is in the past, try next year
         if (constructedDate <= new Date()) {
@@ -1355,7 +1355,7 @@ export class CalendarFeedCollector {
         }
         return constructedDate;
       }
-      
+
       return null;
     } catch (error) {
       return null;
@@ -1368,18 +1368,18 @@ export class CalendarFeedCollector {
   private getRecurringEventDates(eventTitle: string): Date[] {
     const now = new Date();
     const dates: Date[] = [];
-    
+
     // Define recurring patterns for San Jacinto events - LIMITED TO PREVENT DUPLICATION
     if (eventTitle.toLowerCase().includes('city council meeting')) {
       // City Council meets 1st and 3rd Tuesday of each month - next 3 months only
       for (let month = 0; month < 3; month++) {
         const targetMonth = (now.getMonth() + month) % 12;
         const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
-        
+
         // Get 1st Tuesday
         const firstTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 1);
         if (firstTuesday > now) dates.push(firstTuesday);
-        
+
         // Get 3rd Tuesday
         const thirdTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 3);
         if (thirdTuesday > now) dates.push(thirdTuesday);
@@ -1389,7 +1389,7 @@ export class CalendarFeedCollector {
       for (let month = 0; month < 3; month++) {
         const targetMonth = (now.getMonth() + month) % 12;
         const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
-        
+
         const fourthTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 4);
         if (fourthTuesday > now) dates.push(fourthTuesday);
       }
@@ -1397,13 +1397,13 @@ export class CalendarFeedCollector {
       // Kool August Nights - every Wednesday in August (current or next year)
       const currentYear = now.getFullYear();
       const augustYear = now.getMonth() >= 7 ? currentYear + 1 : currentYear;
-      
+
       for (let week = 1; week <= 4; week++) {
         const wednesday = this.getNthWeekdayOfMonth(augustYear, 7, 3, week);
         if (wednesday > now) dates.push(wednesday);
       }
     }
-    
+
     return dates.slice(0, 6); // Limit to 6 future occurrences maximum
   }
 
@@ -1413,14 +1413,14 @@ export class CalendarFeedCollector {
   private getNthWeekdayOfMonth(year: number, month: number, weekday: number, occurrence: number): Date {
     const firstDay = new Date(year, month, 1);
     const firstWeekday = firstDay.getDay();
-    
+
     // Calculate the date of the first occurrence of the target weekday
     const daysUntilTargetWeekday = (weekday - firstWeekday + 7) % 7;
     const firstOccurrence = 1 + daysUntilTargetWeekday;
-    
+
     // Calculate the date of the Nth occurrence
     const targetDate = firstOccurrence + (occurrence - 1) * 7;
-    
+
     // Create date at noon to avoid timezone boundary issues
     const result = new Date(year, month, targetDate, 12, 0, 0);
     return result;
@@ -1442,16 +1442,16 @@ export class CalendarFeedCollector {
       // Look for day number in the cell or its children
       const dayText = $element.find('a').first().text().trim() || 
                     $element.text().match(/\b(\d{1,2})\b/)?.[1];
-      
+
       if (dayText && /^\d{1,2}$/.test(dayText)) {
         const dayNumber = parseInt(dayText);
-        
+
         // Find month context from table structure
         const monthContext = this.findMonthContext($element);
         if (monthContext) {
           return this.constructDateFromDayAndMonth(dayNumber, monthContext);
         }
-        
+
         // Try to extract month from URL or page context
         const pageText = $element.closest('body').find('h1, h2, .page-title, .calendar-title').text();
         const monthMatch = pageText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i);
@@ -1459,7 +1459,7 @@ export class CalendarFeedCollector {
           return this.constructDateFromDayAndMonth(dayNumber, monthMatch[1]);
         }
       }
-      
+
       return null;
     } catch (error) {
       return null;

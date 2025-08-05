@@ -22,6 +22,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/events/filter", async (req, res) => {
     try {
       const filters = eventFilterSchema.parse(req.body);
+      
+      // If location is provided, collect events for that location first
+      if (filters.location && filters.location.trim() !== '') {
+        await calendarCollector.collectForLocation(filters.location);
+      }
+
       const events = await storage.getFilteredEvents(filters);
       res.json(events);
     } catch (error) {
@@ -424,7 +430,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Manual feed re-prioritization requested");
       await calendarCollector.reprioritizeAllFeeds();
-      
+
       res.json({ 
         success: true, 
         message: "Feed prioritization complete",
@@ -440,10 +446,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feed-priorities", async (req, res) => {
     try {
       const sources = calendarCollector.getSources();
-      
+
       // Group by domain for priority analysis
       const domainGroups: Record<string, any[]> = {};
-      
+
       sources.forEach(source => {
         const domain = source.websiteUrl ? new URL(source.websiteUrl).hostname : 'unknown';
         if (!domainGroups[domain]) {
@@ -458,7 +464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           state: source.state
         });
       });
-      
+
       res.json({
         domainGroups,
         totalSources: sources.length,
