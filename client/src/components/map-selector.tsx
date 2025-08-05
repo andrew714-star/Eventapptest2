@@ -66,6 +66,8 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       container: mapContainer.current,
       style: {
         version: 8,
+        name: 'OpenStreetMap',
+        metadata: {},
         sources: {
           'osm': {
             type: 'raster',
@@ -82,9 +84,12 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
           {
             id: 'osm',
             type: 'raster',
-            source: 'osm'
+            source: 'osm',
+            minzoom: 0,
+            maxzoom: 18
           }
-        ]
+        ],
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
       },
       center: [-98.5795, 39.8283] as LngLatLike, // Center of US
       zoom: 4,
@@ -192,7 +197,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       source: 'cities',
       layout: {
         'text-field': ['get', 'label'],
-        'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+        'text-font': ['Noto Sans Regular'],
         'text-offset': [0, 1.5],
         'text-anchor': 'top',
         'text-size': 12
