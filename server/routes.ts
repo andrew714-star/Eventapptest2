@@ -407,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const discoveredFeeds = [];
 
       // Regional mapping of major cities by state
-      const regionalCities = {
+      const regionalCities: Record<string, string[]> = {
         "California": ["Los Angeles", "San Francisco", "San Diego", "Sacramento", "Fresno"],
         "Texas": ["Houston", "Dallas", "Austin", "San Antonio", "Fort Worth"],
         "Florida": ["Miami", "Orlando", "Tampa", "Jacksonville", "Tallahassee"],

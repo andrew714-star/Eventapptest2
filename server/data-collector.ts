@@ -387,6 +387,16 @@ export class EventDataCollector {
     }
     return false;
   }
+
+  addCalendarSource(source: any): boolean {
+    try {
+      // Delegate to the calendar collector to add the new source
+      return calendarCollector.addSource(source);
+    } catch (error) {
+      console.error('Failed to add calendar source:', error);
+      return false;
+    }
+  }
 }
 
 export const dataCollector = new EventDataCollector();

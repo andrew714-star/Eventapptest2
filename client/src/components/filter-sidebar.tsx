@@ -416,10 +416,10 @@ function USMapWithDrawing({ selectedRegions, onRegionChange }: USMapWithDrawingP
           return isCityIntersectingPath(city, closedPath);
         });
         
-        const newSelectedRegions = [...new Set([
+        const newSelectedRegions = Array.from(new Set([
           ...selectedRegions, 
           ...intersectingCities.map(c => c.name)
-        ])];
+        ]));
         onRegionChange(newSelectedRegions);
         setCurrentPath("");
       }

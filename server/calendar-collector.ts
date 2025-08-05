@@ -515,73 +515,9 @@ export class CalendarFeedCollector {
         return parsedEvents;
     } catch (error) {
         console.error(`Failed to scrape HTML events from ${source.websiteUrl}:`, error);
-        throw new Error(`Failed to scrape HTML events: ${error.message}`);
+        throw new Error(`Failed to scrape HTML events: ${(error as Error).message}`);
     }
-} private async scrapeHTMLEvents(source: CalendarSource): Promise<InsertEvent[]> {
-    if (!source.websiteUrl) return [];
-    
-    try {
-      const response = await axios.get(source.websiteUrl, {
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      const $ = cheerio.load(response.data);
-      const parsedEvents: InsertEvent[] = [];
-      
-      // Common selectors for events
-      const eventSelectors = [
-        '.event-item, .event, .calendar-event',
-        '[class*="event"], [id*="event"]',
-        '.upcoming-events li, .events-list li'
-      ];
-      
-      for (const selector of eventSelectors) {
-        const events = $(selector);
-        if (events.length > 0) {
-          events.slice(0, 5).each((_, element) => {
-            const $event = $(element);
-            const title = $event.find('h1, h2, h3, .title, .event-title').first().text().trim() ||
-                         $event.find('a').first().text().trim() ||
-                         'Community Event';
-            
-            if (title && title.length > 3) {
-              const description = $event.find('.description, .summary, p').first().text().trim() || 
-                                'Event details available on website';
-              
-              const dateText = $event.find('.date, .event-date, time').first().text().trim();
-              const startDate = this.parseEventDate(dateText) || new Date();
-              const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-              
-              parsedEvents.push({
-                title: this.cleanText(title),
-                description: this.cleanText(description.substring(0, 300)),
-                category: this.categorizeEvent(title, description),
-                location: `${source.city}, ${source.state}`,
-                organizer: source.name,
-                startDate,
-                endDate,
-                startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                attendees: 0,
-                imageUrl: null,
-                isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
-                source: source.id
-              });
-            }
-          });
-          
-          if (parsedEvents.length > 0) break; // Found events with this selector
-        }
-      }
-      
-      return parsedEvents;
-    } catch (error) {
-      throw new Error(`Failed to scrape HTML events: ${error}`);
-    }
-  }
+}
 
   public generateFallbackEvents(source: CalendarSource): InsertEvent[] {
     // Generate realistic fallback events when real feeds are unavailable
