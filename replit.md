@@ -5,6 +5,7 @@ CityWide Events is a comprehensive automated events aggregation platform that co
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+Event loading behavior: Events should not load or be searched until after a user enters a location (current implementation maintains this - server pre-loads events in background but frontend only displays them after location selection).
 
 # System Architecture
 
