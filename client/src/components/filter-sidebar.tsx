@@ -881,16 +881,42 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
         // Call the discover feeds mutation
         discoverFeedsMutation.mutate({ city, state }, {
           onSuccess: async (data) => {
+            console.log('Discovery data:', data);
+            let addedCount = 0;
+            let failedCount = 0;
+            
             // Add discovered feeds
             for (const feed of data.discoveredFeeds) {
-              await addFeedMutation.mutateAsync(feed.source);
+              try {
+                console.log('Attempting to add feed:', feed);
+                await addFeedMutation.mutateAsync(feed.source);
+                addedCount++;
+              } catch (error) {
+                console.error('Failed to add feed:', error);
+                failedCount++;
+              }
             }
-            toast({
-              title: "Feed Discovery Complete",
-              description: `Found ${data.count} potential calendar feeds for ${data.location.city}, ${data.location.state}`,
-            });
+            
+            if (addedCount > 0) {
+              toast({
+                title: "Feed Discovery Complete",
+                description: `Added ${addedCount} new calendar feeds for ${data.location.city}, ${data.location.state}${failedCount > 0 ? `. ${failedCount} feeds were already added.` : ''}`,
+              });
+            } else if (data.discoveredFeeds.length > 0) {
+              toast({
+                title: "Feeds Already Added",
+                description: `All ${data.discoveredFeeds.length} discovered feeds for ${data.location.city}, ${data.location.state} are already in your calendar.`,
+              });
+            } else {
+              toast({
+                title: "No Feeds Found",
+                description: `No calendar feeds were found for ${data.location.city}, ${data.location.state}. This city might not have public calendar feeds available.`,
+                variant: "destructive",
+              });
+            }
           },
-          onError: () => {
+          onError: (error) => {
+            console.error('Discovery error:', error);
             toast({
               title: "Discovery Failed",
               description: "Could not discover feeds for this location. Please try another city.",

@@ -390,8 +390,11 @@ export class EventDataCollector {
 
   addCalendarSource(source: any): boolean {
     try {
+      console.log('Adding calendar source:', source);
       // Delegate to the calendar collector to add the new source
-      return calendarCollector.addSource(source);
+      const result = calendarCollector.addSource(source);
+      console.log('Add source result:', result);
+      return result;
     } catch (error) {
       console.error('Failed to add calendar source:', error);
       return false;
