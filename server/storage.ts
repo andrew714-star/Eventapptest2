@@ -8,6 +8,7 @@ export interface IStorage {
   createEvent(event: InsertEvent): Promise<Event>;
   updateEvent(id: string, event: Partial<InsertEvent>): Promise<Event | undefined>;
   deleteEvent(id: string): Promise<boolean>;
+  clearAllEvents(): Promise<void>;
   getEventsByDateRange(startDate: string, endDate: string): Promise<Event[]>;
   getEventsByCategory(category: string): Promise<Event[]>;
 }
@@ -103,6 +104,11 @@ export class MemStorage implements IStorage {
 
   async deleteEvent(id: string): Promise<boolean> {
     return this.events.delete(id);
+  }
+
+  async clearAllEvents(): Promise<void> {
+    this.events.clear();
+    console.log('All events cleared from storage');
   }
 
   async getEventsByDateRange(startDate: string, endDate: string): Promise<Event[]> {

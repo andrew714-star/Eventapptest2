@@ -474,13 +474,23 @@ export class CalendarFeedCollector {
             
             // Try different selectors - look for any text containing event names
             const eventPatterns = ['City Council Meeting', 'Kool August Nights', 'Planning Commission'];
+            const processedEventTypes = new Set<string>(); // Track which event types we've already processed
             
             for (const pattern of eventPatterns) {
+                // Skip if we've already processed this event type
+                if (processedEventTypes.has(pattern)) {
+                    console.log(`Skipping ${pattern} - already processed`);
+                    continue;
+                }
+                
                 // Find all elements containing the pattern
                 const elements = $(`*:contains("${pattern}")`);
                 console.log(`Found ${elements.length} elements containing "${pattern}"`);
                 
+                // Only process the first occurrence of each event type
+                let foundValidEvent = false;
                 elements.each((_, element) => {
+                    if (foundValidEvent) return; // Skip additional occurrences
                     const $element = $(element);
                     const elementText = $element.text();
                     
@@ -549,6 +559,10 @@ export class CalendarFeedCollector {
                                 console.log(`✓ Created recurring San Jacinto event: ${pattern} on ${recurringDate.toDateString()}`);
                             }
                         }
+                        
+                        // Mark this event type as processed
+                        foundValidEvent = true;
+                        processedEventTypes.add(pattern);
                     }
                 });
             }
@@ -1050,42 +1064,42 @@ export class CalendarFeedCollector {
     const now = new Date();
     const dates: Date[] = [];
     
-    // Define recurring patterns for San Jacinto events
+    // Define recurring patterns for San Jacinto events - LIMITED TO PREVENT DUPLICATION
     if (eventTitle.toLowerCase().includes('city council meeting')) {
-      // City Council meets 1st and 3rd Tuesday of each month
-      for (let month = 0; month < 6; month++) {
+      // City Council meets 1st and 3rd Tuesday of each month - next 3 months only
+      for (let month = 0; month < 3; month++) {
         const targetMonth = (now.getMonth() + month) % 12;
         const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
         
         // Get 1st Tuesday
-        const firstTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 1); // Tuesday = 2, 1st occurrence
+        const firstTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 1);
         if (firstTuesday > now) dates.push(firstTuesday);
         
         // Get 3rd Tuesday
-        const thirdTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 3); // Tuesday = 2, 3rd occurrence
+        const thirdTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 3);
         if (thirdTuesday > now) dates.push(thirdTuesday);
       }
     } else if (eventTitle.toLowerCase().includes('planning commission')) {
-      // Planning Commission meets 2nd Tuesday of each month
-      for (let month = 0; month < 6; month++) {
+      // Planning Commission meets 2nd Tuesday of each month - next 3 months only
+      for (let month = 0; month < 3; month++) {
         const targetMonth = (now.getMonth() + month) % 12;
         const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
         
-        const secondTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 2); // Tuesday = 2, 2nd occurrence
+        const secondTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 2);
         if (secondTuesday > now) dates.push(secondTuesday);
       }
     } else if (eventTitle.toLowerCase().includes('kool august nights')) {
-      // Kool August Nights - every Wednesday in August
+      // Kool August Nights - every Wednesday in August (current or next year)
       const currentYear = now.getFullYear();
-      const augustYear = now.getMonth() >= 7 ? currentYear + 1 : currentYear; // If past August, use next year
+      const augustYear = now.getMonth() >= 7 ? currentYear + 1 : currentYear;
       
       for (let week = 1; week <= 4; week++) {
-        const wednesday = this.getNthWeekdayOfMonth(augustYear, 7, 3, week); // August = 7, Wednesday = 3
+        const wednesday = this.getNthWeekdayOfMonth(augustYear, 7, 3, week);
         if (wednesday > now) dates.push(wednesday);
       }
     }
     
-    return dates.slice(0, 10); // Limit to 10 future occurrences
+    return dates.slice(0, 6); // Limit to 6 future occurrences maximum
   }
 
   /**
