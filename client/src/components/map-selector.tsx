@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Map as MapLibreMap, NavigationControl, GeolocateControl, LngLatLike } from '@maptiler/sdk';
 import '@maptiler/sdk/dist/maptiler-sdk.css';
+import { getMapTilerApiKey } from '@/lib/env';
 
 interface MapSelectorProps {
   onLocationSelect: (city: string, state: string, coordinates: [number, number]) => void;
@@ -56,14 +57,26 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isLoadingKey, setIsLoadingKey] = useState(true);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    // Load API key first
+    getMapTilerApiKey().then((key) => {
+      setApiKey(key);
+      setIsLoadingKey(false);
+    }).catch(() => {
+      setIsLoadingKey(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current || !apiKey || isLoadingKey) return;
 
     // Initialize the map
     map.current = new MapLibreMap({
       container: mapContainer.current,
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${import.meta.env.VITE_MAPTILER_API_KEY}`,
+      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${apiKey}`,
       center: [-98.5795, 39.8283] as LngLatLike, // Center of US
       zoom: 4,
     });
@@ -94,7 +107,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       try {
         // Reverse geocoding to get location information
         const response = await fetch(
-          `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${import.meta.env.VITE_MAPTILER_API_KEY}`
+          `https://api.maptiler.com/geocoding/${lng},${lat}.json?key=${apiKey}`
         );
         const data = await response.json();
         
@@ -145,7 +158,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         map.current = null;
       }
     };
-  }, [onLocationSelect]);
+  }, [onLocationSelect, apiKey]);
 
   const addCityMarkers = () => {
     if (!map.current) return;
@@ -231,9 +244,9 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   };
 
   return (
-    <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200">
+    <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200 relative">
       <div ref={mapContainer} className="w-full h-full" />
-      {!isLoaded && (
+      {(isLoadingKey || !isLoaded) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
