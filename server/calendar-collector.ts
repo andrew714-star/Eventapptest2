@@ -487,28 +487,24 @@ export class CalendarFeedCollector {
                     if (elementText.includes(pattern) && elementText.length < 200) { // Avoid large containers
                         console.log(`Event element text: "${elementText}"`);
                         
+                        // Enhanced date extraction - look for various date patterns in the text
+                        let eventDate = this.extractComprehensiveDate(elementText, $element);
+                        
                         // Look for time patterns in the text
                         const timeMatch = elementText.match(/(\d{1,2}:\d{2}\s*[AP]M)\s*(?:to|-)\s*(\d{1,2}:\d{2}\s*[AP]M)/i);
+                        let startTime = '7:00 PM';
+                        let endTime = '9:30 PM';
+                        
                         if (timeMatch) {
-                            const startTime = timeMatch[1];
-                            const endTime = timeMatch[2];
+                            startTime = timeMatch[1];
+                            endTime = timeMatch[2];
                             console.log(`Found time pattern: ${startTime} to ${endTime}`);
-                            
-                            // Try to extract date from element text or surrounding context
-                            let eventDate = this.extractDateFromText(elementText, $element);
-                            
-                            // If no date found, try to find date in parent or sibling elements
-                            if (!eventDate) {
-                                const parentText = $element.parent().text();
-                                const siblingText = $element.siblings().text();
-                                eventDate = this.extractDateFromText(parentText + ' ' + siblingText, $element.parent());
-                            }
-                            
-                            // Fallback to recurring events if no specific date found
-                            if (!eventDate) {
-                                eventDate = this.getNextOccurrenceDate(pattern);
-                            }
-                            
+                        } else {
+                            console.log(`No time pattern found, using default times`);
+                        }
+                        
+                        // Only create event if we found a valid date
+                        if (eventDate) {
                             console.log(`Extracted event date: ${eventDate.toDateString()} for ${pattern}`);
                             
                             parsedEvents.push({
@@ -528,6 +524,8 @@ export class CalendarFeedCollector {
                             });
                             
                             console.log(`✓ Successfully created San Jacinto event: ${pattern} on ${eventDate.toDateString()}`);
+                        } else {
+                            console.log(`⚠ Skipping ${pattern} - no valid date found in text: "${elementText}"`);
                         }
                     }
                 });
@@ -875,6 +873,72 @@ export class CalendarFeedCollector {
   }
 
   /**
+   * Comprehensive date extraction for San Jacinto events with enhanced pattern matching
+   */
+  private extractComprehensiveDate(text: string, $element?: any): Date | null {
+    if (!text) return null;
+    
+    console.log(`Attempting comprehensive date extraction from: "${text}"`);
+    
+    // Try multiple approaches to find dates
+    
+    // 1. Look for explicit date patterns in the text
+    const datePatterns = [
+      // Full date patterns
+      /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4}/i,
+      /\d{1,2}\/\d{1,2}\/\d{4}/,
+      /\d{4}-\d{1,2}-\d{1,2}/,
+      
+      // Month and day only (will add current/next year)
+      /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
+      /\d{1,2}\/\d{1,2}(?!\d)/,
+      
+      // Day patterns with context
+      /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
+    ];
+    
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        console.log(`Found date pattern: "${match[0]}"`);
+        const parsedDate = this.parseEventDate(match[0]);
+        if (parsedDate) {
+          console.log(`Successfully parsed date: ${parsedDate.toDateString()}`);
+          return parsedDate;
+        }
+      }
+    }
+    
+    // 2. Check element attributes if available
+    if ($element) {
+      const dateAttrs = ['data-date', 'datetime', 'data-event-date', 'title', 'data-start-date'];
+      for (const attr of dateAttrs) {
+        const attrValue = $element.attr(attr);
+        if (attrValue) {
+          console.log(`Checking attribute ${attr}: "${attrValue}"`);
+          const attrDate = this.parseEventDate(attrValue);
+          if (attrDate) {
+            console.log(`Found date in attribute ${attr}: ${attrDate.toDateString()}`);
+            return attrDate;
+          }
+        }
+      }
+    }
+    
+    // 3. Look for calendar context (table cell dates)
+    if ($element) {
+      const calendarDate = this.extractCalendarCellDate($element);
+      if (calendarDate) {
+        console.log(`Found calendar cell date: ${calendarDate.toDateString()}`);
+        return calendarDate;
+      }
+    }
+    
+    console.log(`No date found in comprehensive extraction for: "${text}"`);
+    return null;
+  }
+
+  /**
    * Extract date from text content or DOM elements
    */
   private extractDateFromText(text: string, $element?: any): Date | null {
@@ -1002,6 +1066,38 @@ export class CalendarFeedCollector {
     const fallbackDate = new Date();
     fallbackDate.setDate(fallbackDate.getDate() + 7);
     return fallbackDate;
+  }
+
+  /**
+   * Extract date from calendar table cell context
+   */
+  private extractCalendarCellDate($element: any): Date | null {
+    try {
+      // Look for day number in the cell or its children
+      const dayText = $element.find('a').first().text().trim() || 
+                    $element.text().match(/\b(\d{1,2})\b/)?.[1];
+      
+      if (dayText && /^\d{1,2}$/.test(dayText)) {
+        const dayNumber = parseInt(dayText);
+        
+        // Find month context from table structure
+        const monthContext = this.findMonthContext($element);
+        if (monthContext) {
+          return this.constructDateFromDayAndMonth(dayNumber, monthContext);
+        }
+        
+        // Try to extract month from URL or page context
+        const pageText = $element.closest('body').find('h1, h2, .page-title, .calendar-title').text();
+        const monthMatch = pageText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i);
+        if (monthMatch) {
+          return this.constructDateFromDayAndMonth(dayNumber, monthMatch[1]);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
   }
 }
 
