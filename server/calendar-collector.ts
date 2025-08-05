@@ -284,6 +284,8 @@ export class CalendarFeedCollector {
   }
 
   private async collectFromSource(source: CalendarSource): Promise<InsertEvent[]> {
+    console.log(`Collecting from ${source.name} (${source.feedType}): ${source.feedUrl}`);
+    
     try {
       switch (source.feedType) {
         case 'ical':
@@ -297,13 +299,34 @@ export class CalendarFeedCollector {
         case 'html':
           return await this.scrapeHTMLEvents(source);
         default:
-          // Try to auto-detect feed type
-          return await this.parseICalFeed(source);
+          // Try to auto-detect feed type based on URL
+          if (source.feedUrl?.includes('.ics') || source.feedUrl?.includes('ICalendarHandler')) {
+            console.log(`Auto-detecting as iCal for ${source.name}`);
+            return await this.parseICalFeed(source);
+          } else if (source.feedUrl?.includes('.rss') || source.feedUrl?.includes('rss')) {
+            console.log(`Auto-detecting as RSS for ${source.name}`);
+            return await this.parseRSSFeed(source);
+          } else {
+            console.log(`Auto-detecting as HTML for ${source.name}`);
+            return await this.scrapeHTMLEvents(source);
+          }
       }
     } catch (error) {
-      // Fallback to simulated data for demo purposes when real feeds fail
-      console.log(`Real feed unavailable for ${source.name}, using fallback data`);
-      return this.generateFallbackEvents(source);
+      console.error(`Failed to collect from ${source.name} (${source.feedType}):`, error);
+      
+      // For iCal feeds, try alternative parsing methods
+      if (source.feedType === 'ical' && source.feedUrl) {
+        console.log(`Attempting alternative parsing for iCal feed: ${source.name}`);
+        try {
+          return await this.scrapeHTMLEvents(source);
+        } catch (fallbackError) {
+          console.error(`Fallback HTML scraping also failed for ${source.name}:`, fallbackError);
+        }
+      }
+      
+      // No fallback data - return empty array to ensure only authentic data
+      console.log(`No fallback data for ${source.name} - using authentic feeds only`);
+      return [];
     }
   }
 
@@ -311,41 +334,68 @@ export class CalendarFeedCollector {
     if (!source.feedUrl) return [];
     
     try {
+      console.log(`Attempting to parse iCal feed: ${source.feedUrl}`);
+      
       const response = await axios.get(source.feedUrl, {
         timeout: 10000,
         headers: {
-          'User-Agent': 'CityWide Events Aggregator 1.0'
+          'User-Agent': 'CityWide Events Aggregator 1.0',
+          'Accept': 'text/calendar, application/calendar, text/plain, */*'
         }
       });
+      
+      console.log(`iCal Response Status: ${response.status}, Content-Type: ${response.headers['content-type']}`);
+      console.log(`iCal Response Data (first 500 chars): ${response.data.substring(0, 500)}`);
+      
+      // Check if response is actually iCalendar format
+      if (!response.data.includes('BEGIN:VCALENDAR') && !response.data.includes('BEGIN:VEVENT')) {
+        console.log(`Response doesn't appear to be iCalendar format for ${source.feedUrl}`);
+        throw new Error('Response is not in iCalendar format');
+      }
       
       const events = ical.parseICS(response.data);
       const parsedEvents: InsertEvent[] = [];
       
-      for (const event of Object.values(events)) {
+      console.log(`Parsed ${Object.keys(events).length} calendar objects from ${source.feedUrl}`);
+      
+      for (const [key, event] of Object.entries(events)) {
+        console.log(`Processing event: ${key}, type: ${event.type}, summary: ${event.summary}`);
+        
         if (event.type === 'VEVENT' && event.start && event.summary) {
           const startDate = new Date(event.start);
           const endDate = event.end ? new Date(event.end) : new Date(startDate.getTime() + 60 * 60 * 1000);
           
-          parsedEvents.push({
-            title: event.summary,
-            description: event.description || 'Event details available on website',
-            category: this.categorizeEvent(event.summary, event.description || ''),
-            location: event.location || `${source.city}, ${source.state}`,
-            organizer: source.name,
-            startDate,
-            endDate,
-            startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-            endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-            attendees: 0,
-            imageUrl: null,
-            isFree: event.description?.toLowerCase().includes('free') ? 'true' : 'false',
-            source: source.id
-          });
+          // Only include future events
+          if (startDate > new Date()) {
+            parsedEvents.push({
+              title: event.summary,
+              description: event.description || 'Event details available on website',
+              category: this.categorizeEvent(event.summary, event.description || ''),
+              location: event.location || `${source.city}, ${source.state}`,
+              organizer: source.name,
+              startDate,
+              endDate,
+              startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+              endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+              attendees: 0,
+              imageUrl: null,
+              isFree: event.description?.toLowerCase().includes('free') ? 'true' : 'false',
+              source: source.id
+            });
+            
+            console.log(`✓ Added iCal event: ${event.summary} on ${startDate.toDateString()}`);
+          } else {
+            console.log(`Skipped past event: ${event.summary} on ${startDate.toDateString()}`);
+          }
+        } else {
+          console.log(`Skipped calendar object: type=${event.type}, hasStart=${!!event.start}, hasSummary=${!!event.summary}`);
         }
       }
       
+      console.log(`Successfully parsed ${parsedEvents.length} future events from iCal feed: ${source.feedUrl}`);
       return parsedEvents.slice(0, 10); // Limit to 10 events per source
     } catch (error) {
+      console.error(`Failed to parse iCal feed ${source.feedUrl}:`, error);
       throw new Error(`Failed to parse iCal feed: ${error}`);
     }
   }
