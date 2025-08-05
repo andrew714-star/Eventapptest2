@@ -188,14 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/config/maptiler-key', async (req, res) => {
-    try {
-      const apiKey = process.env.MAPTILER_API_KEY || '';
-      res.json({ apiKey });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to fetch API key' });
-    }
-  });
+
 
   app.get("/api/calendar-sources/by-state/:state", async (req, res) => {
     try {

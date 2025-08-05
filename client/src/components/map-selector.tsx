@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Map as MapLibreMap, NavigationControl, LngLatLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getMapTilerApiKey } from '@/lib/env';
 
 interface MapSelectorProps {
   onLocationSelect: (city: string, state: string, coordinates: [number, number]) => void;

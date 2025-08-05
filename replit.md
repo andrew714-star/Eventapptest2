@@ -56,11 +56,12 @@ The system collects from authentic sources like San Francisco City Events, Austi
 The UI is built with a comprehensive component system:
 
 - **Base Components**: shadcn/ui components for consistent design patterns
-- **Feature Components**: Calendar view, event modals, filter sidebar, and header
+- **Feature Components**: Calendar view, event modals, filter sidebar, and header with interactive map selection
 - **Layout System**: Responsive grid layout with mobile-first design
 - **Accessibility**: Built-in accessibility features through Radix UI primitives
+- **Interactive Map**: OpenStreetMap-based location selector with city markers and reverse geocoding
 
-The calendar component provides both calendar and list views with event filtering and search capabilities.
+The calendar component provides both calendar and list views with event filtering and search capabilities. The MapSelector component allows users to choose locations by clicking on an interactive map with city markers or anywhere on the map for reverse geocoding.
 
 # External Dependencies
 
@@ -76,6 +77,8 @@ The calendar component provides both calendar and list views with event filterin
 - **Tailwind CSS**: Utility-first CSS framework for styling
 - **Lucide React**: Icon library for consistent iconography
 - **Date-fns**: Date manipulation and formatting utilities
+- **MapLibre GL**: Interactive map rendering with OpenStreetMap tiles
+- **OpenStreetMap**: Free map tiles and Nominatim geocoding service
 
 ## Development Tools
 

@@ -273,10 +273,10 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                       <Map size={16} className="text-gray-400 hover:text-gray-600" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-5xl max-h-[90vh]">
+                  <DialogContent className="max-w-5xl max-h-[90vh]" aria-describedby="map-description">
                     <DialogHeader>
                       <DialogTitle>Select Location on Map</DialogTitle>
-                      <p className="text-sm text-muted-foreground">
+                      <p id="map-description" className="text-sm text-muted-foreground">
                         Click anywhere on the map or click on city markers to select a location. You can zoom and pan to explore different areas.
                       </p>
                     </DialogHeader>
