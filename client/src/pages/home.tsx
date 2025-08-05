@@ -117,65 +117,103 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {!filters.location || filters.location.trim() === '' ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex flex-col items-center justify-center h-64 text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                      <MapPin className="text-gray-400" size={32} />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Location</h3>
-                    <p className="text-gray-600 max-w-md">
-                      Please choose a city from the sidebar to discover local events, city council meetings, and community activities.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : isLoading ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : currentView === "calendar" ? (
-              <Calendar events={events} onEventClick={handleEventClick} />
-            ) : (
-              <div className="space-y-4">
-                {events.map((event) => (
-                  <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleEventClick(event)}>
+            {currentView === "calendar" ? (
+              <div>
+                {!filters.location || filters.location.trim() === '' ? (
+                  <Card className="mb-6">
                     <CardContent className="pt-6">
-                      <div className="flex items-start space-x-4">
-                        <div className="flex-shrink-0 w-16 text-center">
-                          <div className="text-sm font-medium text-primary">
-                            {event.startTime}
-                          </div>
+                      <div className="flex flex-col items-center justify-center h-32 text-center">
+                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                          <MapPin className="text-gray-400" size={24} />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <h4 className="text-lg font-medium text-gray-900 truncate">
-                              {event.title}
-                            </h4>
-                            <Badge variant="secondary">{event.category}</Badge>
-                            <div className="flex items-center space-x-1 text-xs text-gray-500">
-                              {getSourceIcon(event.source)}
-                              <span>{getSourceLabel(event.source)}</span>
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-2">
-                            {event.description}
-                          </p>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <span>{event.location}</span>
-                            <span>{event.attendees} attending</span>
-                            <span>{event.organizer}</span>
-                          </div>
-                        </div>
+                        <h3 className="text-md font-medium text-gray-900 mb-1">Select a Location</h3>
+                        <p className="text-gray-600 text-sm max-w-md">
+                          Choose a city from the sidebar to discover local events and activities.
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                ) : isLoading ? (
+                  <Card className="mb-6">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-center h-32">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
+                <Calendar events={events} onEventClick={handleEventClick} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {!filters.location || filters.location.trim() === '' ? (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center justify-center h-64 text-center">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                          <MapPin className="text-gray-400" size={32} />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Location</h3>
+                        <p className="text-gray-600 max-w-md">
+                          Please choose a city from the sidebar to discover local events and activities.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : isLoading ? (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-center h-64">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : events.length === 0 ? (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center justify-center h-64 text-center">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Events Found</h3>
+                        <p className="text-gray-600 max-w-md">
+                          No events were found for this location. Try selecting a different city or check back later.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  events.map((event) => (
+                    <Card key={event.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleEventClick(event)}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0 w-16 text-center">
+                            <div className="text-sm font-medium text-primary">
+                              {event.startTime}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h4 className="text-lg font-medium text-gray-900 truncate">
+                                {event.title}
+                              </h4>
+                              <Badge variant="secondary">{event.category}</Badge>
+                              <div className="flex items-center space-x-1 text-xs text-gray-500">
+                                {getSourceIcon(event.source)}
+                                <span>{getSourceLabel(event.source)}</span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2">
+                              {event.description}
+                            </p>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500">
+                              <span>{event.location}</span>
+                              <span>{event.attendees} attending</span>
+                              <span>{event.organizer}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             )}
           </div>

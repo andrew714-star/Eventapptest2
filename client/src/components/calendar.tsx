@@ -22,7 +22,7 @@ interface CalendarProps {
   onEventClick: (event: Event) => void;
 }
 
-export function Calendar({ events, onEventClick }: CalendarProps) {
+export function Calendar({ events = [], onEventClick }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
 
