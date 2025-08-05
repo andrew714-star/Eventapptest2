@@ -221,6 +221,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Discovering feeds for ${city}, ${state}...`);
       const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city, state);
 
+      // Add discovered feeds to the calendar collector automatically
+      for (const discoveredFeed of discoveredFeeds) {
+        try {
+          const added = calendarCollector.addSource(discoveredFeed.source);
+          console.log(`Auto-adding discovered feed: ${discoveredFeed.source.name} - Success: ${added}`);
+          if (!added) {
+            console.log(`Failed to add feed: ${discoveredFeed.source.name} - may already exist`);
+          }
+        } catch (error) {
+          console.error(`Error adding discovered feed ${discoveredFeed.source.name}:`, error);
+        }
+      }
+
       res.json({
         location: { city, state },
         discoveredFeeds: discoveredFeeds.map(df => ({
