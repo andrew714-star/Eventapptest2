@@ -120,6 +120,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear all events
+  app.delete("/api/events", async (req, res) => {
+    try {
+      await storage.clearAllEvents();
+      res.json({ message: "All events cleared successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to clear events" });
+    }
+  });
+
   // Data collection routes
   app.get("/api/data-sources", async (req, res) => {
     try {
