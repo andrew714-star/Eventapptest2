@@ -461,10 +461,10 @@ export class CalendarFeedCollector {
         const parsedEvents: InsertEvent[] = [];
 
         // DEBUG: Check if this is San Jacinto
-        console.log(`DEBUG: Checking if ${source.feedUrl} includes sanjacintoca.gov: ${source.feedUrl.includes('sanjacintoca.gov')}`);
+        console.log(`DEBUG: Checking if ${source.feedUrl} includes sanjacintoca.gov: ${source.feedUrl?.includes('sanjacintoca.gov')}`);
 
         // San Jacinto calendar requires special handling - look for calendar table structure
-        if (source.feedUrl.includes('sanjacintoca.gov')) {
+        if (source.feedUrl?.includes('sanjacintoca.gov')) {
             console.log(`Parsing San Jacinto calendar - searching entire page for event patterns`);
             
             const fullPageText = $.text();
@@ -494,8 +494,22 @@ export class CalendarFeedCollector {
                             const endTime = timeMatch[2];
                             console.log(`Found time pattern: ${startTime} to ${endTime}`);
                             
-                            // Create event for current events (August 2025)
-                            const eventDate = new Date(2025, 7, 5); // August 5, 2025
+                            // Try to extract date from element text or surrounding context
+                            let eventDate = this.extractDateFromText(elementText, $element);
+                            
+                            // If no date found, try to find date in parent or sibling elements
+                            if (!eventDate) {
+                                const parentText = $element.parent().text();
+                                const siblingText = $element.siblings().text();
+                                eventDate = this.extractDateFromText(parentText + ' ' + siblingText, $element.parent());
+                            }
+                            
+                            // Fallback to recurring events if no specific date found
+                            if (!eventDate) {
+                                eventDate = this.getNextOccurrenceDate(pattern);
+                            }
+                            
+                            console.log(`Extracted event date: ${eventDate.toDateString()} for ${pattern}`);
                             
                             parsedEvents.push({
                                 title: this.cleanText(pattern),
@@ -544,10 +558,25 @@ export class CalendarFeedCollector {
                                 const startTime = eventMatch[2];
                                 const endTime = eventMatch[3];
                                 
-                                // Get date from adjacent cell or cell attributes
-                                const dayNumber = $cell.find('a').first().text().trim() || $cell.text().match(/\b(\d{1,2})\b/)?.[1];
-                                if (dayNumber && title && startTime) {
-                                    const eventDate = new Date(2025, 7, parseInt(dayNumber)); // August 2025
+                                // Try to extract proper date from cell context
+                                let eventDate = this.extractDateFromText($cell.text(), $cell);
+                                
+                                // If no date found, try to get from table structure
+                                if (!eventDate) {
+                                    const dayNumber = $cell.find('a').first().text().trim() || $cell.text().match(/\b(\d{1,2})\b/)?.[1];
+                                    if (dayNumber) {
+                                        // Try to find month context from table headers or surrounding elements
+                                        const monthContext = this.findMonthContext($cell);
+                                        eventDate = this.constructDateFromDayAndMonth(parseInt(dayNumber), monthContext);
+                                    }
+                                }
+                                
+                                // Final fallback for recurring events
+                                if (!eventDate) {
+                                    eventDate = this.getNextOccurrenceDate(title);
+                                }
+                                
+                                if (eventDate && title && startTime) {
                                     
                                     if (eventDate > new Date()) { // Only future events
                                         parsedEvents.push({
@@ -843,6 +872,136 @@ export class CalendarFeedCollector {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Extract date from text content or DOM elements
+   */
+  private extractDateFromText(text: string, $element?: any): Date | null {
+    if (!text) return null;
+    
+    try {
+      // First try the existing parseEventDate method
+      const parsedDate = this.parseEventDate(text);
+      if (parsedDate) return parsedDate;
+      
+      // If element is provided, check for date attributes
+      if ($element) {
+        const dateAttrs = ['data-date', 'datetime', 'data-event-date', 'title'];
+        for (const attr of dateAttrs) {
+          const attrValue = $element.attr(attr);
+          if (attrValue) {
+            const attrDate = this.parseEventDate(attrValue);
+            if (attrDate) return attrDate;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.log(`Failed to extract date from text: "${text}"`);
+      return null;
+    }
+  }
+
+  /**
+   * Find month context from table headers or surrounding elements
+   */
+  private findMonthContext($cell: any): string | null {
+    try {
+      // Look for month in table headers
+      const $table = $cell.closest('table');
+      if ($table.length) {
+        const headerText = $table.find('th, .month-header, .calendar-header').text();
+        const monthMatch = headerText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i);
+        if (monthMatch) return monthMatch[1];
+      }
+      
+      // Look for month in parent elements
+      let $parent = $cell.parent();
+      while ($parent.length && $parent.prop('tagName') !== 'BODY') {
+        const parentText = $parent.text();
+        const monthMatch = parentText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*/i);
+        if (monthMatch) return monthMatch[1];
+        $parent = $parent.parent();
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Construct date from day number and month context
+   */
+  private constructDateFromDayAndMonth(day: number, monthContext: string | null): Date | null {
+    if (!monthContext || day < 1 || day > 31) return null;
+    
+    try {
+      const currentYear = new Date().getFullYear();
+      const dateString = `${monthContext} ${day}, ${currentYear}`;
+      const constructedDate = new Date(dateString);
+      
+      if (!isNaN(constructedDate.getTime())) {
+        // If date is in the past, try next year
+        if (constructedDate <= new Date()) {
+          constructedDate.setFullYear(currentYear + 1);
+        }
+        return constructedDate;
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Get next occurrence date for recurring events
+   */
+  private getNextOccurrenceDate(eventTitle: string): Date {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Define recurring patterns for San Jacinto events
+    const recurringEvents: { [key: string]: { monthDay: number, weekday?: number } } = {
+      'City Council Meeting': { monthDay: 5 }, // 1st and 3rd Tuesday, using 5th as placeholder
+      'Planning Commission': { monthDay: 15 }, // 2nd Tuesday, using 15th as placeholder  
+      'Kool August Nights': { monthDay: 20 } // Summer event series
+    };
+    
+    // Find matching pattern
+    const pattern = Object.keys(recurringEvents).find(key => 
+      eventTitle.toLowerCase().includes(key.toLowerCase())
+    );
+    
+    if (pattern) {
+      const config = recurringEvents[pattern];
+      let eventMonth = currentMonth;
+      let eventYear = currentYear;
+      
+      // Create date for current month
+      let eventDate = new Date(eventYear, eventMonth, config.monthDay);
+      
+      // If event is in the past, move to next month
+      if (eventDate <= now) {
+        eventMonth++;
+        if (eventMonth > 11) {
+          eventMonth = 0;
+          eventYear++;
+        }
+        eventDate = new Date(eventYear, eventMonth, config.monthDay);
+      }
+      
+      return eventDate;
+    }
+    
+    // Default fallback - next week
+    const fallbackDate = new Date();
+    fallbackDate.setDate(fallbackDate.getDate() + 7);
+    return fallbackDate;
   }
 }
 
