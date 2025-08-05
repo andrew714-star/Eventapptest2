@@ -3,7 +3,7 @@ import { registerRoutes, setupRoutes } from "./routes";
 import { serveStatic, log } from "./vite";
 import { dataCollector } from "./data-collector";
 import { Storage } from './storage';
-import { CalendarCollector } from './calendar-collector';
+import { CalendarFeedCollector } from './calendar-collector';
 
 const app = express();
 app.use(express.json());
@@ -65,10 +65,9 @@ app.use((req, res, next) => {
 
 
   // Initialize calendar collector (but don't start automatic collection)
-  const calendarCollector = new CalendarCollector(storage);
+  const calendarCollector = new CalendarFeedCollector();
 
-  // Start the collector in standby mode
-  await calendarCollector.startCollection();
+  // Calendar collector initialized in standby mode
 
   const eventCount = await storage.getEventCount();
   console.log(`Calendar collector initialized in standby mode. ${eventCount} events currently in storage.`);
