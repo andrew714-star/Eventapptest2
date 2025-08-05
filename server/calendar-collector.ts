@@ -503,9 +503,9 @@ export class CalendarFeedCollector {
                             console.log(`No time pattern found, using default times`);
                         }
                         
-                        // Only create event if we found a valid date
+                        // If we found a specific date, use it
                         if (eventDate) {
-                            console.log(`Extracted event date: ${eventDate.toDateString()} for ${pattern}`);
+                            console.log(`Extracted specific event date: ${eventDate.toDateString()} for ${pattern}`);
                             
                             parsedEvents.push({
                                 title: this.cleanText(pattern),
@@ -525,7 +525,29 @@ export class CalendarFeedCollector {
                             
                             console.log(`✓ Successfully created San Jacinto event: ${pattern} on ${eventDate.toDateString()}`);
                         } else {
-                            console.log(`⚠ Skipping ${pattern} - no valid date found in text: "${elementText}"`);
+                            // If no specific date found, create multiple recurring instances
+                            console.log(`No specific date found for ${pattern}, creating recurring instances`);
+                            const recurringDates = this.getRecurringEventDates(pattern);
+                            
+                            for (const recurringDate of recurringDates) {
+                                parsedEvents.push({
+                                    title: this.cleanText(pattern),
+                                    description: this.cleanText(elementText),
+                                    category: pattern.includes('Council') ? 'Government' : pattern.includes('Commission') ? 'Government' : 'Entertainment',
+                                    location: pattern.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : 'San Jacinto City Hall',
+                                    organizer: source.name,
+                                    startDate: recurringDate,
+                                    endDate: new Date(recurringDate.getTime() + 2.5 * 60 * 60 * 1000),
+                                    startTime: startTime,
+                                    endTime: endTime,
+                                    attendees: 0,
+                                    imageUrl: null,
+                                    isFree: 'true',
+                                    source: source.id
+                                });
+                                
+                                console.log(`✓ Created recurring San Jacinto event: ${pattern} on ${recurringDate.toDateString()}`);
+                            }
                         }
                     }
                 });
@@ -1022,50 +1044,73 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Get next occurrence date for recurring events
+   * Get multiple recurring event dates for San Jacinto events
    */
-  private getNextOccurrenceDate(eventTitle: string): Date {
+  private getRecurringEventDates(eventTitle: string): Date[] {
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const dates: Date[] = [];
     
     // Define recurring patterns for San Jacinto events
-    const recurringEvents: { [key: string]: { monthDay: number, weekday?: number } } = {
-      'City Council Meeting': { monthDay: 5 }, // 1st and 3rd Tuesday, using 5th as placeholder
-      'Planning Commission': { monthDay: 15 }, // 2nd Tuesday, using 15th as placeholder  
-      'Kool August Nights': { monthDay: 20 } // Summer event series
-    };
-    
-    // Find matching pattern
-    const pattern = Object.keys(recurringEvents).find(key => 
-      eventTitle.toLowerCase().includes(key.toLowerCase())
-    );
-    
-    if (pattern) {
-      const config = recurringEvents[pattern];
-      let eventMonth = currentMonth;
-      let eventYear = currentYear;
-      
-      // Create date for current month
-      let eventDate = new Date(eventYear, eventMonth, config.monthDay);
-      
-      // If event is in the past, move to next month
-      if (eventDate <= now) {
-        eventMonth++;
-        if (eventMonth > 11) {
-          eventMonth = 0;
-          eventYear++;
-        }
-        eventDate = new Date(eventYear, eventMonth, config.monthDay);
+    if (eventTitle.toLowerCase().includes('city council meeting')) {
+      // City Council meets 1st and 3rd Tuesday of each month
+      for (let month = 0; month < 6; month++) {
+        const targetMonth = (now.getMonth() + month) % 12;
+        const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
+        
+        // Get 1st Tuesday
+        const firstTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 1); // Tuesday = 2, 1st occurrence
+        if (firstTuesday > now) dates.push(firstTuesday);
+        
+        // Get 3rd Tuesday
+        const thirdTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 3); // Tuesday = 2, 3rd occurrence
+        if (thirdTuesday > now) dates.push(thirdTuesday);
       }
+    } else if (eventTitle.toLowerCase().includes('planning commission')) {
+      // Planning Commission meets 2nd Tuesday of each month
+      for (let month = 0; month < 6; month++) {
+        const targetMonth = (now.getMonth() + month) % 12;
+        const targetYear = now.getFullYear() + Math.floor((now.getMonth() + month) / 12);
+        
+        const secondTuesday = this.getNthWeekdayOfMonth(targetYear, targetMonth, 2, 2); // Tuesday = 2, 2nd occurrence
+        if (secondTuesday > now) dates.push(secondTuesday);
+      }
+    } else if (eventTitle.toLowerCase().includes('kool august nights')) {
+      // Kool August Nights - every Wednesday in August
+      const currentYear = now.getFullYear();
+      const augustYear = now.getMonth() >= 7 ? currentYear + 1 : currentYear; // If past August, use next year
       
-      return eventDate;
+      for (let week = 1; week <= 4; week++) {
+        const wednesday = this.getNthWeekdayOfMonth(augustYear, 7, 3, week); // August = 7, Wednesday = 3
+        if (wednesday > now) dates.push(wednesday);
+      }
     }
     
-    // Default fallback - next week
-    const fallbackDate = new Date();
-    fallbackDate.setDate(fallbackDate.getDate() + 7);
-    return fallbackDate;
+    return dates.slice(0, 10); // Limit to 10 future occurrences
+  }
+
+  /**
+   * Get the Nth occurrence of a weekday in a given month
+   */
+  private getNthWeekdayOfMonth(year: number, month: number, weekday: number, occurrence: number): Date {
+    const firstDay = new Date(year, month, 1);
+    const firstWeekday = firstDay.getDay();
+    
+    // Calculate the date of the first occurrence of the target weekday
+    const daysUntilTargetWeekday = (weekday - firstWeekday + 7) % 7;
+    const firstOccurrence = 1 + daysUntilTargetWeekday;
+    
+    // Calculate the date of the Nth occurrence
+    const targetDate = firstOccurrence + (occurrence - 1) * 7;
+    
+    return new Date(year, month, targetDate);
+  }
+
+  /**
+   * Get next occurrence date for recurring events (legacy fallback)
+   */
+  private getNextOccurrenceDate(eventTitle: string): Date {
+    const recurringDates = this.getRecurringEventDates(eventTitle);
+    return recurringDates.length > 0 ? recurringDates[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   }
 
   /**

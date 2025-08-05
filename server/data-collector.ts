@@ -319,10 +319,13 @@ export class EventDataCollector {
               const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
               const isUnique = !existingEventKeys.has(key);
 
-              // Log events being checked
-              console.log(`Checking Event: ${event.title} from ${event.organizer}`);
+              // Enhanced logging for debugging
+              console.log(`Checking Event: ${event.title} from ${event.organizer} on ${event.startDate?.toDateString()}`);
+              console.log(`Event key: ${key}`);
               if (!isUnique) {
-                  console.log(`Duplicate Found: ${event.title} from ${event.organizer} at ${event.location}`);
+                  console.log(`Duplicate Found: ${event.title} from ${event.organizer} at ${event.location} on ${event.startDate?.toDateString()}`);
+              } else {
+                  console.log(`Unique Event: ${event.title} from ${event.organizer} on ${event.startDate?.toDateString()}`);
               }
 
               return isUnique;
