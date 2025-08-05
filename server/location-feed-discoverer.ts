@@ -242,7 +242,7 @@ export class LocationFeedDiscoverer {
         type: location.organizationType as any,
         feedUrl: feedUrl,
         websiteUrl: new URL(feedUrl).origin,
-        isActive: false, // Start inactive until user enables
+        isActive: true, // Automatically activate discovered feeds
         feedType: feedType
       };
 

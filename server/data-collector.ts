@@ -291,6 +291,18 @@ export class EventDataCollector {
       console.log('Skipping fallback data generation - using authentic calendar feeds only');
       return [];
   }
+
+  async addCalendarSource(source: any): Promise<boolean> {
+      try {
+          // Add the source to the calendar collector 
+          const success = calendarCollector.addSource(source);
+          console.log(`Calendar source ${source.name} added successfully: ${success}`);
+          return success;
+      } catch (error) {
+          console.error(`Failed to add calendar source ${source.name}:`, error);
+          return false;
+      }
+  }
   async syncEventsToStorage(): Promise<number> {
       try {
           const newEvents = await this.collectFromAllSources();
@@ -345,18 +357,7 @@ export class EventDataCollector {
     return false;
   }
 
-  addCalendarSource(source: any): boolean {
-    try {
-      console.log('Adding calendar source:', source);
-      // Delegate to the calendar collector to add the new source
-      const result = calendarCollector.addSource(source);
-      console.log('Add source result:', result);
-      return result;
-    } catch (error) {
-      console.error('Failed to add calendar source:', error);
-      return false;
-    }
-  }
+
 }
 
 export const dataCollector = new EventDataCollector();
