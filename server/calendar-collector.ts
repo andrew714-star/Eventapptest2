@@ -1116,7 +1116,9 @@ export class CalendarFeedCollector {
     // Calculate the date of the Nth occurrence
     const targetDate = firstOccurrence + (occurrence - 1) * 7;
     
-    return new Date(year, month, targetDate);
+    // Create date at noon to avoid timezone boundary issues
+    const result = new Date(year, month, targetDate, 12, 0, 0);
+    return result;
   }
 
   /**
