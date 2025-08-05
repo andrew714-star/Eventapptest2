@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { serveStatic, log } from "./vite";
+import { serveStatic, log, setupVite } from "./vite";
 import { dataCollector } from "./data-collector";
 import { MemStorage } from './storage';
 import { CalendarFeedCollector } from './calendar-collector';
