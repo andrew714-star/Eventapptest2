@@ -119,21 +119,7 @@ export default function Home() {
 
             {currentView === "calendar" ? (
               <div>
-                {!filters.location || filters.location.trim() === '' ? (
-                  <Card className="mb-6">
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col items-center justify-center h-32 text-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                          <MapPin className="text-gray-400" size={24} />
-                        </div>
-                        <h3 className="text-md font-medium text-gray-900 mb-1">Select a Location</h3>
-                        <p className="text-gray-600 text-sm max-w-md">
-                          Choose a city from the sidebar to discover local events and activities.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ) : isLoading ? (
+                {isLoading ? (
                   <Card className="mb-6">
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-center h-32">
