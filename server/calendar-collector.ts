@@ -965,9 +965,23 @@ export class CalendarFeedCollector {
       return false; // Source already exists
     }
 
+    // Check if there are already working feeds from the same domain/city
+    const domain = this.extractDomain(source.feedUrl || source.websiteUrl || '');
+    const sameCityFeeds = this.sources.filter(s => 
+      s.city.toLowerCase() === source.city.toLowerCase() && 
+      s.state === source.state && 
+      s.isActive
+    );
+    
+    // If there are already active feeds for this city, disable this one by default
+    if (sameCityFeeds.length > 0) {
+      console.log(`Found ${sameCityFeeds.length} existing active feeds for ${source.city}, ${source.state}. New feed will be disabled by default.`);
+      source.isActive = false;
+    }
+
     // Add the new source
     this.sources.push(source);
-    console.log(`Added new calendar source: ${source.name} (${source.city}, ${source.state})`);
+    console.log(`Added new calendar source: ${source.name} (${source.city}, ${source.state}) - Active: ${source.isActive}`);
     
     // Apply feed prioritization after adding
     this.prioritizeFeeds(source);
@@ -980,16 +994,14 @@ export class CalendarFeedCollector {
    * when a higher-priority feed is working
    */
   private prioritizeFeeds(newSource: CalendarSource): void {
-    const domain = this.extractDomain(newSource.feedUrl || newSource.websiteUrl || '');
-    if (!domain) return;
+    // Find feeds from the same city/location
+    const sameCityFeeds = this.sources.filter(s => 
+      s.city.toLowerCase() === newSource.city.toLowerCase() && 
+      s.state === newSource.state && 
+      s.id !== newSource.id
+    );
 
-    // Find all sources from the same domain
-    const sameDomainSources = this.sources.filter(s => {
-      const sourceDomain = this.extractDomain(s.feedUrl || s.websiteUrl || '');
-      return sourceDomain === domain && s.id !== newSource.id;
-    });
-
-    if (sameDomainSources.length === 0) return;
+    if (sameCityFeeds.length === 0) return;
 
     // Define feed type priority (higher number = higher priority)
     const feedTypePriority: Record<string, number> = {
@@ -1002,37 +1014,48 @@ export class CalendarFeedCollector {
 
     const newSourcePriority = feedTypePriority[newSource.feedType] || 0;
     
-    // Check if the new source is higher priority and test if it's working
-    this.testFeedWorking(newSource).then(isWorking => {
-      if (isWorking) {
-        console.log(`New feed ${newSource.name} is working, checking for lower priority feeds to disable...`);
-        
-        // Disable lower priority feeds from the same domain
-        sameDomainSources.forEach(existingSource => {
-          const existingPriority = feedTypePriority[existingSource.feedType] || 0;
-          
-          if (existingPriority < newSourcePriority) {
-            console.log(`Disabling lower priority feed: ${existingSource.name} (${existingSource.feedType}) in favor of ${newSource.name} (${newSource.feedType})`);
-            existingSource.isActive = false;
-          } else if (existingPriority === newSourcePriority) {
-            // Same priority - test both and keep the working one
-            this.testFeedWorking(existingSource).then(existingWorking => {
-              if (!existingWorking) {
-                console.log(`Disabling non-working feed: ${existingSource.name} in favor of working ${newSource.name}`);
-                existingSource.isActive = false;
-              }
-            });
-          }
-        });
-      } else {
-        console.log(`New feed ${newSource.name} is not working, keeping existing feeds active`);
-        // If new source doesn't work, disable it
+    // Find the highest priority active feed for this city
+    const activeFeeds = sameCityFeeds.filter(s => s.isActive);
+    const highestPriorityActiveFeed = activeFeeds.reduce((highest, current) => {
+      const currentPriority = feedTypePriority[current.feedType] || 0;
+      const highestPriority = feedTypePriority[highest?.feedType] || 0;
+      return currentPriority > highestPriority ? current : highest;
+    }, null as CalendarSource | null);
+
+    // If there's already a higher priority active feed, keep the new source disabled
+    if (highestPriorityActiveFeed) {
+      const highestPriority = feedTypePriority[highestPriorityActiveFeed.feedType] || 0;
+      if (newSourcePriority <= highestPriority) {
+        console.log(`Keeping new feed ${newSource.name} (${newSource.feedType}) disabled - higher priority feed ${highestPriorityActiveFeed.name} (${highestPriorityActiveFeed.feedType}) already active`);
         newSource.isActive = false;
+        return;
       }
-    }).catch(error => {
-      console.error(`Error testing new feed ${newSource.name}:`, error);
-      newSource.isActive = false;
-    });
+    }
+
+    // Only test and potentially enable if this is the highest priority feed
+    if (newSource.isActive) {
+      this.testFeedWorking(newSource).then(isWorking => {
+        if (isWorking) {
+          console.log(`New feed ${newSource.name} is working and has highest priority, disabling lower priority feeds...`);
+          
+          // Disable lower priority feeds from the same city
+          sameCityFeeds.forEach(existingSource => {
+            const existingPriority = feedTypePriority[existingSource.feedType] || 0;
+            
+            if (existingPriority < newSourcePriority && existingSource.isActive) {
+              console.log(`Disabling lower priority feed: ${existingSource.name} (${existingSource.feedType}) in favor of ${newSource.name} (${newSource.feedType})`);
+              existingSource.isActive = false;
+            }
+          });
+        } else {
+          console.log(`New feed ${newSource.name} is not working, disabling it`);
+          newSource.isActive = false;
+        }
+      }).catch(error => {
+        console.error(`Error testing new feed ${newSource.name}:`, error);
+        newSource.isActive = false;
+      });
+    }
   }
 
   /**
