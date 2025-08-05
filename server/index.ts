@@ -1,9 +1,9 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic, log, setupVite } from "./vite";
+import { registerRoutes, setupRoutes } from "./routes";
+import { serveStatic, log } from "./vite";
 import { dataCollector } from "./data-collector";
-import { MemStorage } from './storage';
-import { CalendarFeedCollector } from './calendar-collector';
+import { Storage } from './storage';
+import { CalendarCollector } from './calendar-collector';
 
 const app = express();
 app.use(express.json());
@@ -60,18 +60,21 @@ app.use((req, res, next) => {
   }
 
   // Initialize storage
-  const storage = new MemStorage();
+  const storage = new Storage();
+  await storage.initialize();
 
 
   // Initialize calendar collector (but don't start automatic collection)
-  const calendarCollector = new CalendarFeedCollector();
+  const calendarCollector = new CalendarCollector(storage);
 
-  // Calendar collector initialized in standby mode
+  // Start the collector in standby mode
+  await calendarCollector.startCollection();
 
   const eventCount = await storage.getEventCount();
   console.log(`Calendar collector initialized in standby mode. ${eventCount} events currently in storage.`);
 
-  
+  // Setup routes
+  setupRoutes(app, storage, calendarCollector);
 
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
