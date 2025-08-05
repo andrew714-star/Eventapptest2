@@ -1059,12 +1059,14 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
             </div>
 
             <div className="relative flex-1">
-              <Label>City</Label>
+              <Label className="text-sm font-medium text-gray-900">
+                City <span className="text-red-500">*</span>
+              </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <Input
                   placeholder="Type city name (e.g., Austin, TX)..."
-                  className="pl-10 pr-10 h-10"
+                  className="pl-10 pr-10 h-10 border-2 border-primary/20 focus:border-primary"
                   value={localFilters.location || ""}
                   onChange={(e) => handleLocationChange(e.target.value)}
                   onFocus={() => {
