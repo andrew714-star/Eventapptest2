@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes, setupRoutes } from "./routes";
+import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./vite";
 import { dataCollector } from "./data-collector";
 import { MemStorage } from './storage';
@@ -71,8 +71,7 @@ app.use((req, res, next) => {
   const eventCount = await storage.getEventCount();
   console.log(`Calendar collector initialized in standby mode. ${eventCount} events currently in storage.`);
 
-  // Setup routes
-  setupRoutes(app, storage, calendarCollector);
+  
 
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
