@@ -6,6 +6,8 @@ import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
 import { feedDiscoverer } from './location-feed-discoverer';
 import { cityDiscoverer } from './us-cities-database';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all events
@@ -228,20 +230,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Congressional district routes
   app.get("/api/congressional-districts", async (req, res) => {
     try {
-      // Generate comprehensive congressional districts for all 435 districts
-      const allDistricts = generateAllCongressionalDistricts();
+      // Use real congressional district data from CSV
+      const realDistricts = await loadRealCongressionalDistricts();
 
       const geoJsonData = {
         type: "FeatureCollection",
-        features: allDistricts
+        features: realDistricts
       };
 
       res.json(geoJsonData);
     } catch (error) {
-      console.error("Error generating congressional districts:", error);
-      res.status(500).json({ message: "Failed to load congressional districts" });
+      console.error("Error loading congressional districts:", error);
+      // Fallback to generated districts if CSV loading fails
+      const allDistricts = generateAllCongressionalDistricts();
+      const geoJsonData = {
+        type: "FeatureCollection",
+        features: allDistricts
+      };
+      res.json(geoJsonData);
     }
   });
+
+  // Load real congressional districts from CSV data
+  async function loadRealCongressionalDistricts() {
+    try {
+      const csvPath = path.join(__dirname, '../attached_assets/NTAD_Congressional_Districts_1009129779752246747_1754511934089.csv');
+      
+      if (!fs.existsSync(csvPath)) {
+        console.log('CSV file not found, using fallback data');
+        return generateAllCongressionalDistricts();
+      }
+
+      const csvContent = fs.readFileSync(csvPath, 'utf-8');
+      const lines = csvContent.split('\n');
+      const headers = lines[0].split(',');
+      
+      const districts = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const values = line.split(',');
+        
+        // Parse the CSV data
+        const statefp = values[1]?.replace(/"/g, '');
+        const cd119fp = values[2]?.replace(/"/g, '');
+        const geoid = values[3]?.replace(/"/g, '');
+        const namelsad = values[5]?.replace(/"/g, '');
+        const intptlat = parseFloat(values[12]?.replace(/"/g, ''));
+        const intptlon = parseFloat(values[13]?.replace(/"/g, ''));
+        const district = values[35]?.replace(/"/g, '');
+        const state = values[36]?.replace(/"/g, '');
+        
+        if (statefp && cd119fp && !isNaN(intptlat) && !isNaN(intptlon)) {
+          // Create a simplified polygon around the center point
+          const boundarySize = 0.3;
+          
+          districts.push({
+            type: "Feature",
+            properties: {
+              CD119FP: cd119fp,
+              STATEFP: statefp,
+              NAMELSAD: namelsad || `Congressional District ${cd119fp}`,
+              state: state || getStateFromFips(statefp),
+              district: parseInt(cd119fp),
+              representative: `District ${cd119fp} Representative`
+            },
+            geometry: {
+              type: "Polygon",
+              coordinates: [[
+                [intptlon - boundarySize, intptlat - boundarySize],
+                [intptlon + boundarySize, intptlat - boundarySize],
+                [intptlon + boundarySize, intptlat + boundarySize],
+                [intptlon - boundarySize, intptlat + boundarySize],
+                [intptlon - boundarySize, intptlat - boundarySize]
+              ]]
+            }
+          });
+        }
+      }
+      
+      console.log(`Loaded ${districts.length} congressional districts from CSV`);
+      return districts;
+    } catch (error) {
+      console.error('Error loading CSV data:', error);
+      return generateAllCongressionalDistricts();
+    }
+  }
+
+  function getStateFromFips(fips: string): string {
+    const fipsToState: { [key: string]: string } = {
+      '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+      '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+      '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+      '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+      '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+      '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+      '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+      '55': 'WI', '56': 'WY'
+    };
+    return fipsToState[fips] || 'US';
+  }
 
   // Generate all 435 congressional districts with proper geographic distribution
   function generateAllCongressionalDistricts() {
