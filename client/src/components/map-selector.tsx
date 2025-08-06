@@ -90,29 +90,20 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         },
         center: [-98.5795, 39.8283] as LngLatLike,
         zoom: 4,
-        maxZoom: 16,
+        maxZoom: 14, // Reduce max zoom to limit tile requests
         minZoom: 3,
         attributionControl: true,
         cooperativeGestures: false,
-        preserveDrawingBuffer: false, // Reduce memory usage
-        failIfMajorPerformanceCaveat: false
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false,
+        refreshExpiredTiles: false, // Don't refresh expired tiles
+        maxTileCacheSize: 50 // Limit tile cache size
       });
 
       // Add navigation control
       map.current.addControl(new NavigationControl(), 'top-right');
 
-      // Add simplified error handling - ignore tile loading errors
-      map.current.on('error', (e) => {
-        const errorMessage = e.error?.message || '';
-        // Ignore common tile loading and signal abort errors
-        if (errorMessage.includes('signal') || 
-            errorMessage.includes('AbortError') || 
-            errorMessage.includes('NetworkError') ||
-            errorMessage.includes('tile')) {
-          return;
-        }
-        console.warn('Map warning:', errorMessage);
-      });
+      // Remove error handling that interferes with map operations
 
       map.current.on('load', () => {
         if (map.current) {
@@ -161,21 +152,12 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       return () => {
         try {
           if (map.current) {
-            // Remove specific event listeners first
-            map.current.off('click');
-            map.current.off('load');
-            map.current.off('error');
-            map.current.off('idle');
-            
-            // Stop any pending requests by removing the map
             map.current.remove();
             map.current = null;
           }
-          setIsLoaded(false);
-          setIsInitializing(false);
         } catch (error) {
-          console.warn('Error during map cleanup:', error);
-          map.current = null;
+          // Silently handle cleanup errors
+        } finally {
           setIsLoaded(false);
           setIsInitializing(false);
         }
