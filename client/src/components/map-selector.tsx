@@ -61,40 +61,50 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    // Initialize the map with OpenStreetMap style
-    map.current = new MapLibreMap({
-      container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm': {
-            type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
-          }
+    try {
+      // Initialize the map with OpenStreetMap style
+      map.current = new MapLibreMap({
+        container: mapContainer.current,
+        style: {
+          version: 8,
+          sources: {
+            'osm': {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap contributors'
+            }
+          },
+          layers: [
+            {
+              id: 'osm',
+              type: 'raster',
+              source: 'osm'
+            }
+          ]
         },
-        layers: [
-          {
-            id: 'osm',
-            type: 'raster',
-            source: 'osm'
-          }
-        ]
-      },
-      center: [-98.5795, 39.8283] as LngLatLike, // Center of US
-      zoom: 4,
-    });
+        center: [-98.5795, 39.8283] as LngLatLike, // Center of US
+        zoom: 4,
+      });
 
-    // Add navigation control
-    map.current.addControl(new NavigationControl(), 'top-right');
+      // Add navigation control
+      map.current.addControl(new NavigationControl(), 'top-right');
 
-    map.current.on('load', () => {
-      setIsLoaded(true);
-      addCityMarkers();
-    });
+      // Add error handling for map events
+      map.current.on('error', (e) => {
+        console.error('Map error:', e.error);
+      });
 
-    // Handle map clicks
+      map.current.on('load', () => {
+        try {
+          setIsLoaded(true);
+          addCityMarkers();
+        } catch (error) {
+          console.error('Error loading city markers:', error);
+        }
+      });
+
+      // Handle map clicks
     map.current.on('click', async (e) => {
       const { lng, lat } = e.lngLat;
 
@@ -129,12 +139,15 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       }
     });
 
-    return () => {
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-    };
+      return () => {
+        if (map.current) {
+          map.current.remove();
+          map.current = null;
+        }
+      };
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
   }, [onLocationSelect]);
 
   const addCityMarkers = () => {
@@ -192,29 +205,41 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       }
     });
 
-    // Handle city marker clicks
+    // Handle city marker clicks with error handling
     map.current.on('click', 'city-markers', (e) => {
-      if (e.features && e.features[0]) {
-        const feature = e.features[0];
-        const properties = feature.properties;
-        const coordinates = (feature.geometry as any).coordinates;
+      try {
+        if (e.features && e.features[0]) {
+          const feature = e.features[0];
+          const properties = feature.properties;
+          const coordinates = (feature.geometry as any).coordinates;
 
-        if (properties) {
-          onLocationSelect(properties.name, properties.state, coordinates);
+          if (properties) {
+            onLocationSelect(properties.name, properties.state, coordinates);
+          }
         }
+      } catch (error) {
+        console.error('Error handling city marker click:', error);
       }
     });
 
-    // Change cursor on hover
+    // Change cursor on hover with error handling
     map.current.on('mouseenter', 'city-markers', () => {
-      if (map.current) {
-        map.current.getCanvas().style.cursor = 'pointer';
+      try {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = 'pointer';
+        }
+      } catch (error) {
+        console.error('Error setting cursor on hover:', error);
       }
     });
 
     map.current.on('mouseleave', 'city-markers', () => {
-      if (map.current) {
-        map.current.getCanvas().style.cursor = '';
+      try {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = '';
+        }
+      } catch (error) {
+        console.error('Error resetting cursor:', error);
       }
     });
   };
