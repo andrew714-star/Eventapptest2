@@ -48,7 +48,11 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
       });
       
       if (!response.ok) {
-        throw new Error('Failed to add feed');
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.message || 'Failed to add feed');
+        (error as any).status = response.status;
+        (error as any).errorData = errorData;
+        throw error;
       }
       
       return response.json();
@@ -56,6 +60,22 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+      
+      toast({
+        title: "Feed Added",
+        description: "Calendar feed has been added successfully.",
+      });
+    },
+    onError: (error: any) => {
+      const isAlreadyExists = error.status === 409;
+      
+      toast({
+        title: isAlreadyExists ? "Feed Already Exists" : "Failed to Add Feed",
+        description: isAlreadyExists 
+          ? error.errorData?.message || "This calendar feed has already been added."
+          : "Could not add this calendar feed. Please try again.",
+        variant: isAlreadyExists ? "default" : "destructive",
+      });
     },
   });
 
@@ -151,12 +171,40 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     },
     onSuccess: async (data) => {
       // Add all discovered feeds automatically
+      const addResults = [];
       for (const feed of data.discoveredFeeds) {
-        await addFeedMutation.mutateAsync(feed.source);
+        try {
+          const response = await fetch('/api/add-discovered-feed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: { ...feed.source, isActive: true } })
+          });
+          
+          if (response.ok) {
+            addResults.push({ success: true });
+            queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+          } else if (response.status === 409) {
+            addResults.push({ success: false, alreadyExists: true });
+          } else {
+            addResults.push({ success: false, alreadyExists: false });
+          }
+        } catch (error) {
+          console.warn('Error adding feed:', error);
+          addResults.push({ success: false, alreadyExists: false });
+        }
       }
+      
+      const newFeeds = addResults.filter(r => r.success).length;
+      const existingFeeds = addResults.filter(r => r.alreadyExists).length;
+      
+      let description = `Found ${data.totalCount} calendar feeds across ${data.cities.length} major cities`;
+      if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
+      if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
+      
       toast({
         title: "Top Cities Discovery Complete",
-        description: `Found ${data.totalCount} calendar feeds across ${data.cities.length} major cities`,
+        description: description,
       });
     },
     onError: () => {
@@ -184,12 +232,40 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     },
     onSuccess: async (data) => {
       // Add all discovered feeds automatically
+      const addResults = [];
       for (const feed of data.discoveredFeeds) {
-        await addFeedMutation.mutateAsync(feed.source);
+        try {
+          const response = await fetch('/api/add-discovered-feed', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: { ...feed.source, isActive: true } })
+          });
+          
+          if (response.ok) {
+            addResults.push({ success: true });
+            queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+          } else if (response.status === 409) {
+            addResults.push({ success: false, alreadyExists: true });
+          } else {
+            addResults.push({ success: false, alreadyExists: false });
+          }
+        } catch (error) {
+          console.warn('Error adding feed:', error);
+          addResults.push({ success: false, alreadyExists: false });
+        }
       }
+      
+      const newFeeds = addResults.filter(r => r.success).length;
+      const existingFeeds = addResults.filter(r => r.alreadyExists).length;
+      
+      let description = `Found ${data.count} calendar feeds across ${data.cities.length} cities in ${data.state}`;
+      if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
+      if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
+      
       toast({
         title: "State Discovery Complete",
-        description: `Found ${data.count} calendar feeds across ${data.cities.length} cities in ${data.state}`,
+        description: description,
       });
     },
     onError: () => {
