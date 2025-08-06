@@ -126,10 +126,10 @@ export function DataSourcesModal({ isOpen, onClose }: DataSourcesModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="data-sources-description">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Data Sources Management</DialogTitle>
-          <p className="text-gray-600 dark:text-gray-400">
+          <p id="data-sources-description" className="text-gray-600 dark:text-gray-400">
             Manage automated event collection from city websites, school districts, and community organizations
           </p>
         </DialogHeader>

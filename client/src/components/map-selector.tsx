@@ -108,6 +108,10 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
             }
           }
         );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         const data = await response.json();
 
         if (data.address) {

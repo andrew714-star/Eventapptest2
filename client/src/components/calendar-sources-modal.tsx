@@ -124,7 +124,7 @@ export function CalendarSourcesModal() {
           Data Sources
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto overflow-hidden">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto overflow-hidden" aria-describedby="calendar-sources-description">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Calendar Sources ({sourcesData?.sources.length || 0})</span>
@@ -138,6 +138,10 @@ export function CalendarSourcesModal() {
             </Button>
           </DialogTitle>
         </DialogHeader>
+
+        <p id="calendar-sources-description" className="text-sm text-muted-foreground mb-4">
+          View and manage all calendar feed sources across the United States. Toggle sources on/off and monitor their sync status.
+        </p>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">

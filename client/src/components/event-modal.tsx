@@ -44,7 +44,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="event-description">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             {event.title}
@@ -52,7 +52,7 @@ export function EventModal({ event, isOpen, onClose }: EventModalProps) {
 
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div id="event-description" className="space-y-4">
           {/* Event Image */}
           {event.imageUrl && (
             <img
