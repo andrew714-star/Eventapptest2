@@ -12,8 +12,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/events", async (req, res) => {
     try {
       const events = await storage.getAllEvents();
+      console.log(`API /api/events called - returning ${events.length} events`);
       res.json(events);
     } catch (error) {
+      console.error("Error in /api/events:", error);
       res.status(500).json({ message: "Failed to fetch events" });
     }
   });
@@ -22,9 +24,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/events/filter", async (req, res) => {
     try {
       const filters = eventFilterSchema.parse(req.body);
+      console.log(`API /api/events/filter called with filters:`, filters);
       const events = await storage.getFilteredEvents(filters);
+      console.log(`Returning ${events.length} filtered events`);
       res.json(events);
     } catch (error) {
+      console.error("Error in /api/events/filter:", error);
       res.status(400).json({ message: "Invalid filter parameters" });
     }
   });

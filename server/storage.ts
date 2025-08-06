@@ -32,7 +32,9 @@ export class MemStorage implements IStorage {
   }
 
   async getAllEvents(): Promise<Event[]> {
-    return Array.from(this.events.values());
+    const events = Array.from(this.events.values());
+    console.log(`Storage: getAllEvents() returning ${events.length} events from ${this.events.size} stored events`);
+    return events;
   }
 
   async getFilteredEvents(filters: EventFilter): Promise<Event[]> {
@@ -86,6 +88,7 @@ export class MemStorage implements IStorage {
       isFree: event.isFree ?? "true"
     };
     this.events.set(id, newEvent);
+    console.log(`Storage: Created event ${newEvent.title} (ID: ${id}). Total events: ${this.events.size}`);
     return newEvent;
   }
 
