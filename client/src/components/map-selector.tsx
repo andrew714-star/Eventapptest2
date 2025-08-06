@@ -69,6 +69,18 @@ const US_CITIES = [
   { name: "Salem", state: "OR", coordinates: [-123.0351, 44.9429] as [number, number] },
 ];
 
+// FIPS code to state mapping
+const fipsToState: { [key: string]: string } = {
+  '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+  '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+  '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+  '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+  '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+  '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+  '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+  '55': 'WI', '56': 'WY'
+};
+
 export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -337,25 +349,57 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       map.current.on('click', 'district-fill', async (e) => {
         if (e.features && e.features[0]) {
           const feature = e.features[0];
-          const district = feature.properties?.district || feature.properties?.CD118FP;
-          const state = feature.properties?.state || fipsToState[feature.properties?.STATEFP];
+          const props = feature.properties;
+          
+          // Get district number and state from various possible fields
+          const district = props?.district || props?.CD119FP || props?.CD118FP;
+          const state = props?.state || fipsToState[props?.STATEFP] || fipsToState[props?.fips];
+          
+          console.log('District clicked:', { district, state, props });
           
           if (district && state) {
             await handleDistrictSelect(state, district.toString());
+          } else {
+            console.warn('Missing district or state info:', props);
           }
         }
       });
       
-      // Add hover effects
-      map.current.on('mouseenter', 'district-fill', () => {
-        if (map.current) {
+      // Add hover effects with district info popup
+      const districtPopup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false
+      });
+
+      map.current.on('mouseenter', 'district-fill', (e) => {
+        if (map.current && e.features && e.features[0]) {
           map.current.getCanvas().style.cursor = 'pointer';
+          
+          const feature = e.features[0];
+          const props = feature.properties;
+          const district = props?.district || props?.CD119FP || props?.CD118FP;
+          const state = props?.state || fipsToState[props?.STATEFP] || fipsToState[props?.fips];
+          const name = props?.NAMELSAD || `District ${district}`;
+          
+          if (district && state) {
+            const coordinates = e.lngLat;
+            districtPopup.setLngLat(coordinates)
+              .setHTML(`
+                <div class="text-sm">
+                  <div class="font-medium">${name}</div>
+                  <div class="text-gray-600">${state}-${district}</div>
+                  <div class="text-xs text-gray-500 mt-1">Click to discover feeds</div>
+                </div>
+              `)
+              .addTo(map.current);
+          }
         }
       });
       
       map.current.on('mouseleave', 'district-fill', () => {
         if (map.current) {
           map.current.getCanvas().style.cursor = '';
+          districtPopup.remove();
         }
       });
       
