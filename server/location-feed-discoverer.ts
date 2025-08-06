@@ -26,6 +26,7 @@ export class LocationFeedDiscoverer {
   private commonFeedPaths = [
     '/calendar',
     '/events',
+    '/apps/events',
     '/calendar.ics',
     '/events.ics',
     '/calendar/feed',
