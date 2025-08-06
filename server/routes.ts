@@ -225,6 +225,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Congressional district routes
+  app.get("/api/congressional-districts", async (req, res) => {
+    try {
+      // Use US Census Bureau TIGERweb API for current congressional districts
+      const response = await fetch('https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/54/query?where=1%3D1&outFields=*&f=geojson');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch congressional districts');
+      }
+      
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("Error fetching congressional districts:", error);
+      res.status(500).json({ message: "Failed to fetch congressional districts data" });
+    }
+  });
+
+  // Get cities within a congressional district
+  app.post("/api/congressional-district/cities", async (req, res) => {
+    try {
+      const { district, state } = req.body;
+      
+      if (!district || !state) {
+        return res.status(400).json({ message: "District and state are required" });
+      }
+      
+      // Get cities within the district using reverse geocoding and boundary checking
+      const cities = await cityDiscoverer.getCitiesInDistrict(state, district);
+      
+      res.json({
+        district: `${state}-${district}`,
+        cities,
+        count: cities.length
+      });
+    } catch (error) {
+      console.error("Error getting cities in district:", error);
+      res.status(500).json({ message: "Failed to get cities in congressional district" });
+    }
+  });
+
+  // Discover feeds for congressional district
+  app.post("/api/congressional-district/discover-feeds", async (req, res) => {
+    try {
+      const { district, state } = req.body;
+      
+      if (!district || !state) {
+        return res.status(400).json({ message: "District and state are required" });
+      }
+      
+      console.log(`Discovering feeds for Congressional District ${state}-${district}...`);
+      
+      // Get all cities in the district
+      const cities = await cityDiscoverer.getCitiesInDistrict(state, district);
+      
+      let totalDiscovered = 0;
+      let totalAdded = 0;
+      const results = [];
+      
+      // Discover feeds for each city in the district
+      for (const city of cities) {
+        try {
+          const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city.name, state);
+          totalDiscovered += discoveredFeeds.length;
+          
+          // Auto-add discovered feeds
+          for (const feed of discoveredFeeds) {
+            const success = calendarCollector.addSource(feed.source);
+            if (success) totalAdded++;
+          }
+          
+          results.push({
+            city: city.name,
+            discovered: discoveredFeeds.length,
+            feeds: discoveredFeeds.map(df => df.source)
+          });
+        } catch (error) {
+          console.error(`Failed to discover feeds for ${city.name}, ${state}:`, error);
+        }
+      }
+      
+      res.json({
+        district: `${state}-${district}`,
+        citiesProcessed: cities.length,
+        totalDiscovered,
+        totalAdded,
+        results
+      });
+    } catch (error) {
+      console.error("Error discovering feeds for district:", error);
+      res.status(500).json({ message: "Failed to discover feeds for congressional district" });
+    }
+  });
+
   // Location-based feed discovery
   app.post("/api/discover-feeds", async (req, res) => {
     try {

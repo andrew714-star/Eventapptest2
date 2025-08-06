@@ -2,10 +2,22 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl, { Map as MapLibreMap, NavigationControl, LngLatLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 interface MapSelectorProps {
   onLocationSelect: (city: string, state: string, coordinates: [number, number]) => void;
   selectedLocation?: string;
+}
+
+interface CongressionalDistrict {
+  properties: {
+    CD119FP: string; // District number
+    STATEFP: string; // State FIPS code
+    NAMELSAD: string; // Full name
+  };
+  geometry: any;
 }
 
 // Major US Cities with coordinates for initial markers
@@ -58,6 +70,10 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   const map = useRef<MapLibreMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showDistricts, setShowDistricts] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [districtFeeds, setDistrictFeeds] = useState<any[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!mapContainer.current || map.current || isInitializing) return;
@@ -92,7 +108,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         zoom: 4,
         maxZoom: 14, // Reduce max zoom to limit tile requests
         minZoom: 3,
-        attributionControl: true,
+        attributionControl: false,
         cooperativeGestures: false,
         preserveDrawingBuffer: false,
         failIfMajorPerformanceCaveat: false,
@@ -266,9 +282,181 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
     }
   };
 
+  // Function to load congressional districts
+  const loadCongressionalDistricts = async () => {
+    if (!map.current) return;
+    
+    try {
+      const response = await fetch('/api/congressional-districts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch congressional districts');
+      }
+      
+      const districtsData = await response.json();
+      
+      // Add district boundaries to the map
+      if (map.current.getSource('districts')) {
+        map.current.removeLayer('district-boundaries');
+        map.current.removeLayer('district-fill');
+        map.current.removeSource('districts');
+      }
+      
+      map.current.addSource('districts', {
+        type: 'geojson',
+        data: districtsData
+      });
+      
+      // Add district fill layer
+      map.current.addLayer({
+        id: 'district-fill',
+        type: 'fill',
+        source: 'districts',
+        paint: {
+          'fill-color': '#3b82f6',
+          'fill-opacity': 0.1
+        }
+      });
+      
+      // Add district boundaries
+      map.current.addLayer({
+        id: 'district-boundaries',
+        type: 'line',
+        source: 'districts',
+        paint: {
+          'line-color': '#3b82f6',
+          'line-width': 2,
+          'line-opacity': 0.7
+        }
+      });
+      
+      // Handle district clicks
+      map.current.on('click', 'district-fill', async (e) => {
+        if (e.features && e.features[0]) {
+          const feature = e.features[0];
+          const district = feature.properties?.CD119FP;
+          const stateFips = feature.properties?.STATEFP;
+          
+          if (district && stateFips) {
+            await handleDistrictSelect(stateFips, district);
+          }
+        }
+      });
+      
+      // Add hover effects
+      map.current.on('mouseenter', 'district-fill', () => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = 'pointer';
+        }
+      });
+      
+      map.current.on('mouseleave', 'district-fill', () => {
+        if (map.current) {
+          map.current.getCanvas().style.cursor = '';
+        }
+      });
+      
+      setShowDistricts(true);
+      
+    } catch (error) {
+      console.error('Error loading congressional districts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load congressional districts",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Function to handle district selection
+  const handleDistrictSelect = async (stateFips: string, district: string) => {
+    // Map FIPS codes to state abbreviations (simplified mapping)
+    const fipsToState: { [key: string]: string } = {
+      '06': 'CA', '48': 'TX', '36': 'NY', '12': 'FL', '17': 'IL',
+      '42': 'PA', '39': 'OH', '13': 'GA', '37': 'NC', '26': 'MI'
+      // Add more mappings as needed
+    };
+    
+    const state = fipsToState[stateFips];
+    if (!state) {
+      toast({
+        title: "Error",
+        description: "State not supported yet",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const districtId = `${state}-${district}`;
+    setSelectedDistrict(districtId);
+    
+    try {
+      // Discover feeds for the entire congressional district
+      const response = await fetch('/api/congressional-district/discover-feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ district, state })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to discover feeds for district');
+      }
+      
+      const data = await response.json();
+      setDistrictFeeds(data.results || []);
+      
+      toast({
+        title: "District Selected",
+        description: `Found feeds for ${data.citiesProcessed} cities in ${districtId}. Added ${data.totalAdded} new feeds.`,
+      });
+      
+    } catch (error) {
+      console.error('Error discovering district feeds:', error);
+      toast({
+        title: "Error",
+        description: "Failed to discover feeds for this district",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="w-full h-96 rounded-lg overflow-hidden border border-gray-200 relative">
       <div ref={mapContainer} className="w-full h-full" />
+      
+      {/* District Controls */}
+      <div className="absolute top-4 left-4 space-y-2">
+        <Button
+          onClick={showDistricts ? () => {
+            if (map.current) {
+              if (map.current.getSource('districts')) {
+                map.current.removeLayer('district-boundaries');
+                map.current.removeLayer('district-fill');
+                map.current.removeSource('districts');
+              }
+              setShowDistricts(false);
+              setSelectedDistrict(null);
+              setDistrictFeeds([]);
+            }
+          } : loadCongressionalDistricts}
+          variant={showDistricts ? "secondary" : "default"}
+          size="sm"
+        >
+          {showDistricts ? "Hide Districts" : "Show Districts"}
+        </Button>
+        
+        {selectedDistrict && (
+          <Badge variant="outline" className="bg-white/90">
+            District: {selectedDistrict}
+          </Badge>
+        )}
+        
+        {districtFeeds.length > 0 && (
+          <Badge variant="outline" className="bg-white/90">
+            {districtFeeds.reduce((sum, result) => sum + result.discovered, 0)} feeds found
+          </Badge>
+        )}
+      </div>
+      
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

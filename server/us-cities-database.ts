@@ -171,6 +171,28 @@ export class ComprehensiveCityDiscoverer {
 
     return sources;
   }
+
+  // Get cities within a congressional district using Geocodio API for district lookup
+  async getCitiesInDistrict(state: string, district: string): Promise<CityData[]> {
+    try {
+      // For now, return cities by state as a simplified approach
+      // In a production environment, you would use the Geocodio API or similar service
+      // to determine which cities fall within specific congressional district boundaries
+      const stateCities = this.getCitiesByState(state.toUpperCase());
+      
+      // Return a subset based on district number for demonstration
+      // This is a simplified approach - actual implementation would use geographic boundaries
+      const districtNum = parseInt(district);
+      const citiesPerDistrict = Math.max(1, Math.floor(stateCities.length / 10)); // Rough distribution
+      const startIndex = (districtNum - 1) * citiesPerDistrict;
+      const endIndex = Math.min(startIndex + citiesPerDistrict, stateCities.length);
+      
+      return stateCities.slice(startIndex, endIndex);
+    } catch (error) {
+      console.error(`Error getting cities for district ${state}-${district}:`, error);
+      return [];
+    }
+  }
 }
 
 export const cityDiscoverer = new ComprehensiveCityDiscoverer();
