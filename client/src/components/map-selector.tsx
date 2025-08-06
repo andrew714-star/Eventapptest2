@@ -333,7 +333,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       map.current.on('click', 'district-fill', async (e) => {
         if (e.features && e.features[0]) {
           const feature = e.features[0];
-          const district = feature.properties?.CD119FP;
+          const district = feature.properties?.CD118FP;
           const stateFips = feature.properties?.STATEFP;
           
           if (district && stateFips) {
@@ -408,6 +408,8 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         title: "District Selected",
         description: `Found feeds for ${data.citiesProcessed} cities in ${districtId}. Added ${data.totalAdded} new feeds.`,
       });
+      
+      console.log('District feed discovery results:', data);
       
     } catch (error) {
       console.error('Error discovering district feeds:', error);
