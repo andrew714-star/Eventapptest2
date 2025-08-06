@@ -105,10 +105,12 @@ export function LocationSelector() {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to add feed' }));
-        const error = Object.assign(new Error(errorData.message || 'Failed to add feed'), {
-          status: response.status,
-          errorData: errorData
-        });
+        const error = new Error(errorData.message || 'Failed to add feed') as Error & {
+          status: number;
+          errorData: any;
+        };
+        error.status = response.status;
+        error.errorData = errorData;
         throw error;
       }
       
