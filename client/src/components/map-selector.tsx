@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { Map as MapLibreMap, NavigationControl, LngLatLike } from 'maplibre-gl';
+import maplibregl, { Map as MapLibreMap, NavigationControl, LngLatLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface MapSelectorProps {
@@ -63,7 +63,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
 
     try {
       // Initialize the map with OpenStreetMap style
-      map.current = new MapLibreMap({
+      map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
           version: 8,
@@ -104,28 +104,35 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         }
       });
 
-      // Handle map clicks
+      // Handle map clicks with better error handling
     map.current.on('click', async (e) => {
+      if (!e?.lngLat) return;
+      
       const { lng, lat } = e.lngLat;
 
       try {
-        // Reverse geocoding using free Nominatim API
+        // Add a controller for request cancellation
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
           {
             headers: {
               'User-Agent': 'EventCalendarApp/1.0'
-            }
+            },
+            signal: controller.signal
           }
         );
+        
+        clearTimeout(timeoutId);
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json();
 
-        if (data.address) {
-          // Handle response from Nominatim
+        if (data?.address) {
           const address = data.address;
           const city = address.city || address.town || address.village || '';
           const state = address.state || '';
@@ -135,14 +142,23 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
           }
         }
       } catch (error) {
-        console.error('Error getting location info:', error);
+        if (error.name === 'AbortError') {
+          console.log('Request was cancelled');
+        } else {
+          console.error('Error getting location info:', error);
+        }
       }
     });
 
       return () => {
-        if (map.current) {
-          map.current.remove();
-          map.current = null;
+        try {
+          if (map.current) {
+            map.current.off(); // Remove all event listeners
+            map.current.remove();
+            map.current = null;
+          }
+        } catch (error) {
+          console.warn('Error during map cleanup:', error);
         }
       };
     } catch (error) {
