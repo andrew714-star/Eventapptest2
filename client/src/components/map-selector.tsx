@@ -62,46 +62,76 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
     if (!mapContainer.current || map.current) return;
 
     try {
-      // Initialize the map with OpenStreetMap style
+      // Initialize the map with a more stable OpenStreetMap style
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
           version: 8,
           sources: {
-            'osm': {
+            'osm-tiles': {
               type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tiles: [
+                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+              ],
               tileSize: 256,
+              maxzoom: 18,
               attribution: '© OpenStreetMap contributors'
             }
           },
           layers: [
             {
-              id: 'osm',
+              id: 'osm-layer',
               type: 'raster',
-              source: 'osm'
+              source: 'osm-tiles',
+              minzoom: 0,
+              maxzoom: 18
             }
           ]
         },
         center: [-98.5795, 39.8283] as LngLatLike, // Center of US
         zoom: 4,
+        maxZoom: 18,
+        minZoom: 2,
+        attributionControl: true,
+        cooperativeGestures: false
       });
 
       // Add navigation control
       map.current.addControl(new NavigationControl(), 'top-right');
 
-      // Add error handling for map events
+      // Add comprehensive error handling for map events
       map.current.on('error', (e) => {
-        console.error('Map error:', e.error);
+        console.warn('Map error (non-critical):', e.error?.message || 'Unknown map error');
+        // Don't throw or break execution for map errors
       });
 
       map.current.on('load', () => {
         try {
           setIsLoaded(true);
-          addCityMarkers();
+          // Add a small delay to ensure map is fully ready
+          setTimeout(() => {
+            addCityMarkers();
+          }, 100);
         } catch (error) {
           console.error('Error loading city markers:', error);
+          setIsLoaded(true); // Still set loaded to remove spinner
         }
+      });
+
+      map.current.on('idle', () => {
+        // Map has finished loading and is idle
+        console.log('Map is ready and idle');
+      });
+
+      // Handle source and tile errors gracefully
+      map.current.on('sourcedataloading', () => {
+        // Loading source data
+      });
+
+      map.current.on('sourcedata', () => {
+        // Source data loaded
       });
 
       // Handle map clicks with better error handling
@@ -167,97 +197,116 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   }, [onLocationSelect]);
 
   const addCityMarkers = () => {
-    if (!map.current) return;
+    if (!map.current || !map.current.isStyleLoaded()) {
+      console.log('Map not ready for markers yet');
+      return;
+    }
 
-    // Add source for city markers
-    map.current.addSource('cities', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: US_CITIES.map(city => ({
-          type: 'Feature',
-          properties: {
-            name: city.name,
-            state: city.state,
-            label: `${city.name}, ${city.state}`
-          },
-          geometry: {
-            type: 'Point',
-            coordinates: city.coordinates
-          }
-        }))
+    try {
+      // Check if source already exists
+      if (map.current.getSource('cities')) {
+        console.log('Cities source already exists');
+        return;
       }
-    });
+
+      // Add source for city markers
+      map.current.addSource('cities', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: US_CITIES.map(city => ({
+            type: 'Feature',
+            properties: {
+              name: city.name,
+              state: city.state,
+              label: `${city.name}, ${city.state}`
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: city.coordinates
+            }
+          }))
+        }
+      });
 
     // Add city markers layer
-    map.current.addLayer({
-      id: 'city-markers',
-      type: 'circle',
-      source: 'cities',
-      paint: {
-        'circle-radius': 6,
-        'circle-color': '#3b82f6',
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 2,
-        'circle-opacity': 0.8
+      if (!map.current.getLayer('city-markers')) {
+        map.current.addLayer({
+          id: 'city-markers',
+          type: 'circle',
+          source: 'cities',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#3b82f6',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+            'circle-opacity': 0.8
+          }
+        });
       }
-    });
 
-    // Add city labels layer (simplified without custom fonts)
-    map.current.addLayer({
-      id: 'city-labels',
-      type: 'symbol',
-      source: 'cities',
-      layout: {
-        'text-field': ['get', 'label'],
-        'text-offset': [0, 1.5],
-        'text-anchor': 'top',
-        'text-size': 12
-      },
-      paint: {
-        'text-color': '#374151',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1
+      // Add city labels layer (simplified without custom fonts)
+      if (!map.current.getLayer('city-labels')) {
+        map.current.addLayer({
+          id: 'city-labels',
+          type: 'symbol',
+          source: 'cities',
+          layout: {
+            'text-field': ['get', 'label'],
+            'text-offset': [0, 1.5],
+            'text-anchor': 'top',
+            'text-size': 12
+          },
+          paint: {
+            'text-color': '#374151',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1
+          }
+        });
       }
-    });
 
     // Handle city marker clicks with error handling
-    map.current.on('click', 'city-markers', (e) => {
-      try {
-        if (e.features && e.features[0]) {
-          const feature = e.features[0];
-          const properties = feature.properties;
-          const coordinates = (feature.geometry as any).coordinates;
+      map.current.on('click', 'city-markers', (e) => {
+        try {
+          if (e.features && e.features[0]) {
+            const feature = e.features[0];
+            const properties = feature.properties;
+            const coordinates = (feature.geometry as any).coordinates;
 
-          if (properties) {
-            onLocationSelect(properties.name, properties.state, coordinates);
+            if (properties) {
+              onLocationSelect(properties.name, properties.state, coordinates);
+            }
           }
+        } catch (error) {
+          console.error('Error handling city marker click:', error);
         }
-      } catch (error) {
-        console.error('Error handling city marker click:', error);
-      }
-    });
+      });
 
-    // Change cursor on hover with error handling
-    map.current.on('mouseenter', 'city-markers', () => {
-      try {
-        if (map.current) {
-          map.current.getCanvas().style.cursor = 'pointer';
+      // Change cursor on hover with error handling
+      map.current.on('mouseenter', 'city-markers', () => {
+        try {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = 'pointer';
+          }
+        } catch (error) {
+          console.error('Error setting cursor on hover:', error);
         }
-      } catch (error) {
-        console.error('Error setting cursor on hover:', error);
-      }
-    });
+      });
 
-    map.current.on('mouseleave', 'city-markers', () => {
-      try {
-        if (map.current) {
-          map.current.getCanvas().style.cursor = '';
+      map.current.on('mouseleave', 'city-markers', () => {
+        try {
+          if (map.current) {
+            map.current.getCanvas().style.cursor = '';
+          }
+        } catch (error) {
+          console.error('Error resetting cursor:', error);
         }
-      } catch (error) {
-        console.error('Error resetting cursor:', error);
-      }
-    });
+      });
+
+    } catch (error) {
+      console.error('Error adding city markers:', error);
+      setIsLoaded(true); // Still set loaded to remove spinner
+    }
   };
 
   return (
