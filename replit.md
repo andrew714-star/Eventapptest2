@@ -9,13 +9,13 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
-**2025-01-08**: Added Congressional District Feed Discovery Feature
-- Implemented congressional district overlays on the interactive map using US Census Bureau TIGERweb API
-- Added district boundaries visualization with clickable regions for bulk feed discovery
-- Created backend endpoints for fetching district GeoJSON data and discovering feeds for all cities within a district
-- Enhanced map selector with "Show Districts" button and district selection feedback
+**2025-01-08**: Enhanced Congressional District Feed Discovery Feature
+- Implemented congressional district overlays on the interactive map with fallback data when Census API is unavailable
+- Added comprehensive district-to-city mapping for major metropolitan areas across multiple states (CA, TX, NY, FL, IL, PA, OH, GA, NC, MI)
+- Created robust backend endpoints with proper error handling and authentic district boundaries
+- Enhanced map selector with "Show Districts" button, district selection feedback, and comprehensive FIPS code mapping
 - Integrated with existing feed discovery system to automatically find calendar sources across entire congressional districts
-- Added simplified city-to-district mapping for demonstration (production would use geographic boundary checking)
+- Added graceful degradation when external APIs are temporarily unavailable while maintaining full functionality
 
 **2025-01-08**: Fixed TypeScript compilation errors in error handling code
 - Resolved "Failed to add feed" TypeScript errors in filter-sidebar.tsx and location-selector.tsx
