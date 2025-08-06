@@ -401,6 +401,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Source is required" });
       }
 
+      // Check if source already exists before attempting to add
+      const existingSource = calendarCollector.getSources().find(s => 
+        s.feedUrl === source.feedUrl || s.id === source.id || 
+        (s.name === source.name && s.city === source.city && s.state === source.state)
+      );
+
+      if (existingSource) {
+        return res.status(409).json({ 
+          error: "Calendar source already exists", 
+          message: `${source.name} is already added for ${source.city}, ${source.state}`,
+          existingSource: {
+            id: existingSource.id,
+            name: existingSource.name,
+            isActive: existingSource.isActive
+          }
+        });
+      }
+
       // Add the source to the collector's sources
       const success = await dataCollector.addCalendarSource(source);
 
@@ -413,7 +431,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `Added calendar source: ${source.name}` 
         });
       } else {
-        res.status(400).json({ error: "Failed to add calendar source" });
+        res.status(400).json({ 
+          error: "Failed to add calendar source", 
+          message: "The calendar source could not be added. This may be due to an invalid URL or duplicate entry." 
+        });
       }
     } catch (error) {
       console.error("Add discovered feed error:", error);

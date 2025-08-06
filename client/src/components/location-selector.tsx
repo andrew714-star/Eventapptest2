@@ -104,7 +104,11 @@ export function LocationSelector() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to add feed');
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(errorData.message || 'Failed to add feed');
+        (error as any).status = response.status;
+        (error as any).errorData = errorData;
+        throw error;
       }
       
       return response.json();
@@ -119,12 +123,21 @@ export function LocationSelector() {
         description: `${source.name} has been added and will start collecting events automatically.`,
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      const isAlreadyExists = error.status === 409;
+      
       toast({
-        title: "Failed to Add Feed",
-        description: "Could not add this calendar feed. It may already exist.",
-        variant: "destructive",
+        title: isAlreadyExists ? "Feed Already Exists" : "Failed to Add Feed",
+        description: isAlreadyExists 
+          ? error.errorData?.message || "This calendar feed has already been added."
+          : "Could not add this calendar feed. Please try again.",
+        variant: isAlreadyExists ? "default" : "destructive",
       });
+      
+      // If it already exists, mark it as added in the UI
+      if (isAlreadyExists && error.errorData?.existingSource) {
+        setAddedFeeds(prev => new Set(prev).add(error.errorData.existingSource.id));
+      }
     },
   });
 
@@ -151,13 +164,37 @@ export function LocationSelector() {
     discoverFeedsMutation.mutate({ city, state }, {
       onSuccess: async (data) => {
         // Automatically add the discovered feeds
+        const addResults = [];
         for (const feed of data.discoveredFeeds) {
-          await addFeedMutation.mutateAsync(feed.source);
+          try {
+            await addFeedMutation.mutateAsync(feed.source);
+            addResults.push({ feed: feed.source, success: true });
+          } catch (error: any) {
+            addResults.push({ 
+              feed: feed.source, 
+              success: false, 
+              alreadyExists: error.status === 409 
+            });
+            
+            // If feed already exists, mark it as added in UI
+            if (error.status === 409 && error.errorData?.existingSource) {
+              setAddedFeeds(prev => new Set(prev).add(error.errorData.existingSource.id));
+            }
+          }
         }
+        
         setDiscoveredFeeds(data.discoveredFeeds);
+        
+        const newFeeds = addResults.filter(r => r.success).length;
+        const existingFeeds = addResults.filter(r => r.alreadyExists).length;
+        
+        let description = `Found ${data.count} potential calendar feeds`;
+        if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
+        if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
+        
         toast({
           title: "Feed Discovery Complete",
-          description: `Found ${data.count} potential calendar feeds for ${data.location.city}, ${data.location.state}`,
+          description: description,
         });
       },
       onError: () => {
