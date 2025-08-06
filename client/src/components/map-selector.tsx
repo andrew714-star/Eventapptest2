@@ -57,12 +57,15 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current || map.current || isInitializing) return;
+    
+    setIsInitializing(true);
 
     try {
-      // Initialize the map with a more stable OpenStreetMap style
+      // Initialize the map with a simpler style to avoid glyph errors
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
@@ -70,13 +73,9 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
           sources: {
             'osm-tiles': {
               type: 'raster',
-              tiles: [
-                'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
-              ],
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               tileSize: 256,
-              maxzoom: 18,
+              maxzoom: 19,
               attribution: '© OpenStreetMap contributors'
             }
           },
@@ -84,18 +83,19 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
             {
               id: 'osm-layer',
               type: 'raster',
-              source: 'osm-tiles',
-              minzoom: 0,
-              maxzoom: 18
+              source: 'osm-tiles'
             }
-          ]
+          ],
+          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
         },
-        center: [-98.5795, 39.8283] as LngLatLike, // Center of US
+        center: [-98.5795, 39.8283] as LngLatLike,
         zoom: 4,
         maxZoom: 18,
         minZoom: 2,
         attributionControl: true,
-        cooperativeGestures: false
+        cooperativeGestures: false,
+        preserveDrawingBuffer: true,
+        failIfMajorPerformanceCaveat: false
       });
 
       // Add navigation control
@@ -109,90 +109,95 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
 
       map.current.on('load', () => {
         try {
-          setIsLoaded(true);
-          // Add a small delay to ensure map is fully ready
-          setTimeout(() => {
+          if (map.current) {
+            setIsLoaded(true);
+            setIsInitializing(false);
             addCityMarkers();
-          }, 100);
+          }
         } catch (error) {
-          console.error('Error loading city markers:', error);
-          setIsLoaded(true); // Still set loaded to remove spinner
+          console.error('Error during map load:', error);
+          setIsLoaded(true);
+          setIsInitializing(false);
         }
       });
 
       map.current.on('idle', () => {
-        // Map has finished loading and is idle
-        console.log('Map is ready and idle');
-      });
-
-      // Handle source and tile errors gracefully
-      map.current.on('sourcedataloading', () => {
-        // Loading source data
-      });
-
-      map.current.on('sourcedata', () => {
-        // Source data loaded
-      });
-
-      // Handle map clicks with better error handling
-    map.current.on('click', async (e) => {
-      if (!e?.lngLat) return;
-      
-      const { lng, lat } = e.lngLat;
-
-      try {
-        // Add a controller for request cancellation
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-          {
-            headers: {
-              'User-Agent': 'EventCalendarApp/1.0'
-            },
-            signal: controller.signal
-          }
-        );
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        if (!isLoaded && map.current) {
+          setIsLoaded(true);
+          setIsInitializing(false);
         }
-        const data = await response.json();
+      });
 
-        if (data?.address) {
-          const address = data.address;
-          const city = address.city || address.town || address.village || '';
-          const state = address.state || '';
-
-          if (city && state) {
-            onLocationSelect(city, state, [lng, lat]);
-          }
+      // Handle tile errors more gracefully
+      map.current.on('error', (e) => {
+        if (e.error?.message?.includes('signal')) {
+          // Ignore signal abort errors as they're usually from cancelled requests
+          return;
         }
-      } catch (error) {
-        if (error.name === 'AbortError') {
-          console.log('Request was cancelled');
-        } else {
+        console.warn('Map error (non-critical):', e.error?.message || 'Unknown error');
+      });
+
+      // Handle map clicks with simplified error handling
+      map.current.on('click', async (e) => {
+        if (!e?.lngLat || !map.current) return;
+        
+        const { lng, lat } = e.lngLat;
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'EventCalendarApp/1.0'
+              }
+            }
+          );
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          
+          const data = await response.json();
+
+          if (data?.address) {
+            const address = data.address;
+            const city = address.city || address.town || address.village || '';
+            const state = address.state || '';
+
+            if (city && state) {
+              onLocationSelect(city, state, [lng, lat]);
+            }
+          }
+        } catch (error) {
           console.error('Error getting location info:', error);
         }
-      }
-    });
+      });
 
       return () => {
         try {
           if (map.current) {
-            map.current.off(); // Remove all event listeners
+            // Remove specific event listeners first
+            map.current.off('click');
+            map.current.off('load');
+            map.current.off('error');
+            map.current.off('idle');
+            
+            // Stop any pending requests by removing the map
             map.current.remove();
             map.current = null;
           }
+          setIsLoaded(false);
+          setIsInitializing(false);
         } catch (error) {
           console.warn('Error during map cleanup:', error);
+          map.current = null;
+          setIsLoaded(false);
+          setIsInitializing(false);
         }
       };
     } catch (error) {
       console.error('Error initializing map:', error);
+      setIsInitializing(false);
     }
   }, [onLocationSelect]);
 
@@ -245,20 +250,21 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         });
       }
 
-      // Add city labels layer (simplified without custom fonts)
+      // Add city labels layer with basic text styling
       if (!map.current.getLayer('city-labels')) {
         map.current.addLayer({
           id: 'city-labels',
           type: 'symbol',
           source: 'cities',
           layout: {
-            'text-field': ['get', 'label'],
+            'text-field': ['get', 'name'],
             'text-offset': [0, 1.5],
             'text-anchor': 'top',
-            'text-size': 12
+            'text-size': 10,
+            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular']
           },
           paint: {
-            'text-color': '#374151',
+            'text-color': '#333333',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1
           }
