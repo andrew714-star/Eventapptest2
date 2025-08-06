@@ -251,97 +251,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Load real congressional districts from CSV data
+  // Load real congressional districts from GeoJSON data
   async function loadRealCongressionalDistricts() {
     try {
-      const csvPath = path.join(__dirname, '../attached_assets/NTAD_Congressional_Districts_1009129779752246747_1754511934089.csv');
+      const geoJsonPath = path.join(__dirname, '../attached_assets/congressional-districts.geojson');
       
-      if (!fs.existsSync(csvPath)) {
-        console.log('CSV file not found, using fallback data');
+      if (!fs.existsSync(geoJsonPath)) {
+        console.log('GeoJSON file not found, using fallback data');
         return generateAllCongressionalDistricts();
       }
 
-      const csvContent = fs.readFileSync(csvPath, 'utf-8');
-      const lines = csvContent.split('\n');
+      const geoJsonContent = fs.readFileSync(geoJsonPath, 'utf-8');
+      const geoJsonData = JSON.parse(geoJsonContent);
       
-      const districts = [];
-      
-      // Parse CSV with proper quote handling
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-        
-        // Split CSV line handling quotes
-        const values = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let j = 0; j < line.length; j++) {
-          const char = line[j];
-          if (char === '"' && (j === 0 || line[j-1] === ',')) {
-            inQuotes = true;
-          } else if (char === '"' && inQuotes && (j === line.length - 1 || line[j+1] === ',')) {
-            inQuotes = false;
-          } else if (char === ',' && !inQuotes) {
-            values.push(current.trim());
-            current = '';
-            continue;
-          } else {
-            current += char;
-          }
-        }
-        values.push(current.trim()); // Add the last value
-        
-        // Extract required fields
-        const statefp = values[1]?.replace(/"/g, '');
-        const cd119fp = values[2]?.replace(/"/g, '');
-        const namelsad = values[5]?.replace(/"/g, '');
-        const intptlat = parseFloat(values[12]?.replace(/[+]/g, ''));
-        const intptlon = parseFloat(values[13]?.replace(/[+]/g, ''));
-        const district = values[35]?.replace(/"/g, '');
-        const state = values[36]?.replace(/"/g, '');
-        
-        if (statefp && cd119fp && !isNaN(intptlat) && !isNaN(intptlon)) {
-          // Create more realistic district boundaries based on geographic data
-          const boundarySize = 0.2; // Smaller districts for more accuracy
-          const districtNumber = parseInt(cd119fp) || 1;
-          
-          // Add some geographic variation based on district characteristics
-          const latVariation = (districtNumber % 3 - 1) * 0.1;
-          const lonVariation = (Math.floor(districtNumber / 3) % 3 - 1) * 0.1;
-          
-          const centerLat = intptlat + latVariation;
-          const centerLon = intptlon + lonVariation;
-          
-          districts.push({
-            type: "Feature",
-            properties: {
-              CD119FP: cd119fp,
-              STATEFP: statefp,
-              NAMELSAD: namelsad || `Congressional District ${cd119fp}`,
-              state: state || getStateFromFips(statefp),
-              district: districtNumber,
-              representative: `District ${cd119fp} Representative`,
-              fips: statefp
-            },
-            geometry: {
-              type: "Polygon",
-              coordinates: [[
-                [centerLon - boundarySize, centerLat - boundarySize],
-                [centerLon + boundarySize, centerLat - boundarySize],
-                [centerLon + boundarySize, centerLat + boundarySize],
-                [centerLon - boundarySize, centerLat + boundarySize],
-                [centerLon - boundarySize, centerLat - boundarySize]
-              ]]
-            }
-          });
-        }
+      if (!geoJsonData.features || !Array.isArray(geoJsonData.features)) {
+        throw new Error('Invalid GeoJSON format');
       }
+
+      // Process and standardize the features
+      const districts = geoJsonData.features.map((feature: any) => {
+        const props = feature.properties || {};
+        
+        // Extract district info from various possible field names
+        const cd = props.CD119FP || props.CD118FP || props.DISTRICT || props.district;
+        const state = props.STUSPS || props.STATE || props.state || fipsToState[props.STATEFP] || fipsToState[props.GEOID?.substring(0, 2)];
+        const namelsad = props.NAMELSAD || `Congressional District ${cd}`;
+        
+        return {
+          type: "Feature",
+          properties: {
+            CD119FP: cd ? cd.toString().padStart(2, '0') : '00',
+            STATEFP: props.STATEFP || getStateFips(state) || '00',
+            NAMELSAD: namelsad,
+            state: state || 'US',
+            district: parseInt(cd) || 0,
+            representative: props.representative || `Representative District ${cd}`,
+            fips: props.STATEFP || getStateFips(state) || '00'
+          },
+          geometry: feature.geometry
+        };
+      });
       
-      console.log(`Loaded ${districts.length} congressional districts from CSV`);
+      console.log(`Loaded ${districts.length} congressional districts from GeoJSON`);
       return districts;
     } catch (error) {
-      console.error('Error loading CSV data:', error);
+      console.error('Error loading GeoJSON data:', error);
       return generateAllCongressionalDistricts();
     }
   }
