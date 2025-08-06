@@ -230,12 +230,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Generate comprehensive congressional districts for all 435 districts
       const allDistricts = generateAllCongressionalDistricts();
-      
+
       const geoJsonData = {
         type: "FeatureCollection",
         features: allDistricts
       };
-      
+
       res.json(geoJsonData);
     } catch (error) {
       console.error("Error generating congressional districts:", error);
@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate all 435 congressional districts with proper geographic distribution
   function generateAllCongressionalDistricts() {
     const districts = [];
-    
+
     // State districts mapping (current 118th Congress)
     const stateDistricts: { [key: string]: { count: number; lat: number; lng: number; fips: string } } = {
       'AL': { count: 7, lat: 32.3617, lng: -86.2792, fips: '01' },
@@ -307,13 +307,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Create geographic spread for multiple districts in a state
         const latOffset = (districtNum % 3 - 1) * 0.5; // -0.5, 0, 0.5
         const lngOffset = (Math.floor((districtNum - 1) / 3) % 3 - 1) * 0.7; // Geographic spread
-        
+
         const districtLat = info.lat + latOffset;
         const districtLng = info.lng + lngOffset;
-        
+
         // Create realistic district boundaries (simplified rectangles)
         const boundarySize = 0.3; // Degrees
-        
+
         districts.push({
           type: "Feature",
           properties: {
@@ -338,6 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    console.log(`Generated ${districts.length} congressional districts`);
     return districts;
   }
 
@@ -376,14 +377,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/congressional-district/cities", async (req, res) => {
     try {
       const { district, state } = req.body;
-      
+
       if (!district || !state) {
         return res.status(400).json({ message: "District and state are required" });
       }
-      
+
       // Get cities within the district using reverse geocoding and boundary checking
       const cities = await cityDiscoverer.getCitiesInDistrict(state, district);
-      
+
       res.json({
         district: `${state}-${district}`,
         cities,
@@ -399,32 +400,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/congressional-district/discover-feeds", async (req, res) => {
     try {
       const { district, state } = req.body;
-      
+
       if (!district || !state) {
         return res.status(400).json({ message: "District and state are required" });
       }
-      
+
       console.log(`Discovering feeds for Congressional District ${state}-${district}...`);
-      
+
       // Get all cities in the district
       const cities = await cityDiscoverer.getCitiesInDistrict(state, district);
-      
+
       let totalDiscovered = 0;
       let totalAdded = 0;
       const results = [];
-      
+
       // Discover feeds for each city in the district
       for (const city of cities) {
         try {
           const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city.name, state);
           totalDiscovered += discoveredFeeds.length;
-          
+
           // Auto-add discovered feeds
           for (const feed of discoveredFeeds) {
             const success = calendarCollector.addSource(feed.source);
             if (success) totalAdded++;
           }
-          
+
           results.push({
             city: city.name,
             discovered: discoveredFeeds.length,
@@ -434,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`Failed to discover feeds for ${city.name}, ${state}:`, error);
         }
       }
-      
+
       res.json({
         district: `${state}-${district}`,
         citiesProcessed: cities.length,
@@ -675,7 +676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Manual feed re-prioritization requested");
       await calendarCollector.reprioritizeAllFeeds();
-      
+
       res.json({ 
         success: true, 
         message: "Feed prioritization complete",
@@ -691,10 +692,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/feed-priorities", async (req, res) => {
     try {
       const sources = calendarCollector.getSources();
-      
+
       // Group by domain for priority analysis
       const domainGroups: Record<string, any[]> = {};
-      
+
       sources.forEach(source => {
         const domain = source.websiteUrl ? new URL(source.websiteUrl).hostname : 'unknown';
         if (!domainGroups[domain]) {
@@ -709,7 +710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           state: source.state
         });
       });
-      
+
       res.json({
         domainGroups,
         totalSources: sources.length,
