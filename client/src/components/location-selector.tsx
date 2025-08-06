@@ -165,21 +165,53 @@ export function LocationSelector() {
       onSuccess: async (data) => {
         // Automatically add the discovered feeds
         const addResults = [];
+        
+        // Process feeds one by one to handle errors gracefully
         for (const feed of data.discoveredFeeds) {
           try {
-            await addFeedMutation.mutateAsync(feed.source);
-            addResults.push({ feed: feed.source, success: true });
-          } catch (error: any) {
+            // Create a direct fetch call instead of using the mutation to avoid unhandled promise rejections
+            const response = await fetch('/api/add-discovered-feed', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ source: { ...feed.source, isActive: true } })
+            });
+            
+            if (response.ok) {
+              addResults.push({ feed: feed.source, success: true });
+              setAddedFeeds(prev => new Set(prev).add(feed.source.id));
+              // Invalidate queries for successful additions
+              queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+              queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+            } else if (response.status === 409) {
+              // Feed already exists
+              const errorData = await response.json().catch(() => ({}));
+              addResults.push({ 
+                feed: feed.source, 
+                success: false, 
+                alreadyExists: true 
+              });
+              
+              // Mark as added in UI since it already exists
+              if (errorData.existingSource?.id) {
+                setAddedFeeds(prev => new Set(prev).add(errorData.existingSource.id));
+              } else {
+                setAddedFeeds(prev => new Set(prev).add(feed.source.id));
+              }
+            } else {
+              // Other error
+              addResults.push({ 
+                feed: feed.source, 
+                success: false, 
+                alreadyExists: false 
+              });
+            }
+          } catch (error) {
+            console.warn('Error adding feed:', error);
             addResults.push({ 
               feed: feed.source, 
               success: false, 
-              alreadyExists: error.status === 409 
+              alreadyExists: false 
             });
-            
-            // If feed already exists, mark it as added in UI
-            if (error.status === 409 && error.errorData?.existingSource) {
-              setAddedFeeds(prev => new Set(prev).add(error.errorData.existingSource.id));
-            }
           }
         }
         
@@ -187,10 +219,12 @@ export function LocationSelector() {
         
         const newFeeds = addResults.filter(r => r.success).length;
         const existingFeeds = addResults.filter(r => r.alreadyExists).length;
+        const failedFeeds = addResults.filter(r => !r.success && !r.alreadyExists).length;
         
         let description = `Found ${data.count} potential calendar feeds`;
         if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
         if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
+        if (failedFeeds > 0) description += `, ${failedFeeds} failed to add`;
         
         toast({
           title: "Feed Discovery Complete",
@@ -207,8 +241,53 @@ export function LocationSelector() {
     });
   };
 
-  const handleAddFeed = (feed: DiscoveredFeed) => {
-    addFeedMutation.mutate(feed.source);
+  const handleAddFeed = async (feed: DiscoveredFeed) => {
+    try {
+      const response = await fetch('/api/add-discovered-feed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: { ...feed.source, isActive: true } })
+      });
+      
+      if (response.ok) {
+        setAddedFeeds(prev => new Set(prev).add(feed.source.id));
+        queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+        
+        toast({
+          title: "Feed Added",
+          description: `${feed.source.name} has been added and will start collecting events automatically.`,
+        });
+      } else if (response.status === 409) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Mark as added in UI since it already exists
+        if (errorData.existingSource?.id) {
+          setAddedFeeds(prev => new Set(prev).add(errorData.existingSource.id));
+        } else {
+          setAddedFeeds(prev => new Set(prev).add(feed.source.id));
+        }
+        
+        toast({
+          title: "Feed Already Exists",
+          description: errorData.message || "This calendar feed has already been added.",
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast({
+          title: "Failed to Add Feed",
+          description: errorData.message || "Could not add this calendar feed. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding feed:', error);
+      toast({
+        title: "Failed to Add Feed",
+        description: "Could not add this calendar feed. Please check your connection and try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const popularLocations = [

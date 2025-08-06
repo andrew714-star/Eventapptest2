@@ -50,10 +50,12 @@ export class LocationFeedDiscoverer {
   ];
 
   private schoolDistrictPatterns = [
+    '{city}.K12.{state}.us',
     '{city}schools.org',
     '{city}schools.edu',
     '{city}sd.org',
     '{city}isd.org',
+    '{city}usd.org',
     'www.{city}schools.org',
     'www.{city}schools.edu'
   ];
