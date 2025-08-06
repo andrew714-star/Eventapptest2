@@ -65,7 +65,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
     setIsInitializing(true);
 
     try {
-      // Initialize the map with a simpler style to avoid glyph errors
+      // Initialize the map with a simplified style
       map.current = new maplibregl.Map({
         container: mapContainer.current,
         style: {
@@ -75,7 +75,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
               type: 'raster',
               tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
               tileSize: 256,
-              maxzoom: 19,
+              maxzoom: 18,
               attribution: '© OpenStreetMap contributors'
             }
           },
@@ -85,56 +85,41 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
               type: 'raster',
               source: 'osm-tiles'
             }
-          ],
-          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf'
+          ]
+          // Removed glyphs to avoid font loading issues
         },
         center: [-98.5795, 39.8283] as LngLatLike,
         zoom: 4,
-        maxZoom: 18,
-        minZoom: 2,
+        maxZoom: 16,
+        minZoom: 3,
         attributionControl: true,
         cooperativeGestures: false,
-        preserveDrawingBuffer: true,
+        preserveDrawingBuffer: false, // Reduce memory usage
         failIfMajorPerformanceCaveat: false
       });
 
       // Add navigation control
       map.current.addControl(new NavigationControl(), 'top-right');
 
-      // Add comprehensive error handling for map events
+      // Add simplified error handling - ignore tile loading errors
       map.current.on('error', (e) => {
-        console.warn('Map error (non-critical):', e.error?.message || 'Unknown map error');
-        // Don't throw or break execution for map errors
+        const errorMessage = e.error?.message || '';
+        // Ignore common tile loading and signal abort errors
+        if (errorMessage.includes('signal') || 
+            errorMessage.includes('AbortError') || 
+            errorMessage.includes('NetworkError') ||
+            errorMessage.includes('tile')) {
+          return;
+        }
+        console.warn('Map warning:', errorMessage);
       });
 
       map.current.on('load', () => {
-        try {
-          if (map.current) {
-            setIsLoaded(true);
-            setIsInitializing(false);
-            addCityMarkers();
-          }
-        } catch (error) {
-          console.error('Error during map load:', error);
+        if (map.current) {
           setIsLoaded(true);
           setIsInitializing(false);
+          addCityMarkers();
         }
-      });
-
-      map.current.on('idle', () => {
-        if (!isLoaded && map.current) {
-          setIsLoaded(true);
-          setIsInitializing(false);
-        }
-      });
-
-      // Handle tile errors more gracefully
-      map.current.on('error', (e) => {
-        if (e.error?.message?.includes('signal')) {
-          // Ignore signal abort errors as they're usually from cancelled requests
-          return;
-        }
-        console.warn('Map error (non-critical):', e.error?.message || 'Unknown error');
       });
 
       // Handle map clicks with simplified error handling
@@ -250,62 +235,46 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         });
       }
 
-      // Add city labels layer with basic text styling
-      if (!map.current.getLayer('city-labels')) {
-        map.current.addLayer({
-          id: 'city-labels',
-          type: 'symbol',
-          source: 'cities',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-offset': [0, 1.5],
-            'text-anchor': 'top',
-            'text-size': 10,
-            'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular']
-          },
-          paint: {
-            'text-color': '#333333',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1
-          }
-        });
-      }
+      // Skip text labels to avoid glyph loading issues
+      // City names will be shown in tooltips instead
 
-    // Handle city marker clicks with error handling
+    // Handle city marker clicks
       map.current.on('click', 'city-markers', (e) => {
-        try {
-          if (e.features && e.features[0]) {
-            const feature = e.features[0];
-            const properties = feature.properties;
-            const coordinates = (feature.geometry as any).coordinates;
+        if (e.features && e.features[0]) {
+          const feature = e.features[0];
+          const properties = feature.properties;
+          const coordinates = (feature.geometry as any).coordinates;
 
-            if (properties) {
-              onLocationSelect(properties.name, properties.state, coordinates);
-            }
+          if (properties) {
+            onLocationSelect(properties.name, properties.state, coordinates);
           }
-        } catch (error) {
-          console.error('Error handling city marker click:', error);
         }
       });
 
-      // Change cursor on hover with error handling
-      map.current.on('mouseenter', 'city-markers', () => {
-        try {
-          if (map.current) {
-            map.current.getCanvas().style.cursor = 'pointer';
-          }
-        } catch (error) {
-          console.error('Error setting cursor on hover:', error);
+      // Add popup on hover
+      const popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false
+      });
+
+      map.current.on('mouseenter', 'city-markers', (e) => {
+        if (map.current && e.features && e.features[0]) {
+          map.current.getCanvas().style.cursor = 'pointer';
+          
+          const feature = e.features[0];
+          const coordinates = (feature.geometry as any).coordinates.slice();
+          const properties = feature.properties;
+
+          popup.setLngLat(coordinates)
+            .setHTML(`<div class="text-sm font-medium">${properties.label}</div>`)
+            .addTo(map.current);
         }
       });
 
       map.current.on('mouseleave', 'city-markers', () => {
-        try {
-          if (map.current) {
-            map.current.getCanvas().style.cursor = '';
-          }
-        } catch (error) {
-          console.error('Error resetting cursor:', error);
+        if (map.current) {
+          map.current.getCanvas().style.cursor = '';
+          popup.remove();
         }
       });
 
