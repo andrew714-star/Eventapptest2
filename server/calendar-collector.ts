@@ -856,26 +856,34 @@ export class CalendarFeedCollector {
                     if (startDate && startDate > new Date() && this.isValidEventTitle(title)) {
                       // Additional content validation - ensure this isn't just page navigation
                       if (this.isValidEventContent(elementText, title)) {
-                        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+                        // Extra validation: ensure the date is reasonable (within next 2 years)
+                        const twoYearsFromNow = new Date();
+                        twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
+                        
+                        if (startDate < twoYearsFromNow) {
+                          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
 
-                        parsedEvents.push({
-                          title: this.cleanText(title),
-                          description: this.cleanText(description.substring(0, 300)),
-                          category: this.categorizeEvent(title, description),
-                          location: `${source.city}, ${source.state}`,
-                          organizer: source.name,
-                          startDate,
-                          endDate,
-                          startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                          endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                          attendees: 0,
-                          imageUrl: null,
-                          isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
-                          source: source.id
-                        });
+                          parsedEvents.push({
+                            title: this.cleanText(title),
+                            description: this.cleanText(description.substring(0, 300)),
+                            category: this.categorizeEvent(title, description),
+                            location: `${source.city}, ${source.state}`,
+                            organizer: source.name,
+                            startDate,
+                            endDate,
+                            startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            attendees: 0,
+                            imageUrl: null,
+                            isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
+                            source: source.id
+                          });
 
-                        foundEvents = true;
-                        console.log(`✓ Extracted event: "${title}" on ${startDate.toDateString()}`);
+                          foundEvents = true;
+                          console.log(`✓ Extracted event: "${title}" on ${startDate.toDateString()}`);
+                        } else {
+                          console.log(`Skipping "${title}" - date too far in future: ${startDate.toDateString()}`);
+                        }
                       } else {
                         console.log(`Skipping "${title}" - not valid event content`);
                       }
@@ -2129,13 +2137,13 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Validate if a title string represents a real event - VERY PERMISSIVE VERSION
+   * Validate if a title string represents a real upcoming event - STRICT VERSION
    */
   private isValidEventTitle(title: string): boolean {
-    if (!title || title.length < 3 || title.length > 300) return false;
+    if (!title || title.length < 5 || title.length > 300) return false;
 
-    // Only skip titles that are clearly navigation or purely structural
-    const strictlyInvalidPatterns = [
+    // Exclude clearly invalid patterns first
+    const invalidPatterns = [
       /^skip to/i,
       /^search$/i,
       /^menu$/i,
@@ -2153,186 +2161,234 @@ export class CalendarFeedCollector {
       /^privacy policy$/i,
       /^terms of service$/i,
       /^copyright/i,
-      /^all rights reserved/i
+      /^all rights reserved/i,
+      /past.*agenda/i,
+      /^past /i,
+      /^prior to/i,
+      /archive/i,
+      /history/i,
+      /previous/i,
+      /old/i,
+      /\d{4}.*through.*\d{4}/i, // Date ranges like "2022 through 2023"
+      /^board agenda.*\d{4}/i,
+      /employment/i,
+      /policy/i,
+      /procedure/i,
+      /form/i,
+      /application/i,
+      /document/i,
+      /guideline/i,
+      /manual/i,
+      /handbook/i,
+      /directory/i,
+      /staff/i,
+      /department/i,
+      /administration/i,
+      /superintendent/i,
+      /principal/i,
+      /teacher/i,
+      /communications/i,
+      /enrollment/i,
+      /registration/i,
+      /curriculum/i,
+      /resources/i,
+      /links/i,
+      /wellness center/i,
+      /nutrition services/i,
+      /student rights/i,
+      /nondiscrimination/i,
+      /complaint/i,
+      /harassment/i,
+      /bullying/i,
+      /prevention/i,
+      /covid/i,
+      /technology/i,
+      /google/i,
+      /clever/i,
+      /badge/i,
+      /classroom/i,
+      /faq/i,
+      /help/i,
+      /tutorial/i,
+      /how to/i,
+      /instructions/i,
+      /spotlight/i,
+      /valedictorian/i,
+      /graduate/i,
+      /awards/i,
+      /recognition/i,
+      /video gallery/i,
+      /photo gallery/i,
+      /gallery/i,
+      /image/i,
+      /video/i,
+      /your browser/i,
+      /browser does not support/i,
+      /end of/i,
+      /find us/i,
+      /stay connected/i,
+      /powered by/i,
+      /visit us/i,
+      /website/i,
+      /site/i,
+      /page/i,
+      /navigation/i,
+      /submenu/i,
+      /show submenu/i,
+      /toggle/i,
+      /expand/i,
+      /collapse/i
     ];
 
-    for (const pattern of strictlyInvalidPatterns) {
+    for (const pattern of invalidPatterns) {
       if (pattern.test(title)) {
         return false;
       }
     }
 
-    // MUCH MORE PERMISSIVE - Look for ANY indicators that this could be an event
-    const broadEventIndicators = [
-      // Traditional event words
-      /meeting/i, /conference/i, /workshop/i, /seminar/i, /training/i,
-      /celebration/i, /festival/i, /concert/i, /performance/i,
-      /game/i, /match/i, /tournament/i, /graduation/i, /ceremony/i,
-      /fundraiser/i, /dinner/i, /lunch/i, /breakfast/i, /dance/i,
-      /party/i, /reunion/i, /expo/i, /fair/i, /show/i, /exhibition/i,
-      /presentation/i, /lecture/i, /class/i, /session/i,
-      /board/i, /council/i, /committee/i, /hearing/i, /forum/i,
-      /open house/i, /orientation/i, /registration/i, /enrollment/i,
-      /parent/i, /student/i, /academic/i, /sports/i, /athletics/i,
-
-      // Time-related words that often indicate events
-      /today/i, /tomorrow/i, /tonight/i, /morning/i, /afternoon/i, /evening/i,
-      /weekly/i, /monthly/i, /annual/i, /daily/i,
-      /schedule/i, /calendar/i, /agenda/i, /program/i,
-
-      // Action words that often appear in event titles
-      /join/i, /attend/i, /visit/i, /come/i, /participate/i, /register/i,
-      /volunteer/i, /help/i, /support/i, /donate/i,
-
-      // Location words that often accompany events
-      /at/i, /in/i, /hall/i, /center/i, /park/i, /library/i, /school/i,
-      /gym/i, /field/i, /auditorium/i, /room/i,
-
-      // Educational/community activities
-      /pta/i, /pto/i, /booster/i, /club/i, /team/i, /group/i,
-      /fundraise/i, /charity/i, /volunteer/i, /community/i,
-
-      // School-specific events
-      /grade/i, /kindergarten/i, /elementary/i, /middle/i, /high school/i,
-      /teacher/i, /principal/i, /superintendent/i, /staff/i,
-      /curriculum/i, /academic/i, /testing/i, /assessment/i,
-
-      // Seasonal/holiday events
-      /holiday/i, /thanksgiving/i, /christmas/i, /halloween/i, /valentine/i,
-      /spring/i, /summer/i, /fall/i, /winter/i, /break/i,
-
-      // Generic event-like phrases
-      /will be/i, /is scheduled/i, /takes place/i, /happening/i,
-      /upcoming/i, /next/i, /this/i, /save the date/i,
-      /rsvp/i, /admission/i, /ticket/i, /free/i, /cost/i, /price/i
+    // REQUIRE explicit event indicators - much more strict
+    const requiredEventIndicators = [
+      // Meetings and formal events
+      /\bboard meeting\b/i,
+      /\bcouncil meeting\b/i,
+      /\bschool board\b/i,
+      /\bmeeting\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
+      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*\bmeeting\b/i,
+      
+      // School events with dates
+      /\b(game|match|tournament|graduation|ceremony|concert|performance|play|show)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
+      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*\b(game|match|tournament|graduation|ceremony|concert|performance|play|show)\b/i,
+      
+      // Community events
+      /\b(festival|fair|fundraiser|dinner|lunch|breakfast|dance|party|reunion|expo|exhibition|open house)\b/i,
+      
+      // Educational events with timing
+      /\b(workshop|seminar|training|conference|presentation|lecture|class|session|orientation)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
+      
+      // Events with specific times
+      /\b\d{1,2}:\d{2}\s*(am|pm)\b/i,
+      
+      // Upcoming/scheduled events
+      /\bupcoming\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      /\bscheduled\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      /\bnext\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      
+      // Action phrases for events
+      /\b(join us|attend|participate|register|rsvp)\b.*\b(for|to)\b/i,
+      
+      // Specific future dates
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*\d{4}/i,
+      /\b\d{1,2}\/\d{1,2}\/\d{4}\b/i,
+      /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i
     ];
 
-    // If title contains ANY event indicators, consider it potentially valid
-    for (const indicator of broadEventIndicators) {
-      if (indicator.test(title)) {
-        return true;
-      }
-    }
-
-    // Check if title contains date patterns (very likely an event)
-    const datePatterns = [
-      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
-      /\d{1,2}\/\d{1,2}/,
-      /\d{4}/,
-      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i,
-      /\d{1,2}(st|nd|rd|th)/i, // 1st, 2nd, 3rd, 4th, etc.
-      /\b\d{1,2}:\d{2}/i // Times like 7:30
-    ];
-
-    for (const pattern of datePatterns) {
-      if (pattern.test(title)) {
-        return true;
-      }
-    }
-
-    // If title has multiple words and isn't obviously generic, consider it valid
-    const words = title.split(/\s+/).filter(w => w.length > 2);
-    if (words.length >= 2) {
-      // Much more permissive - only exclude if it's mostly generic web content
-      const webGenericWords = ['site', 'page', 'website', 'link', 'url', 'http', 'www'];
-      const webGenericCount = words.filter(word => 
-        webGenericWords.some(generic => word.toLowerCase().includes(generic))
-      ).length;
-
-      // Only exclude if more than 60% of words are web-generic
-      if (webGenericCount < words.length * 0.6) {
-        return true;
-      }
-    }
-
-    // Very permissive fallback - if it's not clearly invalid, consider it potentially valid
-    return title.length > 10;
+    // Title must contain at least one required event indicator
+    return requiredEventIndicators.some(indicator => indicator.test(title));
   }
 
   /**
-   * Validate if the content represents a valid event - ULTRA PERMISSIVE for unorganized websites
+   * Validate if the content represents a valid upcoming event - STRICT VERSION
    */
   private isValidEventContent(elementText: string, title: string): boolean {
-    // If the title is descriptive, assume it's valid
-    if (title.length > 30) return true;
-
-    // Only filter out obvious navigation/system content
-    const obviouslyInvalidPatterns = [
+    // Filter out obvious administrative/non-event content
+    const invalidContentPatterns = [
       /^skip to/i,
       /^search$/i,
       /^menu$/i,
       /^home$/i,
       /^login$/i,
-      /^copyright.*all rights reserved$/i,
-      /^privacy policy$/i,
-      /^terms of service$/i
+      /copyright.*all rights reserved/i,
+      /privacy policy/i,
+      /terms of service/i,
+      /past.*agenda/i,
+      /prior to/i,
+      /archive/i,
+      /history/i,
+      /previous/i,
+      /old/i,
+      /\d{4}.*through.*\d{4}/i,
+      /employment/i,
+      /policy/i,
+      /procedure/i,
+      /form/i,
+      /application/i,
+      /document/i,
+      /guideline/i,
+      /manual/i,
+      /handbook/i,
+      /directory/i,
+      /staff/i,
+      /department/i,
+      /administration/i,
+      /communications/i,
+      /curriculum/i,
+      /wellness center/i,
+      /nutrition services/i,
+      /student rights/i,
+      /nondiscrimination/i,
+      /complaint/i,
+      /harassment/i,
+      /bullying/i,
+      /prevention/i,
+      /covid/i,
+      /technology/i,
+      /faq/i,
+      /help/i,
+      /tutorial/i,
+      /instructions/i,
+      /spotlight/i,
+      /valedictorian/i,
+      /awards/i,
+      /recognition/i,
+      /gallery/i,
+      /your browser/i,
+      /browser does not support/i,
+      /find us/i,
+      /stay connected/i,
+      /powered by/i,
+      /visit us/i,
+      /navigation/i,
+      /submenu/i
     ];
 
-    for (const pattern of obviouslyInvalidPatterns) {
-      if (pattern.test(elementText.trim())) return false;
-    }
-
-    // Very basic length check - be much more permissive
-    if (elementText.length < 10 || elementText.length > 2000) return false;
-
-    // MUCH MORE PERMISSIVE - Look for ANY potential event indicators
-    const broadEventIndicators = [
-      // Date patterns
-      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
-      /\d{1,2}\/\d{1,2}/,
-      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i,
-      /\d{1,2}:\d{2}/,
-      /\d{4}/,
-      
-      // Time-related words
-      /today/i, /tomorrow/i, /tonight/i, /morning/i, /afternoon/i, /evening/i,
-      /weekly/i, /monthly/i, /annual/i, /daily/i,
-      /schedule/i, /calendar/i, /agenda/i, /program/i,
-      
-      // Event-related words
-      /meeting/i, /conference/i, /workshop/i, /seminar/i, /training/i,
-      /celebration/i, /festival/i, /concert/i, /performance/i,
-      /game/i, /match/i, /tournament/i, /graduation/i, /ceremony/i,
-      /fundraiser/i, /dinner/i, /lunch/i, /breakfast/i, /dance/i,
-      /party/i, /reunion/i, /expo/i, /fair/i, /show/i, /exhibition/i,
-      /presentation/i, /lecture/i, /class/i, /session/i,
-      /board/i, /council/i, /committee/i, /hearing/i, /forum/i,
-      /open house/i, /orientation/i, /registration/i, /enrollment/i,
-      /parent/i, /student/i, /academic/i, /sports/i, /athletics/i,
-      /activity/i, /event/i, /happening/i, /upcoming/i,
-      
-      // Action words
-      /join/i, /attend/i, /visit/i, /come/i, /participate/i, /register/i,
-      /volunteer/i, /help/i, /support/i, /donate/i,
-      /will be/i, /is scheduled/i, /takes place/i,
-      
-      // Location words
-      /at\s+\w+/i, /in\s+\w+/i, /hall/i, /center/i, /park/i, /library/i, /school/i,
-      /gym/i, /field/i, /auditorium/i, /room/i,
-      
-      // Numbers that might be dates/times
-      /\b\d{1,2}(st|nd|rd|th)/i,
-      /\d{1,2}\s*[ap]m/i,
-      
-      // Common event phrases
-      /save the date/i, /rsvp/i, /admission/i, /ticket/i, /free/i, /cost/i, /price/i,
-      /contact.*for.*info/i, /more information/i, /details/i
-    ];
-
-    // If content contains ANY event indicators, consider it potentially valid
-    for (const indicator of broadEventIndicators) {
-      if (indicator.test(elementText)) {
-        return true;
+    for (const pattern of invalidContentPatterns) {
+      if (pattern.test(elementText)) {
+        return false;
       }
     }
 
-    // If it has multiple words and reasonable length, still consider it valid
-    const words = elementText.split(/\s+/).filter(w => w.length > 2);
-    if (words.length >= 3 && elementText.length > 20) {
-      return true;
-    }
+    // Require length to be reasonable for an event description
+    if (elementText.length < 15 || elementText.length > 1000) return false;
 
-    return false;
+    // Must contain explicit event content indicators with timing
+    const validEventContentPatterns = [
+      // Events with specific dates/times
+      /\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2})\b/i,
+      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2})\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      
+      // Upcoming/scheduled events
+      /\b(upcoming|scheduled|next)\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      
+      // Action phrases for events
+      /\b(join us|attend|participate|register|rsvp)\b.*\b(for|to)\b/i,
+      /\b(will be held|takes place|is scheduled|happening)\b/i,
+      
+      // Board/council meetings
+      /\b(board|council)\s+(meeting|session)\b/i,
+      
+      // School events
+      /\b(school board|pta|pto)\s+(meeting|event)\b/i,
+      
+      // Specific times
+      /\b\d{1,2}:\d{2}\s*(am|pm)\b/i,
+      
+      // Future dates
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*\d{4}/i,
+      /\b\d{1,2}\/\d{1,2}\/\d{4}\b/i
+    ];
+
+    // Content must match at least one valid event pattern
+    return validEventContentPatterns.some(pattern => pattern.test(elementText));
   }
 }
 
