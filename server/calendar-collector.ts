@@ -304,6 +304,61 @@ export class CalendarFeedCollector {
     try {
       let events: InsertEvent[] = [];
 
+      // First, try to detect if the feedUrl might actually be a calendar feed
+      if (source.feedUrl) {
+        console.log(`Checking if ${source.feedUrl} contains calendar feed patterns...`);
+        
+        // Try to detect actual calendar feeds first
+        if (source.feedUrl.includes('.ics') || source.feedUrl.includes('calendar.') || 
+            source.feedUrl.includes('/calendar/') || source.feedUrl.includes('ICalendarHandler') ||
+            source.feedUrl.includes('/feed') || source.feedUrl.includes('.rss') ||
+            source.feedUrl.includes('api/events') || source.feedUrl.includes('api/calendar')) {
+          
+          console.log(`Feed URL appears to be a structured feed, trying appropriate parser...`);
+          
+          if (source.feedUrl.includes('.ics') || source.feedUrl.includes('ICalendarHandler')) {
+            console.log(`Trying iCal parser for structured feed...`);
+            try {
+              events = await this.parseICalFeed(source);
+              if (events.length > 0) {
+                console.log(`✓ iCal parser found ${events.length} events`);
+                return events;
+              }
+            } catch (error) {
+              console.log(`iCal parser failed, trying other methods...`);
+            }
+          }
+          
+          if (source.feedUrl.includes('.rss') || source.feedUrl.includes('rss') || 
+              source.feedUrl.includes('/feed')) {
+            console.log(`Trying RSS parser for structured feed...`);
+            try {
+              events = await this.parseRSSFeed(source);
+              if (events.length > 0) {
+                console.log(`✓ RSS parser found ${events.length} events`);
+                return events;
+              }
+            } catch (error) {
+              console.log(`RSS parser failed, trying other methods...`);
+            }
+          }
+          
+          if (source.feedUrl.includes('api') || source.feedUrl.includes('.json')) {
+            console.log(`Trying JSON parser for structured feed...`);
+            try {
+              events = await this.parseJSONFeed(source);
+              if (events.length > 0) {
+                console.log(`✓ JSON parser found ${events.length} events`);
+                return events;
+              }
+            } catch (error) {
+              console.log(`JSON parser failed, trying other methods...`);
+            }
+          }
+        }
+      }
+
+      // If no structured feed found, use the original feedType logic
       switch (source.feedType) {
         case 'ical':
           events = await this.parseICalFeed(source);
@@ -543,12 +598,14 @@ export class CalendarFeedCollector {
   }
 
  private async scrapeHTMLEvents(source: CalendarSource): Promise<InsertEvent[]> {
-    // Use feedUrl as fallback if websiteUrl is not available
-    const targetUrl = source.websiteUrl || source.feedUrl;
+    // Always use feedUrl first, then fallback to websiteUrl
+    const targetUrl = source.feedUrl || source.websiteUrl;
     if (!targetUrl) return [];
 
     try {
         console.log(`scrapeHTMLEvents called for ${source.name} with URL: ${targetUrl}`);
+        console.log(`Using feedUrl (${source.feedUrl}) vs websiteUrl (${source.websiteUrl})`);
+        
         const response = await axios.get(targetUrl, {
             timeout: 15000,
             headers: {
