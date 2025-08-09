@@ -307,15 +307,15 @@ export class CalendarFeedCollector {
       // First, try to detect if the feedUrl might actually be a calendar feed
       if (source.feedUrl) {
         console.log(`Checking if ${source.feedUrl} contains calendar feed patterns...`);
-        
+
         // Try to detect actual calendar feeds first
         if (source.feedUrl.includes('.ics') || source.feedUrl.includes('calendar.') || 
             source.feedUrl.includes('/calendar/') || source.feedUrl.includes('ICalendarHandler') ||
             source.feedUrl.includes('/feed') || source.feedUrl.includes('.rss') ||
             source.feedUrl.includes('api/events') || source.feedUrl.includes('api/calendar')) {
-          
+
           console.log(`Feed URL appears to be a structured feed, trying appropriate parser...`);
-          
+
           if (source.feedUrl.includes('.ics') || source.feedUrl.includes('ICalendarHandler')) {
             console.log(`Trying iCal parser for structured feed...`);
             try {
@@ -328,7 +328,7 @@ export class CalendarFeedCollector {
               console.log(`iCal parser failed, trying other methods...`);
             }
           }
-          
+
           if (source.feedUrl.includes('.rss') || source.feedUrl.includes('rss') || 
               source.feedUrl.includes('/feed')) {
             console.log(`Trying RSS parser for structured feed...`);
@@ -342,7 +342,7 @@ export class CalendarFeedCollector {
               console.log(`RSS parser failed, trying other methods...`);
             }
           }
-          
+
           if (source.feedUrl.includes('api') || source.feedUrl.includes('.json')) {
             console.log(`Trying JSON parser for structured feed...`);
             try {
@@ -605,7 +605,7 @@ export class CalendarFeedCollector {
     try {
         console.log(`scrapeHTMLEvents called for ${source.name} with URL: ${targetUrl}`);
         console.log(`Using feedUrl (${source.feedUrl}) vs websiteUrl (${source.websiteUrl})`);
-        
+
         const response = await axios.get(targetUrl, {
             timeout: 15000,
             headers: {
@@ -770,36 +770,34 @@ export class CalendarFeedCollector {
                                     eventDate = this.getNextOccurrenceDate(title);
                                 }
 
-                                if (eventDate && title && startTime) {
+                                if (eventDate && eventDate > new Date() && title && startTime) { // Only future events
 
-                                    if (eventDate > new Date()) { // Only future events
-                                        // Generate better descriptions for San Jacinto events
-                                        let eventDescription = 'Event details available on website';
-                                        if (title.includes('City Council Meeting')) {
-                                            eventDescription = 'Regular City Council meeting to discuss community business, municipal affairs, and public concerns. Open to the public with time for public comments.';
-                                        } else if (title.includes('Planning Commission')) {
-                                            eventDescription = 'Planning Commission meeting to review development proposals, zoning applications, and city planning matters. Public attendance welcomed.';
-                                        } else if (title.includes('Kool August Nights')) {
-                                            eventDescription = 'Classic car show and family entertainment event featuring vintage automobiles, live music, food vendors, and community activities in downtown San Jacinto.';
-                                        }
-
-                                        parsedEvents.push({
-                                            title: this.cleanText(title),
-                                            description: eventDescription,
-                                            category: title.includes('Council') ? 'Government' : title.includes('Commission') ? 'Government' : 'Entertainment',
-                                            location: title.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : title.includes('Council') ? 'San Jacinto City Hall' : 'San Jacinto City Hall',
-                                            organizer: source.name,
-                                            startDate: eventDate,
-                                            endDate: new Date(eventDate.getTime() + 2.5 * 60 * 60 * 1000), // 2.5 hours duration
-                                            startTime: startTime,
-                                            endTime: endTime,
-                                            attendees: 0,
-                                            imageUrl: null,
-                                            isFree: 'true',
-                                            source: source.id
-                                        });
-                                        console.log(`Successfully parsed San Jacinto event: ${title} on ${eventDate.toDateString()}`);
+                                    // Generate better descriptions for San Jacinto events
+                                    let eventDescription = 'Event details available on website';
+                                    if (title.includes('City Council Meeting')) {
+                                        eventDescription = 'Regular City Council meeting to discuss community business, municipal affairs, and public concerns. Open to the public with time for public comments.';
+                                    } else if (title.includes('Planning Commission')) {
+                                        eventDescription = 'Planning Commission meeting to review development proposals, zoning applications, and city planning matters. Public attendance welcomed.';
+                                    } else if (title.includes('Kool August Nights')) {
+                                        eventDescription = 'Classic car show and family entertainment event featuring vintage automobiles, live music, food vendors, and community activities in downtown San Jacinto.';
                                     }
+
+                                    parsedEvents.push({
+                                        title: this.cleanText(title),
+                                        description: eventDescription,
+                                        category: title.includes('Council') ? 'Government' : title.includes('Commission') ? 'Government' : 'Entertainment',
+                                        location: title.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : title.includes('Council') ? 'San Jacinto City Hall' : 'San Jacinto City Hall',
+                                        organizer: source.name,
+                                        startDate: eventDate,
+                                        endDate: new Date(eventDate.getTime() + 2.5 * 60 * 60 * 1000), // 2.5 hours duration
+                                        startTime: startTime,
+                                        endTime: endTime,
+                                        attendees: 0,
+                                        imageUrl: null,
+                                        isFree: 'true',
+                                        source: source.id
+                                    });
+                                    console.log(`Successfully parsed San Jacinto event: ${title} on ${eventDate.toDateString()}`);
                                 }
                             }
                         }
@@ -825,7 +823,7 @@ export class CalendarFeedCollector {
             const generalEventKeywords = [
                 // Meetings and governance
                 'meeting', 'agenda', 'session', 'hearing', 'vote',
-                
+
                 // Events and activities
                 'event', 'activity', 'program', 'celebration', 'festival', 'fair',
                 'ceremony', 'awards', 'recognition', 'honor', 'achievement',
@@ -833,11 +831,11 @@ export class CalendarFeedCollector {
                 'performance', 'concert', 'play', 'drama', 'music', 'art', 'exhibition',
                 'game', 'match', 'tournament', 'athletic', 'sports', 'team', 'competition',
                 'dance', 'party', 'fundraiser', 'volunteer', 'community', 'family',
-                
+
                 // Administrative
                 'registration', 'enrollment', 'orientation', 'open house',
                 'information', 'presentation', 'forum', 'discussion',
-                
+
                 // Calendar/timing
                 'schedule', 'calendar', 'date', 'time', 'day', 'week', 'month',
                 'holiday', 'break', 'vacation', 'closed', 'early', 'release'
@@ -901,32 +899,57 @@ export class CalendarFeedCollector {
                     eventDate = this.extractComprehensiveDate(elementText, $element);
                 }
 
-                if (eventDate && eventDate > new Date()) {
-                    // Extract a meaningful title
-                    let title = this.extractEventTitle(elementText, $element);
+                if (eventDate && eventDate > new Date() && this.isValidEventTitle(this.extractEventTitle(elementText, $element))) {
+                    // Additional content validation - ensure this isn't just page navigation
+                    if (this.isValidEventContent(elementText, this.extractEventTitle(elementText, $element))) {
+                        // Extra validation: ensure the date is reasonable (within next 2 years)
+                        const twoYearsFromNow = new Date();
+                        twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
 
-                    if (title && title.length > 5 && title.length < 200) {
-                        parsedEvents.push({
-                            title: this.cleanText(title),
-                            description: this.cleanText(elementText.substring(0, 300)) || 'Event details available on website',
-                            category: this.categorizeEvent(title, elementText),
-                            location: `${source.city}, ${source.state}`,
-                            organizer: source.name,
-                            startDate: eventDate,
-                            endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
-                            startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            attendees: 0,
-                            imageUrl: null,
-                            isFree: 'true',
-                            source: source.id
-                        });
+                        if (eventDate < twoYearsFromNow) {
+                            // Extract a meaningful title
+                            let title = this.extractEventTitle(elementText, $element);
 
-                        console.log(`✓ Successfully created flexible event: ${title} on ${eventDate.toDateString()}`);
+                            if (title && title.length > 5 && title.length < 200) {
+                                // Check for duplicates
+                                const eventKey = `${title.toLowerCase().trim()}-${eventDate.toDateString()}-${source.city}`;
+                                const isDuplicate = parsedEvents.some(event => 
+                                    `${event.title.toLowerCase().trim()}-${event.startDate.toDateString()}-${source.city}` === eventKey
+                                );
 
-                        // Limit to prevent too many events
-                        if (parsedEvents.length >= 10) break;
+                                if (!isDuplicate) {
+                                    parsedEvents.push({
+                                        title: this.cleanText(title),
+                                        description: this.cleanText(elementText.substring(0, 300)) || 'Event details available on website',
+                                        category: this.categorizeEvent(title, elementText),
+                                        location: `${source.city}, ${source.state}`,
+                                        organizer: source.name,
+                                        startDate: eventDate,
+                                        endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                                        startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                                        endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                                        attendees: 0,
+                                        imageUrl: null,
+                                        isFree: 'true',
+                                        source: source.id
+                                    });
+
+                                    console.log(`✓ Extracted flexible event: "${title}" on ${eventDate.toDateString()}`);
+
+                                    // Limit to prevent too many events
+                                    if (parsedEvents.length >= 10) break;
+                                } else {
+                                    console.log(`Skipping duplicate flexible event: "${title}" on ${eventDate.toDateString()}`);
+                                }
+                            }
+                        } else {
+                          console.log(`Skipping "${title}" - date too far in future: ${eventDate.toDateString()}`);
+                        }
+                    } else {
+                        console.log(`Skipping "${title}" - not valid event content`);
                     }
+                } else {
+                    console.log(`Skipping element - no valid future date found or invalid title. Text: "${elementText.substring(0, 100)}"`);
                 }
             }
 
@@ -934,217 +957,6 @@ export class CalendarFeedCollector {
 
             if (parsedEvents.length > 0) {
                 return parsedEvents;
-            }
-        }
-
-        // For other websites, use comprehensive selectors and multiple parsing strategies
-        console.log(`Starting comprehensive HTML event extraction for ${source.name}`);
-
-        // Strategy 1: Look for structured event data with enhanced selectors - prioritizing list formats
-        const structuredSelectors = [
-            // PRIMARY: List-format calendar selectors (most common for government/school sites)
-            'ul.events li, ol.events li, .events ul li, .events ol li',
-            'ul.calendar li, ol.calendar li, .calendar ul li, .calendar ol li',
-            'ul.event-list li, ol.event-list li, .event-list ul li, .event-list ol li',
-            'ul.upcoming li, ol.upcoming li, .upcoming ul li, .upcoming ol li',
-            'ul.agenda li, ol.agenda li, .agenda ul li, .agenda ol li',
-            'ul.meetings li, ol.meetings li, .meetings ul li, .meetings ol li',
-            'ul.announcements li, ol.announcements li, .announcements ul li, .announcements ol li',
-            'ul.activities li, ol.activities li, .activities ul li, .activities ol li',
-            
-            // Calendar list views (common CMS patterns)
-            '.calendar-list li, .calendar-listing li, .event-listing li',
-            '.upcoming-events li, .events-list li, .event-list li, .event-list-item',
-            '.agenda-list li, .meeting-list li, .announcement-list li',
-            
-            // Table-based list formats
-            'table.events tr, table.calendar tr, table.agenda tr, table.meetings tr',
-            'table.event-list tr, table.calendar-list tr',
-            '.events table tr, .calendar table tr, .agenda table tr',
-            
-            // Standard event selectors
-            '.event-item, .event, .calendar-event, .event-listing, .event-card, .event-list-item',
-            
-            // Calendar-specific selectors
-            '.calendar-item, .calendar-entry, .calendar-listing',
-            'td[title*="event"], td[title*="Event"], .calendar-day[data-event]',
-            '[aria-label*="event"], [aria-label*="Event"]',
-            '.calendar-day .event, .calendar-cell .event',
-
-            // Common CMS selectors
-            '.view-content .views-row', // Drupal CMS events
-            '.post-item, .news-item, .announcement',
-            'article[class*="event"], div[class*="event"]',
-            '.event-wrapper, .event-container',
-
-            // Generic content with event keywords in class/id
-            '[class*="event"], [id*="event"]',
-            '[class*="calendar"], [id*="calendar"]',
-
-            // School/government specific selectors
-            '.news-events .item, .announcements .item',
-            '.board-meetings .item, .meeting-item',
-            '.activities .item, .activity-item',
-
-            // Secondary: Broader content selectors
-            'h1, h2, h3, h4, h5, h6', // Any heading could be an event title
-            'p:has(strong), p:has(b)', // Paragraphs with bold text (often event announcements)
-            'td, th', // Table cells that might contain events
-            'li', // Any list item (fallback)
-            '.card, .box, .tile, .panel, .section', // Common layout containers
-            'div[id], div[class]', // Any div with an id or class (very broad)
-            'article, section, aside', // Semantic content areas
-            '.row, .col, .column, .grid-item', // Grid/layout items
-            '.content, .main, .primary, .secondary', // Content areas
-            'span:has(strong), span:has(b)', // Spans with bold text
-            'a[href*="event"], a[href*="calendar"], a[href*="news"]', // Links to events/calendar/news
-            '[title*="event"], [title*="Event"], [title*="meeting"], [title*="Meeting"]' // Elements with event-related titles
-        ];
-
-        let foundEvents = false;
-
-        for (const selector of structuredSelectors) {
-            const events = $(selector);
-            console.log(`Trying selector "${selector}" - found ${events.length} elements`);
-
-            if (events.length > 0) {
-                events.each((_, element) => {
-                    const $event = $(element);
-                    const elementText = $event.text().trim();
-
-                    // Skip if element is too large (likely a full page container) or too small (likely just labels)
-                    if (elementText.length > 5000 || elementText.length < 10) return;
-
-                    // Only skip elements that are clearly just containers with no meaningful content
-                    // Remove navigation filtering to be more aggressive
-                    if (this.isContainerOnlyElement($event, elementText)) return;
-
-                    // Extract title with multiple strategies - enhanced for list formats
-                    let title = '';
-
-                    // Strategy 1: For list items, look for direct text content first
-                    if ($event.is('li') || $event.closest('li').length > 0) {
-                        // Get the main text content of the list item, excluding child elements that might be metadata
-                        const listItemText = $event.clone().find('.date, .time, .location, .meta, .more').remove().end().text().trim();
-                        if (listItemText && listItemText.length > 10 && listItemText.length < 200 && this.isValidEventTitle(listItemText)) {
-                            title = listItemText;
-                        }
-                    }
-
-                    // Strategy 2: For table rows, look for the first meaningful cell
-                    if (!title && ($event.is('tr') || $event.closest('tr').length > 0)) {
-                        const cells = $event.find('td, th');
-                        for (let i = 0; i < cells.length; i++) {
-                            const cellText = $(cells[i]).text().trim();
-                            // Skip date-only cells, look for event titles
-                            if (cellText && cellText.length > 10 && cellText.length < 200 && 
-                                !this.isDateOnlyText(cellText) && this.isValidEventTitle(cellText)) {
-                                title = cellText;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Strategy 3: Try specific title selectors
-                    if (!title) {
-                        const titleSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', '.title', '.event-title', '.event-name', '.event-heading', 'a[href*="event"]', 'a[href*="calendar"]', 'strong', 'b'];
-                        for (const titleSel of titleSelectors) {
-                            const titleEl = $event.find(titleSel).first();
-                            if (titleEl.length && titleEl.text().trim()) {
-                                const candidateTitle = titleEl.text().trim();
-                                if (this.isValidEventTitle(candidateTitle)) {
-                                    title = candidateTitle;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Strategy 4: Extract from structured text patterns (common in list formats)
-                    if (!title) {
-                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
-                        for (const line of lines.slice(0, 3)) {
-                            // Look for lines that start with event indicators
-                            if (/^(board meeting|council meeting|meeting|workshop|seminar|training|conference|celebration|festival|concert|performance|game|ceremony|fundraiser|presentation|orientation)/i.test(line.trim())) {
-                                if (this.isValidEventTitle(line)) {
-                                    title = line;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Strategy 5: Fallback to first meaningful line
-                    if (!title) {
-                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
-                        for (const line of lines.slice(0, 3)) {
-                            if (this.isValidEventTitle(line)) {
-                                title = line;
-                                break;
-                            }
-                        }
-                    }
-
-                    // Clean and validate title
-                    title = this.cleanEventTitle(title);
-
-                    if (!title || title.length <= 5 || !this.isValidEventTitle(title)) {
-                        console.log(`Skipping element - no valid title found. Text: "${elementText.substring(0, 100)}"`);
-                        return;
-                    }
-
-                    // Extract description
-                    let description = $event.find('.description, .summary, .event-description, .content, p').first().text().trim();
-                    if (!description || description === title) {
-                        // Use remaining text after title as description
-                        const remainingText = elementText.replace(title, '').trim();
-                        description = remainingText.length > 20 ? remainingText.substring(0, 300) : 'Event details available on website';
-                    }
-
-                    // Extract date with comprehensive approach - enhanced for list/table formats
-                    let startDate = this.extractEventDateFromListOrTable($event, elementText);
-
-                    // Only add events with valid, future dates AND proper event validation
-                    if (startDate && startDate > new Date() && this.isValidEventTitle(title)) {
-                      // Additional content validation - ensure this isn't just page navigation
-                      if (this.isValidEventContent(elementText, title)) {
-                        // Extra validation: ensure the date is reasonable (within next 2 years)
-                        const twoYearsFromNow = new Date();
-                        twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
-                        
-                        if (startDate < twoYearsFromNow) {
-                          const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-
-                          parsedEvents.push({
-                            title: this.cleanText(title),
-                            description: this.cleanText(description.substring(0, 300)),
-                            category: this.categorizeEvent(title, description),
-                            location: `${source.city}, ${source.state}`,
-                            organizer: source.name,
-                            startDate,
-                            endDate,
-                            startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                            attendees: 0,
-                            imageUrl: null,
-                            isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
-                            source: source.id
-                          });
-
-                          foundEvents = true;
-                          console.log(`✓ Extracted event: "${title}" on ${startDate.toDateString()}`);
-                        } else {
-                          console.log(`Skipping "${title}" - date too far in future: ${startDate.toDateString()}`);
-                        }
-                      } else {
-                        console.log(`Skipping "${title}" - not valid event content`);
-                      }
-                    } else {
-                      console.log(`Skipping "${title}" - no valid future date found or invalid title`);
-                    }
-                });
-
-                if (foundEvents) break; // Stop if we found events with this selector
             }
         }
 
@@ -1857,13 +1669,13 @@ export class CalendarFeedCollector {
 
     // Strategy 4: Extract from structured text patterns
     const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
-    
+
     // Look for lines that contain event-like patterns
     const eventPatterns = [
-      /\b(meeting|conference|workshop|seminar|training|ceremony|game|match|tournament|concert|performance|presentation|orientation|registration|open house|event|activity|program|celebration|festival|fundraiser)\b/i
+      /\b(meeting|conference|workshop|seminar|training|ceremony|game|match|tournament|concert|performance|presentation|orientation|registration|open house|event|activity|program|celebration|festival)\b/i
     ];
 
-    for (const line of lines.slice(0, 5)) {
+    for (const line of lines.slice(0, 3)) {
       if (line.length > 10 && line.length < 200) {
         // Check if line contains event patterns
         if (eventPatterns.some(pattern => pattern.test(line))) {
@@ -1901,14 +1713,14 @@ export class CalendarFeedCollector {
    */
   private getSchoolEventCategory(eventType: string): string {
     const type = eventType.toLowerCase();
-    
+
     if (type.includes('board') || type.includes('meeting')) return 'Government';
     if (type.includes('athletic') || type.includes('game') || type.includes('sport')) return 'Sports & Recreation';
     if (type.includes('graduation') || type.includes('ceremony') || type.includes('awards')) return 'Education & Learning';
     if (type.includes('conference') || type.includes('workshop') || type.includes('training')) return 'Education & Learning';
     if (type.includes('holiday') || type.includes('break') || type.includes('celebration')) return 'Holiday';
     if (type.includes('registration') || type.includes('enrollment') || type.includes('orientation')) return 'Education & Learning';
-    
+
     return 'Education & Learning';
   }
 
@@ -1969,7 +1781,7 @@ export class CalendarFeedCollector {
     if (comprehensiveDate) return comprehensiveDate;
 
     // Enhanced extraction for list and table formats
-    
+
     // Strategy 1: For list items, look for date in specific positions
     if ($element.is('li') || $element.closest('li').length > 0) {
       // Look for date at the beginning of list text
@@ -1981,7 +1793,7 @@ export class CalendarFeedCollector {
           const date = this.parseEventDate(dateAtStart[0]);
           if (date) return date;
         }
-        
+
         // Check for date in middle of line
         const dateInText = line.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i);
         if (dateInText) {
@@ -1994,7 +1806,7 @@ export class CalendarFeedCollector {
     // Strategy 2: For table rows, check each cell for dates
     if ($element.is('tr') || $element.closest('tr').length > 0) {
       const cells = $element.find('td, th');
-      
+
       // First, look for cells that are likely to contain dates
       cells.each((_, cell) => {
         const cellText = $(cell).text().trim();
@@ -2005,7 +1817,7 @@ export class CalendarFeedCollector {
             /\d{1,2}\/\d{1,2}\/?\d{0,4}/,
             /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
           ];
-          
+
           for (const pattern of datePatterns) {
             const match = cellText.match(pattern);
             if (match) {
@@ -2241,7 +2053,7 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Get days until next weekend (Saturday)
+   * Get days until next weekend
    */
   private getDaysUntilWeekend(): number {
     const today = new Date();
@@ -2255,9 +2067,9 @@ export class CalendarFeedCollector {
    */
   private isDateOnlyText(text: string): boolean {
     if (!text || text.length < 3) return false;
-    
+
     const trimmedText = text.trim();
-    
+
     // Check if it's just a date pattern
     const dateOnlyPatterns = [
       /^\d{1,2}\/\d{1,2}\/?\d{0,4}$/,
@@ -2277,10 +2089,10 @@ export class CalendarFeedCollector {
    */
   private extractEventsFromFullPageText($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
     console.log(`Full page text analysis for ${source.name}`);
-    
-    // Get all text content from the entire page
+
+    // Get all text content from the page
     const fullPageText = $('body').text();
-    
+
     // Split into sentences and paragraphs
     const textChunks = fullPageText
       .split(/[.!?]\s+|\n\s*\n/)
@@ -2293,22 +2105,22 @@ export class CalendarFeedCollector {
     const eventPatterns = [
       // Meeting patterns
       /\b(meeting|assembly|gathering|conference|workshop|seminar)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
-      
+
       // School events
       /\b(school|district|board|pta|pto)\b.*?\b(meeting|event|night|day)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
-      
+
       // Community events
       /\b(community|city|town|council)\b.*?\b(event|meeting|celebration|festival)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
-      
+
       // Date-first patterns
       /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,?\s+\d{4})?\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
-      
+
       // Time patterns
       /\b\d{1,2}:\d{2}\s*[ap]m\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
-      
+
       // Weekday patterns
       /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
-      
+
       // Action patterns
       /\b(join us|come|attend|participate|register|rsvp)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
     ];
@@ -2318,32 +2130,40 @@ export class CalendarFeedCollector {
         if (pattern.test(chunk)) {
           // Extract date from the chunk
           let eventDate = this.extractDateFromFullText(chunk);
-          
+
           if (eventDate && eventDate > new Date()) {
             // Create a clean title from the chunk
             let title = this.extractTitleFromEventText(chunk);
-            
+
             if (title && title.length > 10 && title.length < 200) {
-              parsedEvents.push({
-                title: this.cleanText(title),
-                description: this.cleanText(chunk.substring(0, 300)),
-                category: this.categorizeEvent(title, chunk),
-                location: `${source.city}, ${source.state}`,
-                organizer: source.name,
-                startDate: eventDate,
-                endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
-                startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                attendees: 0,
-                imageUrl: null,
-                isFree: 'true',
-                source: source.id
-              });
+              // Check for duplicates
+              const eventKey = `${title.toLowerCase().trim()}-${eventDate.toDateString()}-${source.city}`;
+              const isDuplicate = parsedEvents.some(event => 
+                `${event.title.toLowerCase().trim()}-${event.startDate.toDateString()}-${source.city}` === eventKey
+              );
 
-              console.log(`✓ Full page analysis found: "${title}" on ${eventDate.toDateString()}`);
+              if (!isDuplicate) {
+                parsedEvents.push({
+                  title: this.cleanText(title),
+                  description: this.cleanText(chunk.substring(0, 300)),
+                  category: this.categorizeEvent(title, chunk),
+                  location: `${source.city}, ${source.state}`,
+                  organizer: source.name,
+                  startDate: eventDate,
+                  endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                  startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                  endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                  attendees: 0,
+                  imageUrl: null,
+                  isFree: 'true',
+                  source: source.id
+                });
 
-              // Limit results to prevent too many low-quality events
-              if (parsedEvents.length >= 15) return;
+                console.log(`✓ Full page analysis found: "${title}" on ${eventDate.toDateString()}`);
+
+                // Limit to prevent too many low-quality events
+                if (parsedEvents.length >= 10) return;
+              }
             }
           }
         }
@@ -2382,7 +2202,7 @@ export class CalendarFeedCollector {
   private extractTitleFromEventText(text: string): string {
     // Look for sentences that start with capital letters and contain event words
     const sentences = text.split(/[.!?]/).map(s => s.trim());
-    
+
     for (const sentence of sentences) {
       if (sentence.length > 10 && sentence.length < 150) {
         // Check if it contains event-related words
@@ -2483,26 +2303,34 @@ export class CalendarFeedCollector {
 
           // Only add if it passes a very basic validity check
           if (bestTitle.length > 5 && !bestTitle.match(/^(skip to|search|menu|home|about|contact)$/i)) {
-            parsedEvents.push({
-              title: bestTitle,
-              description: this.cleanText(elementText.substring(0, 300)) || 'Event details available on website',
-              category: this.categorizeEvent(bestTitle, elementText),
-              location: `${source.city}, ${source.state}`,
-              organizer: source.name,
-              startDate: extractedDate,
-              endDate: new Date(extractedDate.getTime() + 2 * 60 * 60 * 1000),
-              startTime: extractedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-              endTime: new Date(extractedDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-              attendees: 0,
-              imageUrl: null,
-              isFree: 'true',
-              source: source.id
-            });
+            // Check for duplicates
+            const eventKey = `${bestTitle.toLowerCase().trim()}-${extractedDate.toDateString()}-${source.city}`;
+            const isDuplicate = parsedEvents.some(event => 
+              `${event.title.toLowerCase().trim()}-${event.startDate.toDateString()}-${source.city}` === eventKey
+            );
 
-            console.log(`✓ Ultra-aggressive extraction found: "${bestTitle}" on ${extractedDate.toDateString()}`);
+            if (!isDuplicate) {
+              parsedEvents.push({
+                title: bestTitle,
+                description: this.cleanText(elementText.substring(0, 300)) || 'Event details available on website',
+                category: this.categorizeEvent(bestTitle, elementText),
+                location: `${source.city}, ${source.state}`,
+                organizer: source.name,
+                startDate: extractedDate,
+                endDate: new Date(extractedDate.getTime() + 2 * 60 * 60 * 1000),
+                startTime: extractedDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                endTime: new Date(extractedDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                attendees: 0,
+                imageUrl: null,
+                isFree: 'true',
+                source: source.id
+              });
 
-            // Limit to prevent too many duplicate/low-quality events
-            if (parsedEvents.length >= 10) return false;
+              console.log(`✓ Ultra-aggressive extraction found: "${bestTitle}" on ${extractedDate.toDateString()}`);
+
+              // Limit to prevent too many duplicate/low-quality events
+              if (parsedEvents.length >= 10) return false;
+            }
           }
         }
       }
@@ -2541,7 +2369,7 @@ export class CalendarFeedCollector {
   private isNavigationElement($element: any, elementText: string): boolean {
     // Fix null element check
     if (!$element) return false;
-    
+
     // For school districts, be very permissive - only filter out obvious navigation
     const elementClasses = $element.attr('class') || '';
     const elementId = $element.attr('id') || '';
