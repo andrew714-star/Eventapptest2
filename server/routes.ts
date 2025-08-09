@@ -193,12 +193,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               for (const source of relevantSources) {
                   try {
                       console.log(`Syncing events from ${source.name} (${source.city}, ${source.state})`);
-                      const events = await calendarCollector.collectEventsFromSource(source);
+                      const events = await calendarCollector.collectFromSource(source);
                       
-                      // Add events to storage
+                      // Add events to storage (check for duplicates)
+                      const existingEvents = await storage.getAllEvents();
+                      const existingEventKeys = new Set(existingEvents.map(event => 
+                          `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
+                      ));
+                      
                       for (const event of events) {
-                          await storage.createEvent(event);
-                          syncedCount++;
+                          const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
+                          if (!existingEventKeys.has(key)) {
+                              await storage.createEvent(event);
+                              syncedCount++;
+                              console.log(`Storage: Created event ${event.title}. Total synced: ${syncedCount}`);
+                          }
                       }
                   } catch (sourceError) {
                       console.error(`Failed to sync from ${source.name}:`, sourceError);

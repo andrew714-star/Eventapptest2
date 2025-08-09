@@ -283,7 +283,7 @@ export class CalendarFeedCollector {
     return allEvents;
   }
 
-  private async collectFromSource(source: CalendarSource): Promise<InsertEvent[]> {
+  async collectFromSource(source: CalendarSource): Promise<InsertEvent[]> {
     console.log(`Collecting from ${source.name} (${source.feedType}): ${source.feedUrl}`);
     
     try {
