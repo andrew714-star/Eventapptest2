@@ -126,7 +126,7 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
         minZoom: 3,
         attributionControl: false,
         cooperativeGestures: false,
-        preserveDrawingBuffer: false,
+
         failIfMajorPerformanceCaveat: false,
         refreshExpiredTiles: false, // Don't refresh expired tiles
         maxTileCacheSize: 50 // Limit tile cache size
@@ -435,9 +435,16 @@ export function MapSelector({ onLocationSelect, selectedLocation }: MapSelectorP
       const data = await response.json();
       setDistrictFeeds(data.results || []);
       
+      // Add all cities from the district to the user's selected locations
+      if (data.cityLocations && data.cityLocations.length > 0 && onLocationSelect) {
+        for (const cityLocation of data.cityLocations) {
+          onLocationSelect(cityLocation);
+        }
+      }
+      
       toast({
         title: "District Selected",
-        description: `Found feeds for ${data.citiesProcessed} cities in ${districtId}. Added ${data.totalAdded} new feeds.`,
+        description: `Found feeds for ${data.citiesProcessed} cities in ${districtId}. Added ${data.totalAdded} new feeds and ${data.syncedEvents || 0} events.`,
       });
       
       console.log('District feed discovery results:', data);

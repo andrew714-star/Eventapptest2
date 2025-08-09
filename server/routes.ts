@@ -613,11 +613,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // After discovering feeds, automatically sync events from all active sources for these cities
+      console.log(`Triggering automatic event sync for district ${state}-${district}...`);
+      
+      const cityLocations = cities.map(city => `${city.name}, ${state}`);
+      let syncedCount = 0;
+      
+      // Get active calendar sources that match the cities in this district
+      const allSources = calendarCollector.getSources();
+      const relevantSources = allSources.filter(source => {
+          return source.isActive && cityLocations.some(location => 
+              location.toLowerCase().includes(source.city.toLowerCase()) &&
+              location.toLowerCase().includes(source.state.toLowerCase())
+          );
+      });
+      
+      console.log(`Found ${relevantSources.length} active sources for district cities`);
+      
+      // Sync events from relevant sources
+      for (const source of relevantSources) {
+          try {
+              console.log(`Auto-syncing events from ${source.name} (${source.city}, ${source.state})`);
+              const events = await calendarCollector.collectFromSource(source);
+              
+              // Add events to storage (check for duplicates)
+              const existingEvents = await storage.getAllEvents();
+              const existingEventKeys = new Set(existingEvents.map(event => 
+                  `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
+              ));
+              
+              for (const event of events) {
+                  const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
+                  if (!existingEventKeys.has(key)) {
+                      await storage.createEvent(event);
+                      syncedCount++;
+                  }
+              }
+          } catch (sourceError) {
+              console.error(`Failed to auto-sync from ${source.name}:`, sourceError);
+          }
+      }
+
       res.json({
         district: `${state}-${district}`,
         citiesProcessed: cities.length,
         totalDiscovered,
         totalAdded,
+        syncedEvents: syncedCount,
+        cityLocations,
         results
       });
     } catch (error) {

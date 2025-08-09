@@ -9,6 +9,14 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
+**2025-01-09**: Complete District-to-Calendar Integration
+- Implemented full congressional district click functionality - clicking a district automatically discovers feeds for all cities within that district
+- Enhanced backend to auto-sync events from all discovered district feeds immediately upon selection
+- District selection now automatically adds all cities to user's location filter and loads their events
+- Added multiple city selection directly from calendar interface with "Add City" button and auto-suggestions
+- Created "Reload Events" button that syncs events only for user's selected locations, not all sources
+- Fixed event synchronization to work properly with location-specific filtering
+
 **2025-01-08**: Disabled Event Preloading 
 - Removed automatic event collection on server startup per user preference
 - Events now only load when users actively select locations or discover feeds
