@@ -900,6 +900,12 @@ export class CalendarFeedCollector {
             this.extractEventsFromAnyDateContent($, source, parsedEvents);
         }
 
+        // Strategy 4: If still no events, do full page text analysis for event patterns
+        if (parsedEvents.length === 0) {
+            console.log(`Still no events found, trying full page text analysis for ${source.name}`);
+            this.extractEventsFromFullPageText($, source, parsedEvents);
+        }
+
         return parsedEvents;
     } catch (error) {
         console.error(`Failed to scrape HTML events from ${source.websiteUrl}:`, error);
@@ -1787,6 +1793,136 @@ export class CalendarFeedCollector {
   }
 
   /**
+   * Extract events from full page text analysis - for completely unorganized websites
+   */
+  private extractEventsFromFullPageText($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
+    console.log(`Full page text analysis for ${source.name}`);
+    
+    // Get all text content from the entire page
+    const fullPageText = $('body').text();
+    
+    // Split into sentences and paragraphs
+    const textChunks = fullPageText
+      .split(/[.!?]\s+|\n\s*\n/)
+      .map(chunk => chunk.trim())
+      .filter(chunk => chunk.length > 20 && chunk.length < 1000);
+
+    console.log(`Analyzing ${textChunks.length} text chunks from full page`);
+
+    // Look for patterns that suggest events
+    const eventPatterns = [
+      // Meeting patterns
+      /\b(meeting|assembly|gathering|conference|workshop|seminar)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
+      
+      // School events
+      /\b(school|district|board|pta|pto)\b.*?\b(meeting|event|night|day)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
+      
+      // Community events
+      /\b(community|city|town|council)\b.*?\b(event|meeting|celebration|festival)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
+      
+      // Date-first patterns
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,?\s+\d{4})?\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      
+      // Time patterns
+      /\b\d{1,2}:\d{2}\s*[ap]m\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      
+      // Weekday patterns
+      /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      
+      // Action patterns
+      /\b(join us|come|attend|participate|register|rsvp)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
+    ];
+
+    for (const chunk of textChunks.slice(0, 200)) { // Limit to prevent overwhelming processing
+      for (const pattern of eventPatterns) {
+        if (pattern.test(chunk)) {
+          // Extract date from the chunk
+          let eventDate = this.extractDateFromFullText(chunk);
+          
+          if (eventDate && eventDate > new Date()) {
+            // Create a clean title from the chunk
+            let title = this.extractTitleFromEventText(chunk);
+            
+            if (title && title.length > 10 && title.length < 200) {
+              parsedEvents.push({
+                title: this.cleanText(title),
+                description: this.cleanText(chunk.substring(0, 300)),
+                category: this.categorizeEvent(title, chunk),
+                location: `${source.city}, ${source.state}`,
+                organizer: source.name,
+                startDate: eventDate,
+                endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                attendees: 0,
+                imageUrl: null,
+                isFree: 'true',
+                source: source.id
+              });
+
+              console.log(`✓ Full page analysis found: "${title}" on ${eventDate.toDateString()}`);
+
+              // Limit results to prevent too many low-quality events
+              if (parsedEvents.length >= 15) return;
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`Full page analysis completed: found ${parsedEvents.length} events`);
+  }
+
+  /**
+   * Extract date from free-form text
+   */
+  private extractDateFromFullText(text: string): Date | null {
+    // Try all the date patterns we know
+    const datePatterns = [
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i,
+      /\d{1,2}\/\d{1,2}\/?\d{0,4}/,
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\s]*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const date = this.parseEventDate(match[0]);
+        if (date) return date;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract a clean title from event text
+   */
+  private extractTitleFromEventText(text: string): string {
+    // Look for sentences that start with capital letters and contain event words
+    const sentences = text.split(/[.!?]/).map(s => s.trim());
+    
+    for (const sentence of sentences) {
+      if (sentence.length > 10 && sentence.length < 150) {
+        // Check if it contains event-related words
+        const eventWords = ['meeting', 'event', 'program', 'class', 'session', 'workshop', 'seminar', 'conference', 'celebration', 'festival', 'concert', 'performance', 'game', 'ceremony', 'fundraiser', 'presentation', 'orientation'];
+        if (eventWords.some(word => sentence.toLowerCase().includes(word))) {
+          // Clean up the sentence to make a good title
+          return sentence
+            .replace(/^\w+,?\s*/i, '') // Remove leading words like "Additionally,"
+            .replace(/\s*(on|at|in)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}).*$/i, '') // Remove date/time suffixes
+            .trim();
+        }
+      }
+    }
+
+    // Fallback: use first reasonable chunk
+    const words = text.split(/\s+/).slice(0, 10).join(' ');
+    return words.length > 10 ? words : text.substring(0, 50);
+  }
+
+  /**
    * Ultra-aggressive extraction: Find ANY content with dates and treat as potential events
    */
   private extractEventsFromAnyDateContent($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
@@ -1923,6 +2059,9 @@ export class CalendarFeedCollector {
    * Check if an element is likely a navigation or structural element rather than event content
    */
   private isNavigationElement($element: any, elementText: string): boolean {
+    // Fix null element check
+    if (!$element) return false;
+    
     // Check for navigation-specific classes and IDs
     const elementClasses = $element.attr('class') || '';
     const elementId = $element.attr('id') || '';
@@ -1940,22 +2079,18 @@ export class CalendarFeedCollector {
       }
     }
 
-    // Check for navigation-specific text patterns
+    // Check for navigation-specific text patterns - be much more permissive now
     const navTextPatterns = [
-      /skip to/i,
-      /search site/i,
-      /menu/i,
-      /translate/i,
-      /schools$/i,
-      /home$/i,
-      /about$/i,
-      /contact$/i,
-      /^login/i,
-      /accessibility/i
+      /^skip to/i,
+      /^search$/i,
+      /^menu$/i,
+      /^translate$/i,
+      /^login$/i,
+      /^accessibility$/i
     ];
 
     for (const pattern of navTextPatterns) {
-      if (pattern.test(elementText)) {
+      if (pattern.test(elementText.trim())) {
         return true;
       }
     }
@@ -2115,84 +2250,89 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Validate if the content represents a valid event, filtering out navigation and generic page content.
+   * Validate if the content represents a valid event - ULTRA PERMISSIVE for unorganized websites
    */
   private isValidEventContent(elementText: string, title: string): boolean {
-    // If the title is already very descriptive, assume it's valid
-    if (title.length > 50) return true;
+    // If the title is descriptive, assume it's valid
+    if (title.length > 30) return true;
 
-    // Filter out content that clearly belongs to navigation or site structure
-    if (this.isNavigationElement(null, elementText)) return false; // Pass null for element if not needed
-
-    // Filter out content that seems like generic page headers/footers or placeholders
-    const genericContentPatterns = [
-      /^about us$/i, /^contact us$/i, /^site map$/i, /^privacy policy$/i, /^terms of service$/i,
-      /^copyright .* all rights reserved$/i, /^home$/i, /^page .* of .*$/i,
-      /^loading please wait$/i, /^back to top$/i, /^skip to content$/i,
-      /^select a state$/i, /^search results$/i, /^browse by$/i, /^filter by$/i,
-      /^home page$/i, /^main navigation$/i, /^secondary navigation$/i, /^footer navigation$/i,
-      /^you are here: .*$/i, /^follow us on social media$/i, /^share this page$/i,
-      /^subscribe to our newsletter$/i, /^enter your email$/i, /^quick links$/i
+    // Only filter out obvious navigation/system content
+    const obviouslyInvalidPatterns = [
+      /^skip to/i,
+      /^search$/i,
+      /^menu$/i,
+      /^home$/i,
+      /^login$/i,
+      /^copyright.*all rights reserved$/i,
+      /^privacy policy$/i,
+      /^terms of service$/i
     ];
 
-    for (const pattern of genericContentPatterns) {
-      if (pattern.test(elementText)) return false;
+    for (const pattern of obviouslyInvalidPatterns) {
+      if (pattern.test(elementText.trim())) return false;
     }
 
-    // Filter out content that is too short or too long to be a meaningful event description
-    if (elementText.length < 20 || elementText.length > 1000) return false;
+    // Very basic length check - be much more permissive
+    if (elementText.length < 10 || elementText.length > 2000) return false;
 
-    // For school sites, be more strict:
-    // Avoid content that looks like department listings, contact info, or administrative pages
-    const schoolSpecificContentPatterns = [
-      /school district of .*|independent school district/i, // School district names
-      /(grade|kindergarten|elementary|middle|high school)/i, // School levels
-      /district office|administration|board of education|superintendent|principal|staff directory/i, // Administrative terms
-      /contact .*phone|email|address/i, // Contact information patterns
-      /calendar of events.*(school|district)/i, // Calendar pages themselves
-      /news|announcements|press release/i, // Generic news sections
-      /parent portal|student portal|login|portal/i // Portal/login links
+    // MUCH MORE PERMISSIVE - Look for ANY potential event indicators
+    const broadEventIndicators = [
+      // Date patterns
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
+      /\d{1,2}\/\d{1,2}/,
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i,
+      /\d{1,2}:\d{2}/,
+      /\d{4}/,
+      
+      // Time-related words
+      /today/i, /tomorrow/i, /tonight/i, /morning/i, /afternoon/i, /evening/i,
+      /weekly/i, /monthly/i, /annual/i, /daily/i,
+      /schedule/i, /calendar/i, /agenda/i, /program/i,
+      
+      // Event-related words
+      /meeting/i, /conference/i, /workshop/i, /seminar/i, /training/i,
+      /celebration/i, /festival/i, /concert/i, /performance/i,
+      /game/i, /match/i, /tournament/i, /graduation/i, /ceremony/i,
+      /fundraiser/i, /dinner/i, /lunch/i, /breakfast/i, /dance/i,
+      /party/i, /reunion/i, /expo/i, /fair/i, /show/i, /exhibition/i,
+      /presentation/i, /lecture/i, /class/i, /session/i,
+      /board/i, /council/i, /committee/i, /hearing/i, /forum/i,
+      /open house/i, /orientation/i, /registration/i, /enrollment/i,
+      /parent/i, /student/i, /academic/i, /sports/i, /athletics/i,
+      /activity/i, /event/i, /happening/i, /upcoming/i,
+      
+      // Action words
+      /join/i, /attend/i, /visit/i, /come/i, /participate/i, /register/i,
+      /volunteer/i, /help/i, /support/i, /donate/i,
+      /will be/i, /is scheduled/i, /takes place/i,
+      
+      // Location words
+      /at\s+\w+/i, /in\s+\w+/i, /hall/i, /center/i, /park/i, /library/i, /school/i,
+      /gym/i, /field/i, /auditorium/i, /room/i,
+      
+      // Numbers that might be dates/times
+      /\b\d{1,2}(st|nd|rd|th)/i,
+      /\d{1,2}\s*[ap]m/i,
+      
+      // Common event phrases
+      /save the date/i, /rsvp/i, /admission/i, /ticket/i, /free/i, /cost/i, /price/i,
+      /contact.*for.*info/i, /more information/i, /details/i
     ];
 
-    // If the source is a school and the content matches school-specific filtering patterns,
-    // we are more likely to reject it unless it strongly indicates an event.
-    if (source.type === 'school') {
-      let isLikelyEvent = false;
-      const eventKeywords = ['meeting', 'event', 'activity', 'performance', 'game', 'competition', 'fair', 'show', 'concert', 'workshop', 'session', 'assembly', 'ceremony'];
-      if (eventKeywords.some(keyword => elementText.toLowerCase().includes(keyword))) {
-        isLikelyEvent = true;
-      }
-
-      // If it looks like an event, allow it despite school-specific patterns
-      if (isLikelyEvent) return true;
-
-      // Otherwise, filter out if it matches any of the school-specific patterns
-      for (const pattern of schoolSpecificContentPatterns) {
-        if (pattern.test(elementText)) return false;
+    // If content contains ANY event indicators, consider it potentially valid
+    for (const indicator of broadEventIndicators) {
+      if (indicator.test(elementText)) {
+        return true;
       }
     }
 
-    // General content checks:
-    // Avoid content that is just a list of links or navigation items without substantial description
-    const linkCount = (elementText.match(/<a\s+[^>]*>/gi) || []).length;
-    const wordCount = elementText.split(/\s+/).filter(w => w.length > 2).length;
-
-    // If there are significantly more links than words, it's likely navigation or a link dump
-    if (wordCount > 0 && linkCount / wordCount > 0.3) {
-      return false;
+    // If it has multiple words and reasonable length, still consider it valid
+    const words = elementText.split(/\s+/).filter(w => w.length > 2);
+    if (words.length >= 3 && elementText.length > 20) {
+      return true;
     }
 
-    // If the content doesn't contain any clear event-related keywords, it's less likely to be an event
-    const eventKeywords = ['meeting', 'conference', 'workshop', 'seminar', 'training', 'celebration', 'festival', 'concert', 'performance', 'exhibition', 'game', 'match', 'tournament', 'fundraiser', 'dinner', 'lunch', 'dance', 'show', 'class', 'session', 'assembly', 'ceremony', 'activity', 'event'];
-    if (!eventKeywords.some(keyword => elementText.toLowerCase().includes(keyword))) {
-      // But if it contains dates and a reasonable title, it might still be an event
-      if (!this.extractEventDateComprehensive(null, elementText)) { // Check for dates without element context
-        return false;
-      }
-    }
-
-    // Default to true if none of the filtering rules exclude it
-    return true;
+    return false;
   }
 }
 
