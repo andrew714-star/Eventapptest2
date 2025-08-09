@@ -739,6 +739,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add multiple discovered feeds at once
+  app.post("/api/add-multiple-feeds", async (req, res) => {
+    try {
+      const { sources } = req.body;
+
+      if (!sources || !Array.isArray(sources)) {
+        return res.status(400).json({ error: "Sources array is required" });
+      }
+
+      const results = [];
+      const errors = [];
+      let successCount = 0;
+
+      for (const source of sources) {
+        try {
+          // Check if source already exists
+          const existingSource = calendarCollector.getSources().find(s => 
+            s.feedUrl === source.feedUrl || s.id === source.id || 
+            (s.name === source.name && s.city === source.city && s.state === source.state)
+          );
+
+          if (existingSource) {
+            errors.push({
+              source: source.name,
+              error: `Already exists for ${source.city}, ${source.state}`,
+              existing: true
+            });
+            continue;
+          }
+
+          // Add the source
+          const success = await dataCollector.addCalendarSource(source);
+          
+          if (success) {
+            results.push({
+              source: source.name,
+              city: source.city,
+              state: source.state,
+              status: 'added'
+            });
+            successCount++;
+          } else {
+            errors.push({
+              source: source.name,
+              error: 'Failed to add - invalid URL or duplicate entry',
+              existing: false
+            });
+          }
+        } catch (error) {
+          errors.push({
+            source: source.name,
+            error: String(error),
+            existing: false
+          });
+        }
+      }
+
+      // Trigger sync for new sources
+      if (successCount > 0) {
+        try {
+          await dataCollector.syncEventsToStorage();
+        } catch (syncError) {
+          console.error("Failed to sync after bulk add:", syncError);
+        }
+      }
+
+      res.json({
+        success: true,
+        added: successCount,
+        total: sources.length,
+        results,
+        errors
+      });
+    } catch (error) {
+      console.error("Bulk add feeds error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/add-discovered-feed", async (req, res) => {
     try {
       const { source } = req.body;

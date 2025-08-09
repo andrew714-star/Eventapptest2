@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { MapPin, Search, Plus, CheckCircle, Clock, AlertTriangle, Building, GraduationCap, Briefcase } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MapPin, Search, Plus, CheckCircle, Clock, AlertTriangle, Building, GraduationCap, Briefcase, Library, Trees } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CalendarSource {
@@ -40,6 +41,8 @@ const getTypeIcon = (type: string) => {
     case 'city': return <Building className="h-4 w-4" />;
     case 'school': return <GraduationCap className="h-4 w-4" />;
     case 'chamber': return <Briefcase className="h-4 w-4" />;
+    case 'library': return <Library className="h-4 w-4" />;
+    case 'parks': return <Trees className="h-4 w-4" />;
     default: return <Building className="h-4 w-4" />;
   }
 };
@@ -62,6 +65,8 @@ export function LocationSelector() {
   const [discoveredFeeds, setDiscoveredFeeds] = useState<DiscoveredFeed[]>([]);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [addedFeeds, setAddedFeeds] = useState<Set<string>>(new Set());
+  const [selectedFeeds, setSelectedFeeds] = useState<Set<string>>(new Set());
+  const [isAddingMultiple, setIsAddingMultiple] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -95,6 +100,50 @@ export function LocationSelector() {
       });
     },
   });
+  const addMultipleFeedsMutation = useMutation({
+    mutationFn: async (sources: CalendarSource[]) => {
+      const response = await fetch('/api/add-multiple-feeds', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sources: sources.map(s => ({ ...s, isActive: true })) })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to add feeds' }));
+        throw new Error(errorData.message || 'Failed to add feeds');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Mark all successfully added feeds
+      data.results.forEach((result: any) => {
+        const source = discoveredFeeds.find(f => f.source.name === result.source);
+        if (source) {
+          setAddedFeeds(prev => new Set(prev).add(source.source.id));
+        }
+      });
+      
+      setSelectedFeeds(new Set());
+      setIsAddingMultiple(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
+      
+      toast({
+        title: "Multiple Feeds Added",
+        description: `Successfully added ${data.added} of ${data.total} feeds. ${data.errors.length > 0 ? `${data.errors.length} feeds were skipped (already exist or failed).` : ''}`,
+      });
+    },
+    onError: (error) => {
+      setIsAddingMultiple(false);
+      toast({
+        title: "Failed to Add Multiple Feeds",
+        description: String(error),
+        variant: "destructive",
+      });
+    },
+  });
+
   const addFeedMutation = useMutation({
     mutationFn: async (source: CalendarSource) => {
       const response = await fetch('/api/add-discovered-feed', {
@@ -144,6 +193,40 @@ export function LocationSelector() {
     },
   });
 
+  const handleFeedSelection = (feedId: string, checked: boolean) => {
+    setSelectedFeeds(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(feedId);
+      } else {
+        newSet.delete(feedId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allAvailableFeeds = discoveredFeeds
+      .filter(feed => !addedFeeds.has(feed.source.id))
+      .map(feed => feed.source.id);
+    setSelectedFeeds(new Set(allAvailableFeeds));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedFeeds(new Set());
+  };
+
+  const handleAddSelectedFeeds = () => {
+    const feedsToAdd = discoveredFeeds
+      .filter(feed => selectedFeeds.has(feed.source.id))
+      .map(feed => feed.source);
+    
+    if (feedsToAdd.length > 0) {
+      setIsAddingMultiple(true);
+      addMultipleFeedsMutation.mutate(feedsToAdd);
+    }
+  };
+
   const handleSearch = async () => {
     const location = searchLocation.trim();
     if (!location) return;
@@ -163,6 +246,7 @@ export function LocationSelector() {
     setIsDiscovering(true);
     setDiscoveredFeeds([]);
     setAddedFeeds(new Set());
+    setSelectedFeeds(new Set());
 
     discoverFeedsMutation.mutate({ city, state }, {
       onSuccess: async (data) => {
@@ -354,6 +438,7 @@ export function LocationSelector() {
                       setIsDiscovering(true);
                       setDiscoveredFeeds([]);
                       setAddedFeeds(new Set());
+                      setSelectedFeeds(new Set());
                       discoverFeedsMutation.mutate(location);
                     }}
                     disabled={discoverFeedsMutation.isPending}
@@ -381,7 +466,34 @@ export function LocationSelector() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium">Discovered Calendar Feeds</h3>
-                <Badge variant="secondary">{discoveredFeeds.length} found</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{discoveredFeeds.length} found</Badge>
+                  {selectedFeeds.size > 0 && (
+                    <Badge variant="default">{selectedFeeds.size} selected</Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Bulk Selection Controls */}
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                    Select All Available
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleDeselectAll}>
+                    Deselect All
+                  </Button>
+                </div>
+                {selectedFeeds.size > 0 && (
+                  <Button 
+                    onClick={handleAddSelectedFeeds}
+                    disabled={addMultipleFeedsMutation.isPending}
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {addMultipleFeedsMutation.isPending ? 'Adding...' : `Add ${selectedFeeds.size} Selected`}
+                  </Button>
+                )}
               </div>
 
               <ScrollArea className="h-[400px] pr-4">
@@ -394,7 +506,16 @@ export function LocationSelector() {
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
                             <div className="flex items-start gap-3">
-                              <div className="mt-1">
+                              <div className="mt-1 flex items-center gap-2">
+                                {!isAdded && (
+                                  <Checkbox
+                                    checked={selectedFeeds.has(feed.source.id)}
+                                    onCheckedChange={(checked) => 
+                                      handleFeedSelection(feed.source.id, !!checked)
+                                    }
+                                    data-testid={`checkbox-feed-${feed.source.id}`}
+                                  />
+                                )}
                                 {getTypeIcon(feed.source.type)}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -421,6 +542,7 @@ export function LocationSelector() {
                                   size="sm"
                                   onClick={() => handleAddFeed(feed)}
                                   disabled={addFeedMutation.isPending}
+                                  data-testid={`button-add-individual-${feed.source.id}`}
                                 >
                                   <Plus className="h-4 w-4 mr-1" />
                                   Add

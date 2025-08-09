@@ -359,19 +359,19 @@ export class CalendarFeedCollector {
       console.log(`Parsed ${Object.keys(events).length} calendar objects from ${source.feedUrl}`);
       
       for (const [key, event] of Object.entries(events)) {
-        console.log(`Processing event: ${key}, type: ${event.type}, summary: ${event.summary}`);
+        console.log(`Processing event: ${key}, type: ${event.type}, summary: ${(event as any).summary}`);
         
-        if (event.type === 'VEVENT' && event.start && event.summary) {
-          const startDate = new Date(event.start);
-          const endDate = event.end ? new Date(event.end) : new Date(startDate.getTime() + 60 * 60 * 1000);
+        if (event.type === 'VEVENT' && (event as any).start && (event as any).summary) {
+          const startDate = new Date((event as any).start);
+          const endDate = (event as any).end ? new Date((event as any).end) : new Date(startDate.getTime() + 60 * 60 * 1000);
           
           // Only include future events
           if (startDate > new Date()) {
             parsedEvents.push({
-              title: event.summary,
-              description: event.description || 'Event details available on website',
-              category: this.categorizeEvent(event.summary, event.description || ''),
-              location: event.location || `${source.city}, ${source.state}`,
+              title: (event as any).summary,
+              description: (event as any).description || 'Event details available on website',
+              category: this.categorizeEvent((event as any).summary, (event as any).description || ''),
+              location: (event as any).location || `${source.city}, ${source.state}`,
               organizer: source.name,
               startDate,
               endDate,
@@ -379,16 +379,16 @@ export class CalendarFeedCollector {
               endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
               attendees: 0,
               imageUrl: null,
-              isFree: event.description?.toLowerCase().includes('free') ? 'true' : 'false',
+              isFree: (event as any).description?.toLowerCase().includes('free') ? 'true' : 'false',
               source: source.id
             });
             
-            console.log(`✓ Added iCal event: ${event.summary} on ${startDate.toDateString()}`);
+            console.log(`✓ Added iCal event: ${(event as any).summary} on ${startDate.toDateString()}`);
           } else {
-            console.log(`Skipped past event: ${event.summary} on ${startDate.toDateString()}`);
+            console.log(`Skipped past event: ${(event as any).summary} on ${startDate.toDateString()}`);
           }
         } else {
-          console.log(`Skipped calendar object: type=${event.type}, hasStart=${!!event.start}, hasSummary=${!!event.summary}`);
+          console.log(`Skipped calendar object: type=${event.type}, hasStart=${!!(event as any).start}, hasSummary=${!!(event as any).summary}`);
         }
       }
       
@@ -1018,7 +1018,7 @@ export class CalendarFeedCollector {
     const activeFeeds = sameCityFeeds.filter(s => s.isActive);
     const highestPriorityActiveFeed = activeFeeds.reduce((highest, current) => {
       const currentPriority = feedTypePriority[current.feedType] || 0;
-      const highestPriority = feedTypePriority[highest?.feedType] || 0;
+      const highestPriority = feedTypePriority[highest?.feedType || ''] || 0;
       return currentPriority > highestPriority ? current : highest;
     }, null as CalendarSource | null);
 
@@ -1114,7 +1114,7 @@ export class CalendarFeedCollector {
           return true;
       }
     } catch (error) {
-      console.log(`Feed test error for ${source.name}:`, error.message);
+      console.log(`Feed test error for ${source.name}:`, String(error));
       return false;
     }
   }
