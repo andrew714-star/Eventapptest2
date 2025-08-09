@@ -813,78 +813,130 @@ export class CalendarFeedCollector {
             }
         }
 
-        // Hemet USD specific handling
-        if (source.feedUrl?.includes('hemetusd.org')) {
-            console.log(`Parsing Hemet USD events page - searching for event patterns`);
+        // School district specific handling (flexible approach)
+        if (source.type === 'school' || source.feedUrl?.includes('usd.org') || source.feedUrl?.includes('schools') || source.name.toLowerCase().includes('school')) {
+            console.log(`Parsing school district events page - using flexible event detection for ${source.name}`);
 
             const fullPageText = $.text();
-            console.log(`Hemet USD page contains "Board Meeting": ${fullPageText.includes('Board Meeting')}`);
-            console.log(`Hemet USD page contains "event": ${fullPageText.toLowerCase().includes('event')}`);
-            console.log(`Hemet USD page contains dates: ${/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i.test(fullPageText)}`);
+            console.log(`School page contains "event": ${fullPageText.toLowerCase().includes('event')}`);
+            console.log(`School page contains dates: ${/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i.test(fullPageText)}`);
 
-            // Look for common school event patterns
-            const schoolEventPatterns = [
-                'Board Meeting', 'School Board', 'Board of Education',
-                'Parent Conference', 'Open House', 'Back to School',
-                'Graduation', 'Awards Ceremony', 'Athletic Event',
-                'Parent Night', 'Registration', 'Enrollment',
-                'Holiday', 'Winter Break', 'Spring Break',
-                'Staff Development', 'Professional Development',
-                'Conference', 'Workshop', 'Training'
+            // Use a more comprehensive approach - look for ANY content with dates and school-related keywords
+            const schoolRelatedKeywords = [
+                // Board/governance
+                'board', 'meeting', 'agenda', 'session', 'hearing', 'vote', 'policy',
+                
+                // Academic events
+                'school', 'class', 'grade', 'student', 'parent', 'teacher', 'staff',
+                'graduation', 'ceremony', 'awards', 'recognition', 'honor', 'achievement',
+                'conference', 'workshop', 'training', 'development', 'seminar',
+                
+                // Student activities
+                'game', 'match', 'tournament', 'athletic', 'sports', 'team', 'competition',
+                'performance', 'concert', 'play', 'drama', 'music', 'art', 'exhibition',
+                'dance', 'prom', 'homecoming', 'spirit', 'club', 'organization',
+                
+                // Administrative
+                'registration', 'enrollment', 'orientation', 'open house', 'back to school',
+                'information', 'session', 'presentation', 'forum', 'discussion',
+                
+                // Calendar/timing
+                'schedule', 'calendar', 'date', 'time', 'day', 'week', 'month',
+                'holiday', 'break', 'vacation', 'closed', 'early', 'release', 'dismissal',
+                
+                // General events
+                'event', 'activity', 'program', 'celebration', 'festival', 'fair',
+                'fundraiser', 'volunteer', 'community', 'family', 'night'
             ];
 
-            const processedEventTypes = new Set<string>();
+            // Find all content that contains both school keywords and dates
+            const potentialEventElements = [];
 
-            for (const pattern of schoolEventPatterns) {
-                if (processedEventTypes.has(pattern)) continue;
+            // Strategy 1: Look in structured content areas first
+            const contentSelectors = [
+                '.calendar, .events, .news, .announcements, .activities',
+                '.content, .main-content, .page-content',
+                'article, section, .post, .item',
+                'table tr, li, .row, .card, .box',
+                'h1, h2, h3, h4, h5, h6, p, div'
+            ];
 
-                const elements = $(`*:contains("${pattern}")`);
-                console.log(`Found ${elements.length} elements containing "${pattern}"`);
-
-                let foundValidEvent = false;
-                elements.each((_, element) => {
-                    if (foundValidEvent) return;
+            for (const selector of contentSelectors) {
+                $(selector).each((_, element) => {
                     const $element = $(element);
-                    const elementText = $element.text();
+                    const elementText = $element.text().trim();
 
-                    if (elementText.includes(pattern) && elementText.length < 500) {
-                        console.log(`Hemet event element text: "${elementText}"`);
+                    // Skip if too short or too long
+                    if (elementText.length < 15 || elementText.length > 2000) return;
 
-                        let eventDate = this.extractComprehensiveDate(elementText, $element);
+                    // Check for date patterns
+                    const hasDate = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}\s*(AM|PM)|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i.test(elementText);
 
-                        if (!eventDate) {
-                            // Create recurring dates for common school events
-                            eventDate = this.getSchoolEventDate(pattern);
-                        }
+                    if (hasDate) {
+                        // Check for school-related content
+                        const lowerText = elementText.toLowerCase();
+                        const hasSchoolContent = schoolRelatedKeywords.some(keyword => lowerText.includes(keyword));
 
-                        if (eventDate && eventDate > new Date()) {
-                            console.log(`Extracted Hemet USD event date: ${eventDate.toDateString()} for ${pattern}`);
-
-                            parsedEvents.push({
-                                title: this.cleanText(pattern),
-                                description: this.cleanText(elementText.substring(0, 300)) || 'School event details available on website',
-                                category: this.getSchoolEventCategory(pattern),
-                                location: 'Hemet Unified School District, Hemet, CA',
-                                organizer: source.name,
-                                startDate: eventDate,
-                                endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
-                                startTime: '7:00 PM',
-                                endTime: '9:00 PM',
-                                attendees: 0,
-                                imageUrl: null,
-                                isFree: 'true',
-                                source: source.id
+                        if (hasSchoolContent) {
+                            potentialEventElements.push({
+                                element: $element,
+                                text: elementText,
+                                schoolKeywordCount: schoolRelatedKeywords.filter(keyword => lowerText.includes(keyword)).length
                             });
-
-                            console.log(`✓ Successfully created Hemet USD event: ${pattern} on ${eventDate.toDateString()}`);
-                            foundValidEvent = true;
-                            processedEventTypes.add(pattern);
                         }
                     }
                 });
+
+                // If we found events with this selector, process them
+                if (potentialEventElements.length > 0) break;
             }
 
-            console.log(`Hemet USD parser found ${parsedEvents.length} events`);
+            console.log(`Found ${potentialEventElements.length} potential school event elements`);
+
+            // Sort by relevance (more school keywords = higher priority)
+            potentialEventElements.sort((a, b) => b.schoolKeywordCount - a.schoolKeywordCount);
+
+            // Process the most relevant potential events
+            for (const eventData of potentialEventElements.slice(0, 20)) {
+                const { element: $element, text: elementText } = eventData;
+
+                // Extract date from the element
+                let eventDate = this.extractEventDateFromListOrTable($element, elementText);
+
+                if (!eventDate) {
+                    eventDate = this.extractComprehensiveDate(elementText, $element);
+                }
+
+                if (eventDate && eventDate > new Date()) {
+                    // Extract a meaningful title
+                    let title = this.extractSchoolEventTitle(elementText, $element);
+
+                    if (title && title.length > 5 && title.length < 200) {
+                        parsedEvents.push({
+                            title: this.cleanText(title),
+                            description: this.cleanText(elementText.substring(0, 300)) || 'School event details available on website',
+                            category: this.getSchoolEventCategory(title),
+                            location: `${source.city}, ${source.state}`,
+                            organizer: source.name,
+                            startDate: eventDate,
+                            endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                            startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            attendees: 0,
+                            imageUrl: null,
+                            isFree: 'true',
+                            source: source.id
+                        });
+
+                        console.log(`✓ Successfully created flexible school event: ${title} on ${eventDate.toDateString()}`);
+
+                        // Limit to prevent too many events
+                        if (parsedEvents.length >= 10) break;
+                    }
+                }
+            }
+
+            console.log(`Flexible school parser found ${parsedEvents.length} events for ${source.name}`);
 
             if (parsedEvents.length > 0) {
                 return parsedEvents;
@@ -1776,6 +1828,78 @@ export class CalendarFeedCollector {
     const nextMonth = (currentMonth + 1) % 12;
     const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
     return new Date(nextYear, nextMonth, 15, 19, 0);
+  }
+
+  /**
+   * Extract meaningful title from school event content
+   */
+  private extractSchoolEventTitle(text: string, $element: any): string {
+    // Strategy 1: Look for headings in the element
+    const headings = $element.find('h1, h2, h3, h4, h5, h6, .title, .heading, .event-title').first();
+    if (headings.length && headings.text().trim()) {
+      const headingText = headings.text().trim();
+      if (headingText.length > 5 && headingText.length < 150) {
+        return headingText;
+      }
+    }
+
+    // Strategy 2: Look for bold or emphasized text
+    const emphasized = $element.find('strong, b, em, .highlight').first();
+    if (emphasized.length && emphasized.text().trim()) {
+      const emphasizedText = emphasized.text().trim();
+      if (emphasizedText.length > 5 && emphasizedText.length < 150) {
+        return emphasizedText;
+      }
+    }
+
+    // Strategy 3: Look for links that might be event titles
+    const links = $element.find('a[href*="event"], a[href*="calendar"], a[href*="news"]').first();
+    if (links.length && links.text().trim()) {
+      const linkText = links.text().trim();
+      if (linkText.length > 5 && linkText.length < 150) {
+        return linkText;
+      }
+    }
+
+    // Strategy 4: Extract from structured text patterns
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
+    
+    // Look for lines that contain event-like patterns
+    const eventPatterns = [
+      /\b(board meeting|school board|meeting|conference|workshop|seminar|training|graduation|ceremony|game|match|tournament|concert|performance|presentation|orientation|registration|open house|back to school|parent|night|day|event|activity|program|celebration|festival|fundraiser)\b/i
+    ];
+
+    for (const line of lines.slice(0, 5)) {
+      if (line.length > 10 && line.length < 200) {
+        // Check if line contains event patterns
+        if (eventPatterns.some(pattern => pattern.test(line))) {
+          // Clean up the line
+          let cleanLine = line
+            .replace(/\d{1,2}:\d{2}\s*(AM|PM)/gi, '') // Remove times
+            .replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{1,2}/gi, '') // Remove dates
+            .replace(/\d{1,2}\/\d{1,2}\/?\d*/g, '') // Remove date patterns
+            .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+            .replace(/\s+/g, ' ') // Collapse whitespace
+            .trim();
+
+          if (cleanLine.length > 10 && cleanLine.length < 150) {
+            return cleanLine;
+          }
+        }
+      }
+    }
+
+    // Strategy 5: Fallback to first meaningful sentence
+    const sentences = text.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 10 && s.length < 200);
+    for (const sentence of sentences.slice(0, 3)) {
+      const schoolWords = ['school', 'student', 'parent', 'teacher', 'board', 'education', 'academic', 'grade', 'class'];
+      if (schoolWords.some(word => sentence.toLowerCase().includes(word))) {
+        return sentence.trim();
+      }
+    }
+
+    // Final fallback
+    return lines[0] || text.substring(0, 100);
   }
 
   /**
