@@ -894,12 +894,31 @@ export class CalendarFeedCollector {
         // For other websites, use comprehensive selectors and multiple parsing strategies
         console.log(`Starting comprehensive HTML event extraction for ${source.name}`);
 
-        // Strategy 1: Look for structured event data with enhanced selectors
+        // Strategy 1: Look for structured event data with enhanced selectors - prioritizing list formats
         const structuredSelectors = [
-            // Primary event selectors
-            '.event-item, .event, .calendar-event, .event-listing, .event-card, .event-list-item',
+            // PRIMARY: List-format calendar selectors (most common for government/school sites)
+            'ul.events li, ol.events li, .events ul li, .events ol li',
+            'ul.calendar li, ol.calendar li, .calendar ul li, .calendar ol li',
+            'ul.event-list li, ol.event-list li, .event-list ul li, .event-list ol li',
+            'ul.upcoming li, ol.upcoming li, .upcoming ul li, .upcoming ol li',
+            'ul.agenda li, ol.agenda li, .agenda ul li, .agenda ol li',
+            'ul.meetings li, ol.meetings li, .meetings ul li, .meetings ol li',
+            'ul.announcements li, ol.announcements li, .announcements ul li, .announcements ol li',
+            'ul.activities li, ol.activities li, .activities ul li, .activities ol li',
+            
+            // Calendar list views (common CMS patterns)
+            '.calendar-list li, .calendar-listing li, .event-listing li',
             '.upcoming-events li, .events-list li, .event-list li, .event-list-item',
-
+            '.agenda-list li, .meeting-list li, .announcement-list li',
+            
+            // Table-based list formats
+            'table.events tr, table.calendar tr, table.agenda tr, table.meetings tr',
+            'table.event-list tr, table.calendar-list tr',
+            '.events table tr, .calendar table tr, .agenda table tr',
+            
+            // Standard event selectors
+            '.event-item, .event, .calendar-event, .event-listing, .event-card, .event-list-item',
+            
             // Calendar-specific selectors
             '.calendar-item, .calendar-entry, .calendar-listing',
             'td[title*="event"], td[title*="Event"], .calendar-day[data-event]',
@@ -921,11 +940,11 @@ export class CalendarFeedCollector {
             '.board-meetings .item, .meeting-item',
             '.activities .item, .activity-item',
 
-            // MUCH MORE AGGRESSIVE - Any content that might be events
+            // Secondary: Broader content selectors
             'h1, h2, h3, h4, h5, h6', // Any heading could be an event title
             'p:has(strong), p:has(b)', // Paragraphs with bold text (often event announcements)
             'td, th', // Table cells that might contain events
-            'li', // Any list item (remove navigation filtering for now)
+            'li', // Any list item (fallback)
             '.card, .box, .tile, .panel, .section', // Common layout containers
             'div[id], div[class]', // Any div with an id or class (very broad)
             'article, section, aside', // Semantic content areas
@@ -954,27 +973,65 @@ export class CalendarFeedCollector {
                     // Remove navigation filtering to be more aggressive
                     if (this.isContainerOnlyElement($event, elementText)) return;
 
-                    // Extract title with multiple strategies
+                    // Extract title with multiple strategies - enhanced for list formats
                     let title = '';
 
-                    // Try specific title selectors first
-                    const titleSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', '.title', '.event-title', '.event-name', '.event-heading', 'a[href*="event"]', 'a[href*="calendar"]', 'strong', 'b'];
-                    for (const titleSel of titleSelectors) {
-                        const titleEl = $event.find(titleSel).first();
-                        if (titleEl.length && titleEl.text().trim()) {
-                            const candidateTitle = titleEl.text().trim();
-                            // Skip titles that are clearly navigation or generic content
-                            if (this.isValidEventTitle(candidateTitle)) {
-                                title = candidateTitle;
+                    // Strategy 1: For list items, look for direct text content first
+                    if ($event.is('li') || $event.closest('li').length > 0) {
+                        // Get the main text content of the list item, excluding child elements that might be metadata
+                        const listItemText = $event.clone().find('.date, .time, .location, .meta, .more').remove().end().text().trim();
+                        if (listItemText && listItemText.length > 10 && listItemText.length < 200 && this.isValidEventTitle(listItemText)) {
+                            title = listItemText;
+                        }
+                    }
+
+                    // Strategy 2: For table rows, look for the first meaningful cell
+                    if (!title && ($event.is('tr') || $event.closest('tr').length > 0)) {
+                        const cells = $event.find('td, th');
+                        for (let i = 0; i < cells.length; i++) {
+                            const cellText = $(cells[i]).text().trim();
+                            // Skip date-only cells, look for event titles
+                            if (cellText && cellText.length > 10 && cellText.length < 200 && 
+                                !this.isDateOnlyText(cellText) && this.isValidEventTitle(cellText)) {
+                                title = cellText;
                                 break;
                             }
                         }
                     }
 
-                    // Fallback: use first line of text if no structured title found
+                    // Strategy 3: Try specific title selectors
+                    if (!title) {
+                        const titleSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', '.title', '.event-title', '.event-name', '.event-heading', 'a[href*="event"]', 'a[href*="calendar"]', 'strong', 'b'];
+                        for (const titleSel of titleSelectors) {
+                            const titleEl = $event.find(titleSel).first();
+                            if (titleEl.length && titleEl.text().trim()) {
+                                const candidateTitle = titleEl.text().trim();
+                                if (this.isValidEventTitle(candidateTitle)) {
+                                    title = candidateTitle;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 4: Extract from structured text patterns (common in list formats)
                     if (!title) {
                         const lines = elementText.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
-                        for (const line of lines.slice(0, 3)) { // Check first 3 lines
+                        for (const line of lines.slice(0, 3)) {
+                            // Look for lines that start with event indicators
+                            if (/^(board meeting|council meeting|meeting|workshop|seminar|training|conference|celebration|festival|concert|performance|game|ceremony|fundraiser|presentation|orientation)/i.test(line.trim())) {
+                                if (this.isValidEventTitle(line)) {
+                                    title = line;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Strategy 5: Fallback to first meaningful line
+                    if (!title) {
+                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
+                        for (const line of lines.slice(0, 3)) {
                             if (this.isValidEventTitle(line)) {
                                 title = line;
                                 break;
@@ -998,8 +1055,8 @@ export class CalendarFeedCollector {
                         description = remainingText.length > 20 ? remainingText.substring(0, 300) : 'Event details available on website';
                     }
 
-                    // Extract date with comprehensive approach
-                    let startDate = this.extractEventDateComprehensive($event, elementText);
+                    // Extract date with comprehensive approach - enhanced for list/table formats
+                    let startDate = this.extractEventDateFromListOrTable($event, elementText);
 
                     // Only add events with valid, future dates AND proper event validation
                     if (startDate && startDate > new Date() && this.isValidEventTitle(title)) {
@@ -1786,6 +1843,79 @@ export class CalendarFeedCollector {
   }
 
   /**
+   * Extract dates specifically from list items and table rows (common calendar formats)
+   */
+  private extractEventDateFromListOrTable($element: any, elementText: string): Date | null {
+    // First try the original comprehensive method
+    const comprehensiveDate = this.extractEventDateComprehensive($element, elementText);
+    if (comprehensiveDate) return comprehensiveDate;
+
+    // Enhanced extraction for list and table formats
+    
+    // Strategy 1: For list items, look for date in specific positions
+    if ($element.is('li') || $element.closest('li').length > 0) {
+      // Look for date at the beginning of list text
+      const lines = elementText.split('\n').map(l => l.trim()).filter(l => l);
+      for (const line of lines.slice(0, 3)) {
+        // Check if line starts with a date
+        const dateAtStart = line.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i);
+        if (dateAtStart) {
+          const date = this.parseEventDate(dateAtStart[0]);
+          if (date) return date;
+        }
+        
+        // Check for date in middle of line
+        const dateInText = line.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i);
+        if (dateInText) {
+          const date = this.parseEventDate(dateInText[0]);
+          if (date) return date;
+        }
+      }
+    }
+
+    // Strategy 2: For table rows, check each cell for dates
+    if ($element.is('tr') || $element.closest('tr').length > 0) {
+      const cells = $element.find('td, th');
+      
+      // First, look for cells that are likely to contain dates
+      cells.each((_, cell) => {
+        const cellText = $(cell).text().trim();
+        if (cellText && cellText.length < 50) { // Date cells are usually short
+          // Check if this looks like a date
+          const datePatterns = [
+            /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i,
+            /\d{1,2}\/\d{1,2}\/?\d{0,4}/,
+            /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
+          ];
+          
+          for (const pattern of datePatterns) {
+            const match = cellText.match(pattern);
+            if (match) {
+              const date = this.parseEventDate(match[0]);
+              if (date && date > new Date()) {
+                return date;
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Strategy 3: Look for dates in metadata areas (common in list formats)
+    const metaSelectors = ['.date', '.time', '.when', '.event-date', '.event-time', '.meta', '.details'];
+    for (const selector of metaSelectors) {
+      const metaEl = $element.find(selector);
+      if (metaEl.length > 0) {
+        const metaText = metaEl.text().trim();
+        const date = this.parseEventDate(metaText);
+        if (date) return date;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Comprehensive date extraction from event element and text
    */
   private extractEventDateComprehensive($element: any, elementText: string): Date | null {
@@ -2000,6 +2130,28 @@ export class CalendarFeedCollector {
     const currentDay = today.getDay(); // 0 = Sunday, 6 = Saturday
     const daysUntilSaturday = (6 - currentDay + 7) % 7;
     return daysUntilSaturday === 0 ? 7 : daysUntilSaturday; // If today is Saturday, return next Saturday
+  }
+
+  /**
+   * Check if text is primarily just a date (used to skip date-only table cells)
+   */
+  private isDateOnlyText(text: string): boolean {
+    if (!text || text.length < 3) return false;
+    
+    const trimmedText = text.trim();
+    
+    // Check if it's just a date pattern
+    const dateOnlyPatterns = [
+      /^\d{1,2}\/\d{1,2}\/?\d{0,4}$/,
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?$/i,
+      /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*(?:\s+\d{4})?$/i,
+      /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i,
+      /^\d{1,2}:\d{2}\s*(AM|PM)?$/i,
+      /^\d{1,2}$/,
+      /^(am|pm)$/i
+    ];
+
+    return dateOnlyPatterns.some(pattern => pattern.test(trimmedText));
   }
 
   /**
