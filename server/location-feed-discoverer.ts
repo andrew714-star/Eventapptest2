@@ -223,12 +223,13 @@ export class LocationFeedDiscoverer {
     const feeds: DiscoveredFeed[] = [];
     
     try {
-      // First check if domain exists
+      // First check if domain exists with shorter timeout
       const baseUrl = `https://${domain}`;
       const response = await axios.get(baseUrl, {
-        timeout: 5000,
+        timeout: 3000, // Reduced from 5000ms
         headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
-        validateStatus: (status) => status < 500 // Accept 404s but not server errors
+        validateStatus: (status) => status < 500, // Accept 404s but not server errors
+        maxRedirects: 3 // Limit redirects
       });
 
       if (response.status === 404) {
@@ -272,8 +273,9 @@ export class LocationFeedDiscoverer {
   private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.head(feedUrl, {
-        timeout: 3000,
-        headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' }
+        timeout: 2000, // Reduced from 3000ms
+        headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
+        maxRedirects: 3
       });
 
       const contentType = response.headers['content-type'] || '';
