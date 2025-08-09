@@ -462,7 +462,7 @@ export class CalendarFeedCollector {
           today.setHours(0, 0, 0, 0); // Set to start of today
           const eventDateOnly = new Date(startDate);
           eventDateOnly.setHours(0, 0, 0, 0); // Set to start of event date
-          
+
           if (eventDateOnly >= today) {
             parsedEvents.push({
               title: (event as any).summary,
@@ -966,8 +966,8 @@ export class CalendarFeedCollector {
         }
 
         // Strategy 2: If no structured events found, try text pattern matching
-        if (!foundEvents) {
-            console.log(`No structured events found, trying text pattern matching for ${source.name}`);
+        if (!parsedEvents.length) { // Check if parsedEvents is still empty
+            console.log(`No structured events found, trying text pattern extraction for ${source.name}`);
             this.extractEventsFromTextPatterns($, source, parsedEvents);
         }
 
@@ -2151,7 +2151,7 @@ export class CalendarFeedCollector {
           let eventDate = this.extractDateFromFullText(chunk);
 
           if (eventDate && eventDate > new Date()) {
-            // Create a clean title from the chunk
+            // Create a title from the chunk
             let title = this.extractTitleFromEventText(chunk);
 
             if (title && title.length > 10 && title.length < 200) {
@@ -2291,7 +2291,7 @@ export class CalendarFeedCollector {
 
       if (hasDate && extractedDate) {
         // Create a title from the text - use the sentence/phrase containing the date
-        const sentences = elementText.split(/[.!?]\s+/);
+        const sentences = elementText.split(/[.!?]/);
         let bestTitle = '';
 
         for (const sentence of sentences) {
