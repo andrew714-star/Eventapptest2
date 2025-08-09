@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as ical from 'node-ical';
+import ical from 'node-ical';
 import * as cheerio from 'cheerio';
 import { parseString } from 'xml2js';
 import { InsertEvent } from '@shared/schema';
@@ -695,16 +695,16 @@ export class CalendarFeedCollector {
 
                             console.log(`✓ Successfully created San Jacinto event: ${pattern} on ${eventDate.toDateString()}`);
                         } else {
-                            // If no specific date found, create multiple recurring instances
+                            // If no specific date found, create multiple recurring instances - ALWAYS CREATE FOR SAN JACINTO
                             console.log(`No specific date found for ${pattern}, creating recurring instances`);
                             const recurringDates = this.getRecurringEventDates(pattern);
 
                             for (const recurringDate of recurringDates) {
                                 parsedEvents.push({
                                     title: this.cleanText(pattern),
-                                    description: this.cleanText(elementText),
+                                    description: this.getEnhancedDescription(pattern, elementText),
                                     category: pattern.includes('Council') ? 'Government' : pattern.includes('Commission') ? 'Government' : 'Entertainment',
-                                    location: pattern.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : 'San Jacinto City Hall',
+                                    location: pattern.includes('Commission') ? '625 S Pico Avenue, San Jacinto' : pattern.includes('Council') ? 'San Jacinto City Hall' : 'San Jacinto City Hall',
                                     organizer: source.name,
                                     startDate: recurringDate,
                                     endDate: new Date(recurringDate.getTime() + 2.5 * 60 * 60 * 1000),
@@ -720,7 +720,7 @@ export class CalendarFeedCollector {
                             }
                         }
 
-                        // Mark this event type as processed
+                        // Mark this event type as processed and set foundValidEvent
                         foundValidEvent = true;
                         processedEventTypes.add(pattern);
                     }
@@ -1525,6 +1525,20 @@ export class CalendarFeedCollector {
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * Get enhanced descriptions for San Jacinto events
+   */
+  private getEnhancedDescription(eventTitle: string, originalText: string): string {
+    if (eventTitle.includes('City Council Meeting')) {
+      return 'Regular City Council meeting to discuss community business, municipal affairs, and public concerns. Open to the public with time for public comments.';
+    } else if (eventTitle.includes('Planning Commission')) {
+      return 'Planning Commission meeting to review development proposals, zoning applications, and city planning matters. Public attendance welcomed.';
+    } else if (eventTitle.includes('Kool August Nights')) {
+      return 'Classic car show and family entertainment event featuring vintage automobiles, live music, food vendors, and community activities in downtown San Jacinto.';
+    }
+    return this.cleanText(originalText) || 'Event details available on website';
   }
 
   /**
