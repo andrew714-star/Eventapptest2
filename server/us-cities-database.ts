@@ -303,8 +303,14 @@ export class ComprehensiveCityDiscoverer {
         const createdCities = districtCities.map(cityName => ({
           name: cityName,
           state: state === 'CA' ? 'California' : state,
+          stateCode: state.toUpperCase(),
+          county: 'Unknown',
+          type: 'city',
+          lat: 0,
+          lng: 0,
           population: 50000, // Default population for discovery
-          isCapital: false
+          isCapital: false,
+          potentialSources: []
         }));
         return createdCities;
       }

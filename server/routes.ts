@@ -576,10 +576,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           totalDiscovered += discoveredFeeds.length;
 
-          // Auto-add discovered feeds
+          // Auto-add discovered feeds and immediately sync them
           for (const feed of discoveredFeeds) {
             const success = calendarCollector.addSource(feed.source);
-            if (success) totalAdded++;
+            if (success) {
+              totalAdded++;
+              
+              // Immediately sync events from this new source
+              try {
+                console.log(`Immediately syncing events from newly added source: ${feed.source.name}`);
+                const events = await calendarCollector.collectFromSource(feed.source);
+                
+                // Add events to storage with duplicate checking
+                const existingEvents = await storage.getAllEvents();
+                const existingEventKeys = new Set(existingEvents.map(event => 
+                    `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
+                ));
+                
+                for (const event of events) {
+                    const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
+                    if (!existingEventKeys.has(key)) {
+                        await storage.createEvent(event);
+                        syncedCount++;
+                    }
+                }
+              } catch (syncError) {
+                console.error(`Failed to immediately sync from ${feed.source.name}:`, syncError);
+              }
+            }
           }
 
           // Group feeds by organization type for better reporting
@@ -613,45 +637,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // After discovering feeds, automatically sync events from all active sources for these cities
-      console.log(`Triggering automatic event sync for district ${state}-${district}...`);
-      
+      // Events are now automatically synced immediately after feed discovery above
       const cityLocations = cities.map(city => `${city.name}, ${state}`);
-      let syncedCount = 0;
       
-      // Get active calendar sources that match the cities in this district
-      const allSources = calendarCollector.getSources();
-      const relevantSources = allSources.filter(source => {
-          return source.isActive && cityLocations.some(location => 
-              location.toLowerCase().includes(source.city.toLowerCase()) &&
-              location.toLowerCase().includes(source.state.toLowerCase())
-          );
-      });
-      
-      console.log(`Found ${relevantSources.length} active sources for district cities`);
-      
-      // Sync events from relevant sources
-      for (const source of relevantSources) {
-          try {
-              console.log(`Auto-syncing events from ${source.name} (${source.city}, ${source.state})`);
-              const events = await calendarCollector.collectFromSource(source);
-              
-              // Add events to storage (check for duplicates)
-              const existingEvents = await storage.getAllEvents();
-              const existingEventKeys = new Set(existingEvents.map(event => 
-                  `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
-              ));
-              
-              for (const event of events) {
-                  const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
-                  if (!existingEventKeys.has(key)) {
-                      await storage.createEvent(event);
-                      syncedCount++;
-                  }
-              }
-          } catch (sourceError) {
-              console.error(`Failed to auto-sync from ${source.name}:`, sourceError);
-          }
+      // Initialize syncedCount if not already defined
+      if (typeof syncedCount === 'undefined') {
+        syncedCount = 0;
       }
 
       res.json({

@@ -65,11 +65,32 @@ export class MemStorage implements IStorage {
     
     if (locations.length > 0) {
       events = events.filter(event => 
-        locations.some(location =>
-          event.location.toLowerCase().includes(location.toLowerCase()) ||
-          event.organizer.toLowerCase().includes(location.toLowerCase())
-        )
+        locations.some(location => {
+          const locationLower = location.toLowerCase();
+          const eventLocationLower = event.location.toLowerCase();
+          const eventOrganizerLower = event.organizer.toLowerCase();
+          const eventSourceLower = event.source?.toLowerCase() || '';
+          
+          // More flexible matching for city names
+          return eventLocationLower.includes(locationLower) ||
+                 eventOrganizerLower.includes(locationLower) ||
+                 eventSourceLower.includes(locationLower) ||
+                 // Handle "City, State" format searches
+                 (locationLower.includes(',') && (
+                   eventLocationLower.includes(locationLower.split(',')[0].trim()) ||
+                   eventOrganizerLower.includes(locationLower.split(',')[0].trim()) ||
+                   eventSourceLower.includes(locationLower.split(',')[0].trim())
+                 )) ||
+                 // Handle single city name searches matching various formats
+                 (!locationLower.includes(',') && (
+                   eventLocationLower.includes(locationLower) ||
+                   eventOrganizerLower.includes(locationLower) ||
+                   eventSourceLower.includes(locationLower)
+                 ));
+        })
       );
+      
+      console.log(`Storage: Filtered events for locations [${locations.join(', ')}] - found ${events.length} matching events`);
     }
 
     if (filters.startDate) {
