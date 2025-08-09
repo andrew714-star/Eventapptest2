@@ -284,48 +284,72 @@ export class CalendarFeedCollector {
   }
 
   async collectFromSource(source: CalendarSource): Promise<InsertEvent[]> {
-    console.log(`Collecting from ${source.name} (${source.feedType}): ${source.feedUrl}`);
+    console.log(`\n=== Collecting from ${source.name} (${source.feedType}) ===`);
+    console.log(`Feed URL: ${source.feedUrl}`);
+    console.log(`Website URL: ${source.websiteUrl}`);
 
     try {
+      let events: InsertEvent[] = [];
+      
       switch (source.feedType) {
         case 'ical':
-          return await this.parseICalFeed(source);
+          events = await this.parseICalFeed(source);
+          break;
         case 'rss':
-          return await this.parseRSSFeed(source);
+          events = await this.parseRSSFeed(source);
+          break;
         case 'json':
-          return await this.parseJSONFeed(source);
+          events = await this.parseJSONFeed(source);
+          break;
         case 'webcal':
-          return await this.parseWebCalFeed(source);
+          events = await this.parseWebCalFeed(source);
+          break;
         case 'html':
-          return await this.scrapeHTMLEvents(source);
+          events = await this.scrapeHTMLEvents(source);
+          break;
         default:
           // Try to auto-detect feed type based on URL
           if (source.feedUrl?.includes('.ics') || source.feedUrl?.includes('ICalendarHandler')) {
             console.log(`Auto-detecting as iCal for ${source.name}`);
-            return await this.parseICalFeed(source);
+            events = await this.parseICalFeed(source);
           } else if (source.feedUrl?.includes('.rss') || source.feedUrl?.includes('rss')) {
             console.log(`Auto-detecting as RSS for ${source.name}`);
-            return await this.parseRSSFeed(source);
+            events = await this.parseRSSFeed(source);
           } else {
             console.log(`Auto-detecting as HTML for ${source.name}`);
-            return await this.scrapeHTMLEvents(source);
+            events = await this.scrapeHTMLEvents(source);
           }
       }
+      
+      console.log(`✓ Successfully collected ${events.length} events from ${source.name}`);
+      if (events.length > 0) {
+        console.log(`Event titles: ${events.map(e => e.title).join(', ')}`);
+      }
+      
+      return events;
+      
     } catch (error) {
-      console.error(`Failed to collect from ${source.name} (${source.feedType}):`, error);
+      console.error(`❌ Failed to collect from ${source.name} (${source.feedType}):`, error);
 
-      // For iCal feeds, try alternative parsing methods
-      if (source.feedType === 'ical' && source.feedUrl) {
-        console.log(`Attempting alternative parsing for iCal feed: ${source.name}`);
+      // For iCal feeds that might actually be HTML calendar pages, try HTML scraping
+      if ((source.feedType === 'ical' || source.feedUrl?.includes('.ics')) && source.websiteUrl) {
+        console.log(`🔄 Attempting HTML scraping fallback for ${source.name}`);
         try {
-          return await this.scrapeHTMLEvents(source);
+          const htmlEvents = await this.scrapeHTMLEvents({
+            ...source,
+            feedType: 'html'
+          });
+          
+          if (htmlEvents.length > 0) {
+            console.log(`✓ Fallback HTML scraping found ${htmlEvents.length} events for ${source.name}`);
+            return htmlEvents;
+          }
         } catch (fallbackError) {
-          console.error(`Fallback HTML scraping also failed for ${source.name}:`, fallbackError);
+          console.error(`❌ Fallback HTML scraping also failed for ${source.name}:`, fallbackError);
         }
       }
 
-      // No fallback data - return empty array to ensure only authentic data
-      console.log(`No fallback data for ${source.name} - using authentic feeds only`);
+      console.log(`⚠️ No events collected from ${source.name} - authentic feeds only`);
       return [];
     }
   }
@@ -718,101 +742,111 @@ export class CalendarFeedCollector {
             }
         }
 
-        // For other websites, use general selectors
-        const eventSelectors = [
-            '.event-item, .event, .calendar-event',
+        // For other websites, use comprehensive selectors and multiple parsing strategies
+        console.log(`Starting comprehensive HTML event extraction for ${source.name}`);
+        
+        // Strategy 1: Look for structured event data
+        const structuredSelectors = [
+            '.event-item, .event, .calendar-event, .event-listing',
             '[class*="event"], [id*="event"]', 
-            '.upcoming-events li, .events-list li',
-            'td[title*="event"], td[title*="Event"]', // Calendar table cells
-            '[aria-label*="event"], [aria-label*="Event"]', // Accessible calendar events
-            '.calendar-day .event, .calendar-cell .event'
+            '.upcoming-events li, .events-list li, .event-list li',
+            'td[title*="event"], td[title*="Event"]',
+            '[aria-label*="event"], [aria-label*="Event"]',
+            '.calendar-day .event, .calendar-cell .event',
+            '.view-content .views-row', // Drupal CMS events
+            '.event-wrapper, .event-container',
+            'article[class*="event"], div[class*="event"]'
         ];
 
-        for (const selector of eventSelectors) {
+        let foundEvents = false;
+        
+        for (const selector of structuredSelectors) {
             const events = $(selector);
+            console.log(`Trying selector "${selector}" - found ${events.length} elements`);
+            
             if (events.length > 0) {
                 events.each((_, element) => {
                     const $event = $(element);
+                    const elementText = $event.text().trim();
+                    
+                    // Skip if element is too large (likely a container) or too small
+                    if (elementText.length > 1000 || elementText.length < 10) return;
 
-                    // Extract title more precisely - avoid concatenated data
-                    let title = $event.find('h1, h2, h3, .title, .event-title').first().text().trim();
+                    // Extract title with multiple strategies
+                    let title = '';
+                    
+                    // Try specific title selectors first
+                    const titleSelectors = ['h1', 'h2', 'h3', 'h4', '.title', '.event-title', '.event-name', 'a'];
+                    for (const titleSel of titleSelectors) {
+                        const titleEl = $event.find(titleSel).first();
+                        if (titleEl.length && titleEl.text().trim()) {
+                            title = titleEl.text().trim();
+                            break;
+                        }
+                    }
+                    
+                    // Fallback: use first line of text if no structured title found
                     if (!title) {
-                        title = $event.find('a').first().text().trim();
+                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l);
+                        if (lines.length > 0) {
+                            title = lines[0];
+                        }
                     }
 
-                    // Clean title - remove date/time patterns that got mixed in
-                    title = title.replace(/\d{1,2}:\d{2}\s*(AM|PM)/gi, '').trim();
-                    title = title.replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\d{1,2}/gi, '').trim();
-                    title = title.replace(/\d{1,2}\/\d{1,2}\/?\d*/, '').trim();
-                    title = title.replace(/\s+-\s+\d{1,2}:\d{2}\s*(AM|PM)/gi, '').trim();
-                    title = title.replace(/[a-z]$/, '').trim(); // Remove trailing single letters
-
-                    if (!title || title.length <= 3 || title === 'Community Event') {
-                        return; // Skip this event if no valid title
+                    // Clean and validate title
+                    title = this.cleanEventTitle(title);
+                    
+                    if (!title || title.length <= 3) {
+                        console.log(`Skipping element - no valid title found. Text: "${elementText.substring(0, 100)}"`);
+                        return;
                     }
 
-                    if (title && title.length > 3) {
-                        const description = $event.find('.description, .summary, p').first().text().trim() || 
-                                            'Event details available on website';
+                    // Extract description
+                    let description = $event.find('.description, .summary, .event-description, p').first().text().trim();
+                    if (!description || description === title) {
+                        // Use remaining text after title as description
+                        const remainingText = elementText.replace(title, '').trim();
+                        description = remainingText.length > 10 ? remainingText : 'Event details available on website';
+                    }
 
-                        // Try multiple ways to extract date information
-                        let dateText = $event.find('.date, .event-date, time, [class*="date"]').first().text().trim();
-                        if (!dateText) {
-                            // Look for date patterns in the full element text
-                            const fullText = $event.text();
-                            const dateMatch = fullText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{1,2}|\d{1,2}\/\d{1,2}\/?\d*|\w+\s+\d{1,2}\s+\d{4}/i);
-                            dateText = dateMatch ? dateMatch[0] : '';
-                        }
+                    // Extract date with comprehensive approach
+                    let startDate = this.extractEventDateComprehensive($event, elementText);
 
-                        // Check for date in event titles or descriptions that contain dates
-                        if (!dateText) {
-                            const titleText = title + ' ' + description;
-                            const titleDateMatch = titleText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*\d{1,2}|\d{1,2}\/\d{1,2}\/?\d*|\w+\s+\d{1,2}\s+\d{4}/i);
-                            dateText = titleDateMatch ? titleDateMatch[0] : '';
-                        }
+                    // Only add events with valid, future dates
+                    if (startDate && startDate > new Date()) {
+                        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
 
-                        // For San Jacinto calendar: Look for date patterns in parent table cell or surrounding context
-                        if (!dateText) {
-                            const parentTd = $event.closest('td');
-                            if (parentTd.length > 0) {
-                                const cellText = parentTd.text();
-                                // Look for patterns like "August 5", "Aug 5", "5", etc. in table cell context
-                                const cellDateMatch = cellText.match(/(August?|Aug)\s*(\d{1,2})|(\d{1,2})\s*(August?|Aug)/i);
-                                if (cellDateMatch) {
-                                    const day = cellDateMatch[2] || cellDateMatch[3];
-                                    dateText = `August ${day}, 2025`; // Use current year context
-                                }
-                            }
-                        }
-
-                        let startDate = this.parseEventDate(dateText);
-
-                        // Only add events with valid, future dates to ensure authentic data
-                        if (startDate && startDate > new Date()) {
-                            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
-
-                            parsedEvents.push({
-                                title: this.cleanText(title),
-                                description: this.cleanText(description.substring(0, 300)),
-                                category: this.categorizeEvent(title, description),
-                                location: `${source.city}, ${source.state}`,
-                                organizer: source.name,
-                                startDate,
-                                endDate,
-                                startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                                endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-                                attendees: 0,
-                                imageUrl: null,
-                                isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
-                                source: source.id
-                            });
-                        } else {
-                            console.log(`Skipping event "${title}" - no valid future date found`);
-                        }
+                        parsedEvents.push({
+                            title: this.cleanText(title),
+                            description: this.cleanText(description.substring(0, 300)),
+                            category: this.categorizeEvent(title, description),
+                            location: `${source.city}, ${source.state}`,
+                            organizer: source.name,
+                            startDate,
+                            endDate,
+                            startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                            attendees: 0,
+                            imageUrl: null,
+                            isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
+                            source: source.id
+                        });
+                        
+                        foundEvents = true;
+                        console.log(`✓ Extracted event: "${title}" on ${startDate.toDateString()}`);
+                    } else {
+                        console.log(`Skipping "${title}" - no valid future date found`);
                     }
                 });
-                if (parsedEvents.length > 0) break; // Stop if events are found with this selector
+                
+                if (foundEvents) break; // Stop if we found events with this selector
             }
+        }
+
+        // Strategy 2: If no structured events found, try text pattern matching
+        if (!foundEvents) {
+            console.log(`No structured events found, trying text pattern matching for ${source.name}`);
+            this.extractEventsFromTextPatterns($, source, parsedEvents);
         }
 
         return parsedEvents;
@@ -1466,6 +1500,153 @@ export class CalendarFeedCollector {
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * Clean event title by removing common unwanted patterns
+   */
+  private cleanEventTitle(title: string): string {
+    if (!title) return '';
+    
+    return title
+      .replace(/\d{1,2}:\d{2}\s*(AM|PM)/gi, '') // Remove times
+      .replace(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*\d{1,2}/gi, '') // Remove dates
+      .replace(/\d{1,2}\/\d{1,2}\/?\d*/, '') // Remove date patterns
+      .replace(/\s+-\s+\d{1,2}:\d{2}\s*(AM|PM)/gi, '') // Remove time ranges
+      .replace(/^\W+|\W+$/g, '') // Remove leading/trailing non-word chars
+      .replace(/\s+/g, ' ') // Collapse whitespace
+      .trim();
+  }
+
+  /**
+   * Comprehensive date extraction from event element and text
+   */
+  private extractEventDateComprehensive($element: any, elementText: string): Date | null {
+    // Strategy 1: Look for date in element attributes
+    const dateAttrs = ['data-date', 'datetime', 'data-event-date', 'data-start', 'title'];
+    for (const attr of dateAttrs) {
+      const attrValue = $element.attr(attr);
+      if (attrValue) {
+        const attrDate = this.parseEventDate(attrValue);
+        if (attrDate) return attrDate;
+      }
+    }
+
+    // Strategy 2: Look for date in child elements
+    const dateElements = $element.find('.date, .event-date, time, [class*="date"], [class*="time"]');
+    if (dateElements.length > 0) {
+      const dateText = dateElements.first().text().trim();
+      const elementDate = this.parseEventDate(dateText);
+      if (elementDate) return elementDate;
+    }
+
+    // Strategy 3: Extract date patterns from element text
+    const datePatterns = [
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{4}/i,
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
+      /\d{1,2}\/\d{1,2}\/\d{4}/,
+      /\d{1,2}\/\d{1,2}/,
+      /\d{4}-\d{1,2}-\d{1,2}/
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = elementText.match(pattern);
+      if (match) {
+        const patternDate = this.parseEventDate(match[0]);
+        if (patternDate) return patternDate;
+      }
+    }
+
+    // Strategy 4: Look for relative dates
+    const today = new Date();
+    const relativePatterns = [
+      { pattern: /today/i, days: 0 },
+      { pattern: /tomorrow/i, days: 1 },
+      { pattern: /this\s+weekend/i, days: this.getDaysUntilWeekend() },
+      { pattern: /next\s+week/i, days: 7 },
+      { pattern: /next\s+month/i, days: 30 }
+    ];
+
+    for (const relative of relativePatterns) {
+      if (relative.pattern.test(elementText)) {
+        const relativeDate = new Date(today);
+        relativeDate.setDate(today.getDate() + relative.days);
+        return relativeDate;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract events from text patterns when structured data isn't available
+   */
+  private extractEventsFromTextPatterns($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
+    console.log(`Attempting text pattern extraction for ${source.name}`);
+    
+    // Look for common event announcement patterns in the page text
+    const fullPageText = $('body').text();
+    const eventKeywords = [
+      'meeting', 'event', 'workshop', 'conference', 'seminar', 'training',
+      'celebration', 'festival', 'concert', 'performance', 'exhibition',
+      'council', 'commission', 'board', 'committee', 'hearing'
+    ];
+
+    // Split text into paragraphs and look for event-like content
+    const paragraphs = fullPageText.split(/\n\n|\n\s*\n/).map(p => p.trim()).filter(p => p.length > 20);
+    
+    for (const paragraph of paragraphs.slice(0, 50)) { // Limit to first 50 paragraphs
+      // Check if paragraph contains event keywords
+      const hasEventKeyword = eventKeywords.some(keyword => 
+        paragraph.toLowerCase().includes(keyword)
+      );
+
+      if (hasEventKeyword) {
+        // Look for date patterns in the paragraph
+        const datePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?|\d{1,2}\/\d{1,2}\/?\d*/i;
+        const dateMatch = paragraph.match(datePattern);
+        
+        if (dateMatch) {
+          const eventDate = this.parseEventDate(dateMatch[0]);
+          
+          if (eventDate && eventDate > new Date()) {
+            // Extract likely title (first sentence or line)
+            const sentences = paragraph.split(/[.!?]/);
+            const title = sentences[0].trim().substring(0, 100);
+            
+            if (title.length > 10) {
+              parsedEvents.push({
+                title: this.cleanText(title),
+                description: this.cleanText(paragraph.substring(0, 300)),
+                category: this.categorizeEvent(title, paragraph),
+                location: `${source.city}, ${source.state}`,
+                organizer: source.name,
+                startDate: eventDate,
+                endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                startTime: eventDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                endTime: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+                attendees: 0,
+                imageUrl: null,
+                isFree: 'true',
+                source: source.id
+              });
+              
+              console.log(`✓ Extracted text pattern event: "${title}" on ${eventDate.toDateString()}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Get days until next weekend (Saturday)
+   */
+  private getDaysUntilWeekend(): number {
+    const today = new Date();
+    const currentDay = today.getDay(); // 0 = Sunday, 6 = Saturday
+    const daysUntilSaturday = (6 - currentDay + 7) % 7;
+    return daysUntilSaturday === 0 ? 7 : daysUntilSaturday; // If today is Saturday, return next Saturday
   }
 }
 
