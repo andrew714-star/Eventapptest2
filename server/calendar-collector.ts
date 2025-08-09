@@ -770,7 +770,19 @@ export class CalendarFeedCollector {
             // School/government specific selectors
             '.news-events .item, .announcements .item',
             '.board-meetings .item, .meeting-item',
-            '.activities .item, .activity-item'
+            '.activities .item, .activity-item',
+            
+            // Broader content selectors for unlabeled events
+            'article, .article',
+            '.content-item, .item, .entry',
+            '.post, .listing, .record',
+            'section, .section',
+            '.tile, .box, .card',
+            '.row, .grid-item',
+            'li:not(nav li):not(.navigation li):not(.menu li)',
+            'div[class*="content"], div[class*="main"]',
+            '.container > div, .wrapper > div',
+            'main > div, .main > div'
         ];
 
         let foundEvents = false;
@@ -784,11 +796,14 @@ export class CalendarFeedCollector {
                     const $event = $(element);
                     const elementText = $event.text().trim();
                     
-                    // Skip if element is too large (likely a container) or too small
-                    if (elementText.length > 2000 || elementText.length < 15) return;
+                    // Skip if element is too large (likely a full page container) or too small (likely just labels)
+                    if (elementText.length > 5000 || elementText.length < 10) return;
                     
                     // Skip navigation, menu, and header elements
                     if (this.isNavigationElement($event, elementText)) return;
+                    
+                    // Skip elements that are likely just containers with no meaningful content
+                    if (this.isContainerOnlyElement($event, elementText)) return;
 
                     // Extract title with multiple strategies
                     let title = '';
@@ -1609,33 +1624,48 @@ export class CalendarFeedCollector {
   private extractEventsFromTextPatterns($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
     console.log(`Attempting text pattern extraction for ${source.name}`);
     
-    // Look for specific event-related content areas first
+    // Look for specific event-related content areas first, then broader areas
     const eventSections = [
       '.main-content, .content, .page-content',
       '.events, .calendar, .announcements, .news',
       '.upcoming, .activities, .meetings',
-      'main, article, section'
+      'main, article, section',
+      '.container, .wrapper, .layout',
+      '#content, #main, #primary',
+      '.region-content, .field-content',
+      'body > div, html > body > div'
     ];
     
     let targetContent = '';
+    let bestSelector = '';
     
-    // Try to find event-specific content areas
+    // Try to find the most relevant content area
     for (const selector of eventSections) {
       const $section = $(selector);
       if ($section.length > 0) {
-        const sectionText = $section.text();
-        if (sectionText.length > targetContent.length && sectionText.length < 50000) {
-          targetContent = sectionText;
-          console.log(`Using content from selector: ${selector} (${sectionText.length} chars)`);
-          break;
+        const sectionText = $section.text().trim();
+        // Look for content that's substantial but not overwhelming
+        if (sectionText.length > 100 && sectionText.length < 100000) {
+          // Prefer content that contains event-related keywords
+          const eventKeywordCount = this.countEventKeywords(sectionText);
+          if (eventKeywordCount > 0 || !targetContent) {
+            if (eventKeywordCount > this.countEventKeywords(targetContent) || 
+                (eventKeywordCount === this.countEventKeywords(targetContent) && sectionText.length > targetContent.length)) {
+              targetContent = sectionText;
+              bestSelector = selector;
+            }
+          }
         }
       }
     }
     
     // Fallback to body content if no specific sections found
     if (!targetContent) {
-      targetContent = $('body').text();
+      targetContent = $('body').text().trim();
+      bestSelector = 'body';
       console.log(`Using full body content (${targetContent.length} chars)`);
+    } else {
+      console.log(`Using content from selector: ${bestSelector} (${targetContent.length} chars) with ${this.countEventKeywords(targetContent)} event keywords`);
     }
     
     const eventKeywords = [
@@ -1643,7 +1673,9 @@ export class CalendarFeedCollector {
       'celebration', 'festival', 'concert', 'performance', 'exhibition',
       'council', 'board', 'committee', 'hearing', 'forum',
       'graduation', 'ceremony', 'game', 'match', 'tournament',
-      'fundraiser', 'dinner', 'lunch', 'dance', 'show'
+      'fundraiser', 'dinner', 'lunch', 'dance', 'show',
+      'class', 'session', 'orientation', 'registration', 'enrollment',
+      'assembly', 'gathering', 'presentation', 'lecture', 'discussion'
     ];
 
     // Split text into meaningful chunks (sentences and short paragraphs)
@@ -1744,6 +1776,30 @@ export class CalendarFeedCollector {
   }
 
   /**
+   * Count event-related keywords in text to help identify relevant content sections
+   */
+  private countEventKeywords(text: string): number {
+    if (!text) return 0;
+    
+    const eventKeywords = [
+      'meeting', 'conference', 'workshop', 'seminar', 'training',
+      'celebration', 'festival', 'concert', 'performance', 'exhibition',
+      'council', 'board', 'committee', 'hearing', 'forum',
+      'graduation', 'ceremony', 'game', 'match', 'tournament',
+      'fundraiser', 'dinner', 'lunch', 'dance', 'show',
+      'class', 'session', 'orientation', 'registration', 'enrollment',
+      'assembly', 'gathering', 'presentation', 'lecture', 'discussion',
+      'event', 'calendar', 'schedule', 'activity', 'program'
+    ];
+    
+    const lowerText = text.toLowerCase();
+    return eventKeywords.reduce((count, keyword) => {
+      const matches = lowerText.split(keyword).length - 1;
+      return count + matches;
+    }, 0);
+  }
+
+  /**
    * Check if an element is likely a navigation or structural element rather than event content
    */
   private isNavigationElement($element: any, elementText: string): boolean {
@@ -1779,6 +1835,36 @@ export class CalendarFeedCollector {
     ];
     
     for (const pattern of navTextPatterns) {
+      if (pattern.test(elementText)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if element is likely just a container with no meaningful event content
+   */
+  private isContainerOnlyElement($element: any, elementText: string): boolean {
+    // Check if element has many child elements but little direct text
+    const childrenCount = $element.children().length;
+    const directText = $element.clone().children().remove().end().text().trim();
+    
+    // If element has many children but very little direct text, it's likely just a container
+    if (childrenCount > 5 && directText.length < 50) {
+      return true;
+    }
+    
+    // Check for container-specific patterns
+    const containerPatterns = [
+      /^(show|hide|toggle|expand|collapse)$/i,
+      /^(previous|next|page \d+)$/i,
+      /^(sort by|filter by|view all)$/i,
+      /^(loading|please wait)$/i
+    ];
+    
+    for (const pattern of containerPatterns) {
       if (pattern.test(elementText)) {
         return true;
       }
