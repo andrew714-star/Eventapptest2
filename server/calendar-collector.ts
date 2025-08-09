@@ -252,7 +252,7 @@ export class CalendarFeedCollector {
       state: 'CA',
       type: 'school',
       feedUrl: 'https://www.hemetusd.org/events',
-      websiteUrl: 'https://www.hemetusd.org/events',
+      websiteUrl: 'https://www.hemetusd.org',
       isActive: true,
       feedType: 'html'
     }
