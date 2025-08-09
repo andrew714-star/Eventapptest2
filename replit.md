@@ -5,9 +5,15 @@ CityWide Events is a comprehensive automated events aggregation platform that co
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
-Event loading behavior: Events should not load or be searched until after a user enters a location (current implementation maintains this - server pre-loads events in background but frontend only displays them after location selection).
+Event loading behavior: Events should not load or be searched until after a user enters a location. No automatic event preloading on server startup - events should only be collected when users actively select locations or discover feeds.
 
 # Recent Changes
+
+**2025-01-08**: Disabled Event Preloading 
+- Removed automatic event collection on server startup per user preference
+- Events now only load when users actively select locations or discover feeds
+- Updated scheduled sync to only run for already discovered sources
+- Server startup is now faster and respects user preference for on-demand loading
 
 **2025-01-08**: Enhanced Congressional District Feed Discovery Feature
 - Implemented congressional district overlays on the interactive map with fallback data when Census API is unavailable

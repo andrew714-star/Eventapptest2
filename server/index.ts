@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { dataCollector } from "./data-collector";
+import { calendarCollector } from "./calendar-collector";
 
 const app = express();
 app.use(express.json());
@@ -68,24 +69,22 @@ app.use((req, res, next) => {
     reusePort: true,
   }, async () => {
     log(`serving on port ${port}`);
+    log("Server ready - events will load only when users select a location");
     
-    // Initialize with data from various sources
-    log("Initializing event data from city, school, and community sources...");
-    try {
-      const syncedCount = await dataCollector.syncEventsToStorage();
-      log(`Successfully initialized with ${syncedCount} events from multiple sources`);
-    } catch (error) {
-      log("Failed to initialize event data:", String(error));
-    }
+    // Note: Event preloading disabled per user preference
+    // Events will be loaded on-demand when users interact with the app
     
-    // Set up periodic sync every 6 hours
+    // Set up periodic sync every 6 hours (only for already discovered sources)
     setInterval(async () => {
-      log("Running scheduled event sync...");
-      try {
-        const syncedCount = await dataCollector.syncEventsToStorage();
-        log(`Scheduled sync completed: ${syncedCount} new events`);
-      } catch (error) {
-        log("Scheduled sync failed:", String(error));
+      const sources = calendarCollector.getSources();
+      if (sources.length > 0) {
+        log("Running scheduled event sync for discovered sources...");
+        try {
+          const syncedCount = await dataCollector.syncEventsToStorage();
+          log(`Scheduled sync completed: ${syncedCount} new events from ${sources.length} sources`);
+        } catch (error) {
+          log("Scheduled sync failed:", String(error));
+        }
       }
     }, 6 * 60 * 60 * 1000); // 6 hours
   });
