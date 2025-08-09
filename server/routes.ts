@@ -499,10 +499,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let totalAdded = 0;
       const results = [];
 
-      // Discover feeds for each city in the district
+      // Discover all types of feeds for each city in the district
       for (const city of cities) {
         try {
-          const discoveredFeeds = await feedDiscoverer.discoverFeedsForPopularLocation(city.name, state);
+          console.log(`Discovering feeds for ${city.name}, ${state} - searching city, school district, and chamber events...`);
+          
+          // Use the comprehensive discovery method that searches for:
+          // - City government events
+          // - School district events  
+          // - Chamber of commerce events
+          const discoveredFeeds = await feedDiscoverer.discoverFeedsForLocation({
+            city: city.name,
+            state: state,
+            type: 'city'
+          });
+          
           totalDiscovered += discoveredFeeds.length;
 
           // Auto-add discovered feeds
@@ -511,11 +522,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (success) totalAdded++;
           }
 
+          // Group feeds by organization type for better reporting
+          const cityFeeds = discoveredFeeds.filter(f => f.source.type === 'city');
+          const schoolFeeds = discoveredFeeds.filter(f => f.source.type === 'school');
+          const chamberFeeds = discoveredFeeds.filter(f => f.source.type === 'chamber');
+          const libraryFeeds = discoveredFeeds.filter(f => f.source.type === 'library');
+          const parksFeeds = discoveredFeeds.filter(f => f.source.type === 'parks');
+
           results.push({
             city: city.name,
             discovered: discoveredFeeds.length,
-            feeds: discoveredFeeds.map(df => df.source)
+            breakdown: {
+              city: cityFeeds.length,
+              school: schoolFeeds.length,
+              chamber: chamberFeeds.length,
+              library: libraryFeeds.length,
+              parks: parksFeeds.length
+            },
+            feeds: discoveredFeeds.map(df => ({
+              name: df.source.name,
+              type: df.source.type,
+              url: df.source.feedUrl,
+              confidence: df.confidence
+            }))
           });
+          
+          console.log(`Found ${discoveredFeeds.length} feeds for ${city.name}: ${cityFeeds.length} city, ${schoolFeeds.length} school, ${chamberFeeds.length} chamber, ${libraryFeeds.length} library, ${parksFeeds.length} parks`);
         } catch (error) {
           console.error(`Failed to discover feeds for ${city.name}, ${state}:`, error);
         }

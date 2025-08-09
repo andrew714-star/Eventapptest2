@@ -197,8 +197,38 @@ export class ComprehensiveCityDiscoverer {
         'CA-18': ['San Bernardino', 'Fontana', 'Rialto'],
         'CA-19': ['Bakersfield', 'Delano', 'Taft'],
         'CA-20': ['San Diego', 'Chula Vista', 'National City'],
+        'CA-21': ['Fresno', 'Visalia', 'Tulare'],
+        'CA-22': ['Bakersfield', 'Delano', 'Wasco'],
+        'CA-23': ['Ventura', 'Oxnard', 'Camarillo'],
+        'CA-24': ['Santa Barbara', 'San Luis Obispo', 'Lompoc'],
+        'CA-25': ['Los Angeles', 'San Francisco', 'San Diego'],
+        'CA-26': ['Thousand Oaks', 'Simi Valley', 'Moorpark'],
+        'CA-27': ['Los Angeles', 'Sherman Oaks', 'Encino'],
+        'CA-28': ['Los Angeles', 'Beverly Hills', 'Santa Monica'],
+        'CA-29': ['Los Angeles', 'Culver City', 'El Segundo'],
+        'CA-30': ['Los Angeles', 'Torrance', 'Redondo Beach'],
+        'CA-31': ['San Bernardino', 'Rancho Cucamonga', 'Ontario'],
+        'CA-32': ['Los Angeles', 'Monterey Park', 'Alhambra'],
+        'CA-33': ['Los Angeles', 'Inglewood', 'Hawthorne'],
+        'CA-34': ['Los Angeles', 'Downey', 'Lynwood'],
+        'CA-35': ['Riverside', 'Moreno Valley', 'Perris'],
+        'CA-36': ['Riverside', 'Corona', 'Norco'],
+        'CA-37': ['Los Angeles', 'Carson', 'Compton'],
+        'CA-38': ['Los Angeles', 'Whittier', 'Pico Rivera'],
+        'CA-39': ['Orange', 'Fullerton', 'Placentia'],
+        'CA-40': ['Los Angeles', 'Long Beach', 'Lakewood'],
+        'CA-41': ['Riverside', 'Jurupa Valley', 'Eastvale'],
+        'CA-42': ['Los Angeles', 'Long Beach', 'Cerritos'],
+        'CA-43': ['Los Angeles', 'Palmdale', 'Lancaster'],
+        'CA-44': ['Orange', 'Irvine', 'Lake Forest'],
+        'CA-45': ['Orange', 'Anaheim', 'Fullerton'],
+        'CA-46': ['Orange', 'Santa Ana', 'Costa Mesa'],
+        'CA-47': ['Orange', 'Huntington Beach', 'Westminster'],
+        'CA-48': ['Orange', 'Newport Beach', 'Laguna Beach'],
+        'CA-49': ['San Diego', 'Oceanside', 'Carlsbad'],
         'CA-50': ['San Diego', 'Encinitas', 'Solana Beach'],
-        'CA-52': ['San Diego', 'Chula Vista', 'Imperial Beach'],
+        'CA-51': ['San Diego', 'Chula Vista', 'Imperial Beach'],
+        'CA-52': ['San Diego', 'Poway', 'Escondido'],
         
         // Texas districts
         'TX-01': ['Tyler', 'Longview', 'Marshall'],
@@ -252,14 +282,20 @@ export class ComprehensiveCityDiscoverer {
       const districtKey = `${state.toUpperCase()}-${district.padStart(2, '0')}`;
       const districtCities = districtMapping[districtKey] || [];
       
+      console.log(`Looking for district: ${districtKey}, mapped cities: ${districtCities.join(', ')}`);
+      
       // Find cities in our database that match the district
       const stateCities = this.getCitiesByState(state.toUpperCase());
+      console.log(`Available cities in ${state}: ${stateCities.slice(0, 10).map(c => c.name).join(', ')}...`);
+      
       const matchedCities = stateCities.filter(city => 
         districtCities.some(districtCity => 
           city.name.toLowerCase().includes(districtCity.toLowerCase()) ||
           districtCity.toLowerCase().includes(city.name.toLowerCase())
         )
       );
+      
+      console.log(`Matched cities for ${districtKey}: ${matchedCities.map(c => c.name).join(', ')}`);
       
       // If no specific mapping exists, return a sample of cities from the state
       if (matchedCities.length === 0) {

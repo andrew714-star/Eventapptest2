@@ -70,6 +70,21 @@ export class LocationFeedDiscoverer {
     '{city}chamberofcommerce.com'
   ];
 
+  private libraryPatterns = [
+    '{city}library.org',
+    '{city}publiclibrary.org',
+    'www.{city}library.org',
+    'www.{city}pl.org',
+    '{city}lib.org'
+  ];
+
+  private parkRecPatterns = [
+    '{city}parks.org',
+    '{city}recreation.org',
+    'www.{city}parks.org',
+    '{city}parksandrec.org'
+  ];
+
   async discoverFeedsForLocation(location: LocationInfo): Promise<DiscoveredFeed[]> {
     console.log(`Discovering calendar feeds for ${location.city}, ${location.state}...`);
     
@@ -89,10 +104,18 @@ export class LocationFeedDiscoverer {
     const chamberFeeds = await this.discoverChamberFeeds(location, citySlug, stateSlug);
     discoveredFeeds.push(...chamberFeeds);
 
+    // Discover library feeds
+    const libraryFeeds = await this.discoverLibraryFeeds(location, citySlug, stateSlug);
+    discoveredFeeds.push(...libraryFeeds);
+
+    // Discover parks and recreation feeds
+    const parkRecFeeds = await this.discoverParkRecFeeds(location, citySlug, stateSlug);
+    discoveredFeeds.push(...parkRecFeeds);
+
     // Sort by confidence score
     discoveredFeeds.sort((a, b) => b.confidence - a.confidence);
 
-    console.log(`Discovered ${discoveredFeeds.length} potential feeds for ${location.city}, ${location.state}`);
+    console.log(`Discovered ${discoveredFeeds.length} potential feeds for ${location.city}, ${location.state} (${govFeeds.length} city, ${schoolFeeds.length} school, ${chamberFeeds.length} chamber, ${libraryFeeds.length} library, ${parkRecFeeds.length} parks)`);
     return discoveredFeeds;
   }
 
@@ -156,7 +179,47 @@ export class LocationFeedDiscoverer {
     return feeds;
   }
 
-  private async checkDomainForFeeds(domain: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' }): Promise<DiscoveredFeed[]> {
+  private async discoverLibraryFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
+    const feeds: DiscoveredFeed[] = [];
+    
+    for (const domainPattern of this.libraryPatterns) {
+      const domain = domainPattern
+        .replace('{city}', citySlug)
+        .replace('{state}', stateSlug);
+
+      const discoveredFeeds = await this.checkDomainForFeeds(domain, {
+        ...location,
+        type: 'city',
+        organizationType: 'library' as const
+      });
+      
+      feeds.push(...discoveredFeeds);
+    }
+
+    return feeds;
+  }
+
+  private async discoverParkRecFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
+    const feeds: DiscoveredFeed[] = [];
+    
+    for (const domainPattern of this.parkRecPatterns) {
+      const domain = domainPattern
+        .replace('{city}', citySlug)
+        .replace('{state}', stateSlug);
+
+      const discoveredFeeds = await this.checkDomainForFeeds(domain, {
+        ...location,
+        type: 'city',
+        organizationType: 'parks' as const
+      });
+      
+      feeds.push(...discoveredFeeds);
+    }
+
+    return feeds;
+  }
+
+  private async checkDomainForFeeds(domain: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
     
     try {
@@ -206,7 +269,7 @@ export class LocationFeedDiscoverer {
     return feeds;
   }
 
-  private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' }): Promise<DiscoveredFeed | null> {
+  private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.head(feedUrl, {
         timeout: 3000,
@@ -261,7 +324,7 @@ export class LocationFeedDiscoverer {
     }
   }
 
-  private generateSourceName(location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' }): string {
+  private generateSourceName(location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): string {
     switch (location.organizationType) {
       case 'city':
         return `${location.city} City Government`;
@@ -269,6 +332,10 @@ export class LocationFeedDiscoverer {
         return `${location.city} School District`;
       case 'chamber':
         return `${location.city} Chamber of Commerce`;
+      case 'library':
+        return `${location.city} Public Library`;
+      case 'parks':
+        return `${location.city} Parks & Recreation`;
       default:
         return `${location.city} ${location.organizationType}`;
     }
