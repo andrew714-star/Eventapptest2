@@ -254,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Load real congressional districts from GeoJSON data
   async function loadRealCongressionalDistricts() {
     try {
-      const geoJsonPath = path.join(__dirname, '../attached_assets/congressional-districts.geojson');
+      const geoJsonPath = path.join(process.cwd(), 'attached_assets/congressional-districts.geojson');
       
       if (!fs.existsSync(geoJsonPath)) {
         console.log('GeoJSON file not found, using fallback data');
@@ -269,13 +269,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Process and standardize the features
-      const districts = geoJsonData.features.map((feature: any) => {
+      const districts: any[] = geoJsonData.features.map((feature: any) => {
         const props = feature.properties || {};
         
         // Extract district info from various possible field names
         const cd = props.CD119FP || props.CD118FP || props.DISTRICT || props.district;
         const state = props.STUSPS || props.STATE || props.state || fipsToState[props.STATEFP] || fipsToState[props.GEOID?.substring(0, 2)];
         const namelsad = props.NAMELSAD || `Congressional District ${cd}`;
+        
+        // Extract representative information from the accurate GeoJSON data
+        const firstName = props.FIRSTNAME || '';
+        const middleName = props.MIDDLENAME || '';
+        const lastName = props.LASTNAME || '';
+        const party = props.PARTY || '';
+        const representativeName = firstName && lastName 
+          ? `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim()
+          : `Representative District ${cd}`;
         
         return {
           type: "Feature",
@@ -285,7 +294,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             NAMELSAD: namelsad,
             state: state || 'US',
             district: parseInt(cd) || 0,
-            representative: props.representative || `Representative District ${cd}`,
+            representative: representativeName,
+            party: party,
+            firstName: firstName,
+            lastName: lastName,
             fips: props.STATEFP || getStateFips(state) || '00'
           },
           geometry: feature.geometry
@@ -318,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Generate all 435 congressional districts with proper geographic distribution
   function generateAllCongressionalDistricts() {
-    const districts = [];
+    const districts: any[] = [];
 
     // State districts mapping (current 118th Congress)
     const stateDistricts: { [key: string]: { count: number; lat: number; lng: number; fips: string } } = {
