@@ -2102,7 +2102,7 @@ export class CalendarFeedCollector {
     // Look for specific event-related content areas first, then broader areas
     const eventSections = [
       '.main-content, .content, .page-content',
-      '.events, .calendar, .announcements, .news',
+      '.events, .calendar, .announcements, .news .activity-item .CAL-EV-Item ',
       '.upcoming, .activities, .meetings',
       'main, article, section',
       '.container, .wrapper, .layout',
