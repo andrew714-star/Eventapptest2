@@ -3,19 +3,22 @@ import { Header } from "@/components/header";
 import { FilterSidebar } from "@/components/filter-sidebar";
 import { Calendar } from "@/components/calendar";
 import { EventModal } from "@/components/event-modal";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Event, EventFilter } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, School, Globe, BookOpen, MapPin, X } from "lucide-react";
+import { Building2, School, Globe, BookOpen, MapPin, X, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Home() {
   const [filters, setFilters] = useState<EventFilter>({});
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [currentView, setCurrentView] = useState<"calendar" | "list">("calendar");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: events = [], isLoading } = useQuery<Event[]>({
     queryKey: ["/api/events/filter", filters.location, filters.locations],
@@ -59,6 +62,52 @@ export default function Home() {
       setFilters({ ...filters, locations: updatedLocations });
     }
   };
+
+  // Reload events for selected locations
+  const reloadEventsMutation = useMutation({
+    mutationFn: async () => {
+      const locations = [];
+      if (filters.location && filters.location.trim() !== '') {
+        locations.push(filters.location);
+      }
+      if (filters.locations && filters.locations.length > 0) {
+        locations.push(...filters.locations);
+      }
+      
+      if (locations.length === 0) {
+        throw new Error('No locations selected');
+      }
+
+      // Sync events for these specific locations
+      const response = await fetch('/api/sync-events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locations })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reload events');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch events
+      queryClient.invalidateQueries({ queryKey: ["/api/events/filter"] });
+      
+      toast({
+        title: "Events Reloaded",
+        description: "Events have been refreshed for your selected locations.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reload Failed",
+        description: error.message || "Could not reload events. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getSourceIcon = (source: string) => {
     if (source.includes('city') || source.includes('parks')) {
@@ -140,6 +189,20 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
+                    {/* Reload Events Button */}
+                    {((filters.location && filters.location.trim() !== '') || (filters.locations && filters.locations.length > 0)) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => reloadEventsMutation.mutate()}
+                        disabled={reloadEventsMutation.isPending}
+                        className="flex items-center space-x-1"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${reloadEventsMutation.isPending ? 'animate-spin' : ''}`} />
+                        <span>{reloadEventsMutation.isPending ? 'Reloading...' : 'Reload Events'}</span>
+                      </Button>
+                    )}
+                    
                     <div className="bg-gray-100 p-1 rounded-lg">
                       <Button
                         variant={currentView === "calendar" ? "default" : "ghost"}

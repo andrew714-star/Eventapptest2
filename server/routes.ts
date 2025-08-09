@@ -163,13 +163,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/sync-events", async (req, res) => {
       try {
-          console.log("Starting event synchronization from all sources...");
-          const syncedCount = await dataCollector.syncEventsToStorage();
-          res.json({ 
-              message: "Event synchronization completed",
-              syncedCount,
-              timestamp: new Date().toISOString()
-          });
+          const { locations } = req.body;
+          
+          if (locations && Array.isArray(locations) && locations.length > 0) {
+              console.log(`Starting event synchronization for specific locations: ${locations.join(', ')}`);
+              
+              // Get active calendar sources that match the specified locations
+              const allSources = calendarCollector.getSources();
+              const relevantSources = allSources.filter(source => {
+                  const sourceLocation = `${source.city}, ${source.state}`;
+                  return source.isActive && locations.some(location => 
+                      location.toLowerCase().includes(source.city.toLowerCase()) &&
+                      location.toLowerCase().includes(source.state.toLowerCase())
+                  );
+              });
+              
+              console.log(`Found ${relevantSources.length} active sources for specified locations`);
+              
+              if (relevantSources.length === 0) {
+                  return res.json({ 
+                      message: "No active calendar sources found for specified locations",
+                      syncedCount: 0,
+                      timestamp: new Date().toISOString()
+                  });
+              }
+              
+              // Sync events only from relevant sources
+              let syncedCount = 0;
+              for (const source of relevantSources) {
+                  try {
+                      console.log(`Syncing events from ${source.name} (${source.city}, ${source.state})`);
+                      const events = await calendarCollector.collectEventsFromSource(source);
+                      
+                      // Add events to storage
+                      for (const event of events) {
+                          await storage.createEvent(event);
+                          syncedCount++;
+                      }
+                  } catch (sourceError) {
+                      console.error(`Failed to sync from ${source.name}:`, sourceError);
+                  }
+              }
+              
+              res.json({ 
+                  message: `Event synchronization completed for ${locations.length} location(s)`,
+                  syncedCount,
+                  locationsProcessed: locations,
+                  sourcesProcessed: relevantSources.length,
+                  timestamp: new Date().toISOString()
+              });
+          } else {
+              console.log("Starting event synchronization from all sources...");
+              const syncedCount = await dataCollector.syncEventsToStorage();
+              res.json({ 
+                  message: "Event synchronization completed",
+                  syncedCount,
+                  timestamp: new Date().toISOString()
+              });
+          }
       } catch (error) {
           console.error("Event sync failed:", error);
           res.status(500).json({ message: "Failed to sync events" });
