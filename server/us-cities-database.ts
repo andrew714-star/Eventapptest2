@@ -297,6 +297,18 @@ export class ComprehensiveCityDiscoverer {
       
       console.log(`Matched cities for ${districtKey}: ${matchedCities.map(c => c.name).join(', ')}`);
       
+      // If no matches found in database, create city data for the mapped cities to allow feed discovery
+      if (matchedCities.length === 0 && districtCities.length > 0) {
+        console.log(`No matches in database, creating city data for district cities: ${districtCities.join(', ')}`);
+        const createdCities = districtCities.map(cityName => ({
+          name: cityName,
+          state: state === 'CA' ? 'California' : state,
+          population: 50000, // Default population for discovery
+          isCapital: false
+        }));
+        return createdCities;
+      }
+      
       // If no specific mapping exists, return a sample of cities from the state
       if (matchedCities.length === 0) {
         const districtNum = parseInt(district);
