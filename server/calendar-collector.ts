@@ -848,7 +848,7 @@ export class CalendarFeedCollector {
 
             // Strategy 1: Look in structured content areas first
             const contentSelectors = [
-                '.calendar, .events, .news, .announcements, .activities',
+                '.calendar,.events-list, .event-list-item, .events, .news, .announcements, .activities, .event-cal-content',
                 '.content, .main-content, .page-content',
                 'article, section, .post, .item',
                 'table tr, li, .row, .card, .box',
