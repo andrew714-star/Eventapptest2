@@ -745,17 +745,32 @@ export class CalendarFeedCollector {
         // For other websites, use comprehensive selectors and multiple parsing strategies
         console.log(`Starting comprehensive HTML event extraction for ${source.name}`);
         
-        // Strategy 1: Look for structured event data
+        // Strategy 1: Look for structured event data with enhanced selectors
         const structuredSelectors = [
-            '.event-item, .event, .calendar-event, .event-listing',
-            '[class*="event"], [id*="event"]', 
+            // Primary event selectors
+            '.event-item, .event, .calendar-event, .event-listing, .event-card',
             '.upcoming-events li, .events-list li, .event-list li',
-            'td[title*="event"], td[title*="Event"]',
+            
+            // Calendar-specific selectors
+            '.calendar-item, .calendar-entry, .calendar-listing',
+            'td[title*="event"], td[title*="Event"], .calendar-day[data-event]',
             '[aria-label*="event"], [aria-label*="Event"]',
             '.calendar-day .event, .calendar-cell .event',
+            
+            // Common CMS selectors
             '.view-content .views-row', // Drupal CMS events
+            '.post-item, .news-item, .announcement',
+            'article[class*="event"], div[class*="event"]',
             '.event-wrapper, .event-container',
-            'article[class*="event"], div[class*="event"]'
+            
+            // Generic content with event keywords in class/id
+            '[class*="event"], [id*="event"]',
+            '[class*="calendar"], [id*="calendar"]',
+            
+            // School/government specific selectors
+            '.news-events .item, .announcements .item',
+            '.board-meetings .item, .meeting-item',
+            '.activities .item, .activity-item'
         ];
 
         let foundEvents = false;
@@ -770,43 +785,53 @@ export class CalendarFeedCollector {
                     const elementText = $event.text().trim();
                     
                     // Skip if element is too large (likely a container) or too small
-                    if (elementText.length > 1000 || elementText.length < 10) return;
+                    if (elementText.length > 2000 || elementText.length < 15) return;
+                    
+                    // Skip navigation, menu, and header elements
+                    if (this.isNavigationElement($event, elementText)) return;
 
                     // Extract title with multiple strategies
                     let title = '';
                     
                     // Try specific title selectors first
-                    const titleSelectors = ['h1', 'h2', 'h3', 'h4', '.title', '.event-title', '.event-name', 'a'];
+                    const titleSelectors = ['h1', 'h2', 'h3', 'h4', 'h5', '.title', '.event-title', '.event-name', '.event-heading', 'a[href*="event"]', 'a[href*="calendar"]', 'strong', 'b'];
                     for (const titleSel of titleSelectors) {
                         const titleEl = $event.find(titleSel).first();
                         if (titleEl.length && titleEl.text().trim()) {
-                            title = titleEl.text().trim();
-                            break;
+                            const candidateTitle = titleEl.text().trim();
+                            // Skip titles that are clearly navigation or generic content
+                            if (this.isValidEventTitle(candidateTitle)) {
+                                title = candidateTitle;
+                                break;
+                            }
                         }
                     }
                     
                     // Fallback: use first line of text if no structured title found
                     if (!title) {
-                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l);
-                        if (lines.length > 0) {
-                            title = lines[0];
+                        const lines = elementText.split('\n').map(l => l.trim()).filter(l => l && l.length > 5);
+                        for (const line of lines.slice(0, 3)) { // Check first 3 lines
+                            if (this.isValidEventTitle(line)) {
+                                title = line;
+                                break;
+                            }
                         }
                     }
 
                     // Clean and validate title
                     title = this.cleanEventTitle(title);
                     
-                    if (!title || title.length <= 3) {
+                    if (!title || title.length <= 5 || !this.isValidEventTitle(title)) {
                         console.log(`Skipping element - no valid title found. Text: "${elementText.substring(0, 100)}"`);
                         return;
                     }
 
                     // Extract description
-                    let description = $event.find('.description, .summary, .event-description, p').first().text().trim();
+                    let description = $event.find('.description, .summary, .event-description, .content, p').first().text().trim();
                     if (!description || description === title) {
                         // Use remaining text after title as description
                         const remainingText = elementText.replace(title, '').trim();
-                        description = remainingText.length > 10 ? remainingText : 'Event details available on website';
+                        description = remainingText.length > 20 ? remainingText.substring(0, 300) : 'Event details available on website';
                     }
 
                     // Extract date with comprehensive approach
@@ -1584,41 +1609,110 @@ export class CalendarFeedCollector {
   private extractEventsFromTextPatterns($: any, source: CalendarSource, parsedEvents: InsertEvent[]): void {
     console.log(`Attempting text pattern extraction for ${source.name}`);
     
-    // Look for common event announcement patterns in the page text
-    const fullPageText = $('body').text();
+    // Look for specific event-related content areas first
+    const eventSections = [
+      '.main-content, .content, .page-content',
+      '.events, .calendar, .announcements, .news',
+      '.upcoming, .activities, .meetings',
+      'main, article, section'
+    ];
+    
+    let targetContent = '';
+    
+    // Try to find event-specific content areas
+    for (const selector of eventSections) {
+      const $section = $(selector);
+      if ($section.length > 0) {
+        const sectionText = $section.text();
+        if (sectionText.length > targetContent.length && sectionText.length < 50000) {
+          targetContent = sectionText;
+          console.log(`Using content from selector: ${selector} (${sectionText.length} chars)`);
+          break;
+        }
+      }
+    }
+    
+    // Fallback to body content if no specific sections found
+    if (!targetContent) {
+      targetContent = $('body').text();
+      console.log(`Using full body content (${targetContent.length} chars)`);
+    }
+    
     const eventKeywords = [
-      'meeting', 'event', 'workshop', 'conference', 'seminar', 'training',
+      'meeting', 'conference', 'workshop', 'seminar', 'training',
       'celebration', 'festival', 'concert', 'performance', 'exhibition',
-      'council', 'commission', 'board', 'committee', 'hearing'
+      'council', 'board', 'committee', 'hearing', 'forum',
+      'graduation', 'ceremony', 'game', 'match', 'tournament',
+      'fundraiser', 'dinner', 'lunch', 'dance', 'show'
     ];
 
-    // Split text into paragraphs and look for event-like content
-    const paragraphs = fullPageText.split(/\n\n|\n\s*\n/).map(p => p.trim()).filter(p => p.length > 20);
+    // Split text into meaningful chunks (sentences and short paragraphs)
+    const chunks = targetContent
+      .split(/(?:[.!?]+\s+)|(?:\n\s*\n)/)
+      .map(chunk => chunk.trim())
+      .filter(chunk => chunk.length > 30 && chunk.length < 500); // Reasonable event description length
     
-    for (const paragraph of paragraphs.slice(0, 50)) { // Limit to first 50 paragraphs
-      // Check if paragraph contains event keywords
+    console.log(`Processing ${chunks.length} text chunks for event patterns`);
+    
+    for (const chunk of chunks.slice(0, 100)) { // Limit processing
+      // Check if chunk contains event keywords and dates
       const hasEventKeyword = eventKeywords.some(keyword => 
-        paragraph.toLowerCase().includes(keyword)
+        chunk.toLowerCase().includes(keyword)
       );
 
       if (hasEventKeyword) {
-        // Look for date patterns in the paragraph
-        const datePattern = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?|\d{1,2}\/\d{1,2}\/?\d*/i;
-        const dateMatch = paragraph.match(datePattern);
+        // Look for date patterns in the chunk
+        const datePatterns = [
+          /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i,
+          /\d{1,2}\/\d{1,2}\/\d{4}/,
+          /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i
+        ];
+        
+        let dateMatch = null;
+        for (const pattern of datePatterns) {
+          dateMatch = chunk.match(pattern);
+          if (dateMatch) break;
+        }
         
         if (dateMatch) {
           const eventDate = this.parseEventDate(dateMatch[0]);
           
           if (eventDate && eventDate > new Date()) {
-            // Extract likely title (first sentence or line)
-            const sentences = paragraph.split(/[.!?]/);
-            const title = sentences[0].trim().substring(0, 100);
+            // Extract likely title - look for the main subject of the sentence
+            let title = '';
             
-            if (title.length > 10) {
+            // Try to find title patterns in the chunk
+            const titlePatterns = [
+              /(?:the\s+)?([A-Z][^.!?]*(?:meeting|conference|workshop|seminar|training|celebration|festival|concert|performance|exhibition|council|board|committee|hearing|forum|graduation|ceremony|game|match|tournament|fundraiser|dinner|lunch|dance|show)[^.!?]*)/i,
+              /([A-Z][^.!?]*(?:will be|is scheduled|takes place|occurs)[^.!?]*)/i,
+              /([A-Z][^.!?]{10,80})/
+            ];
+            
+            for (const pattern of titlePatterns) {
+              const titleMatch = chunk.match(pattern);
+              if (titleMatch && this.isValidEventTitle(titleMatch[1])) {
+                title = titleMatch[1].trim();
+                break;
+              }
+            }
+            
+            // Fallback: use first meaningful sentence
+            if (!title) {
+              const sentences = chunk.split(/[.!?]/);
+              for (const sentence of sentences) {
+                const cleanSentence = sentence.trim();
+                if (cleanSentence.length > 15 && cleanSentence.length < 150 && this.isValidEventTitle(cleanSentence)) {
+                  title = cleanSentence;
+                  break;
+                }
+              }
+            }
+            
+            if (title && title.length > 10) {
               parsedEvents.push({
                 title: this.cleanText(title),
-                description: this.cleanText(paragraph.substring(0, 300)),
-                category: this.categorizeEvent(title, paragraph),
+                description: this.cleanText(chunk.substring(0, 300)),
+                category: this.categorizeEvent(title, chunk),
                 location: `${source.city}, ${source.state}`,
                 organizer: source.name,
                 startDate: eventDate,
@@ -1647,6 +1741,184 @@ export class CalendarFeedCollector {
     const currentDay = today.getDay(); // 0 = Sunday, 6 = Saturday
     const daysUntilSaturday = (6 - currentDay + 7) % 7;
     return daysUntilSaturday === 0 ? 7 : daysUntilSaturday; // If today is Saturday, return next Saturday
+  }
+
+  /**
+   * Check if an element is likely a navigation or structural element rather than event content
+   */
+  private isNavigationElement($element: any, elementText: string): boolean {
+    // Check for navigation-specific classes and IDs
+    const elementClasses = $element.attr('class') || '';
+    const elementId = $element.attr('id') || '';
+    
+    const navIndicators = [
+      'nav', 'menu', 'header', 'footer', 'sidebar', 'breadcrumb',
+      'search', 'login', 'user', 'account', 'social', 'share',
+      'skip', 'accessibility', 'translate', 'language'
+    ];
+    
+    for (const indicator of navIndicators) {
+      if (elementClasses.toLowerCase().includes(indicator) || 
+          elementId.toLowerCase().includes(indicator)) {
+        return true;
+      }
+    }
+    
+    // Check for navigation-specific text patterns
+    const navTextPatterns = [
+      /skip to/i,
+      /search site/i,
+      /menu/i,
+      /translate/i,
+      /schools$/i,
+      /home$/i,
+      /about$/i,
+      /contact$/i,
+      /^login/i,
+      /accessibility/i
+    ];
+    
+    for (const pattern of navTextPatterns) {
+      if (pattern.test(elementText)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Validate if a title string represents a real event
+   */
+  private isValidEventTitle(title: string): boolean {
+    if (!title || title.length < 5 || title.length > 200) return false;
+    
+    // Skip titles that are clearly navigation or structural content
+    const invalidPatterns = [
+      /^skip to/i,
+      /^search/i,
+      /^menu/i,
+      /^home$/i,
+      /^about$/i,
+      /^contact$/i,
+      /^login/i,
+      /^translate/i,
+      /unified school district/i,
+      /^schools$/i,
+      /^news$/i,
+      /^events$/i,
+      /^calendar$/i,
+      /^more$/i,
+      /^view all$/i,
+      /^read more$/i,
+      /accessibility/i,
+      /for questions concerning/i,
+      /^back to/i,
+      /^go to/i,
+      /^click here/i
+    ];
+    
+    for (const pattern of invalidPatterns) {
+      if (pattern.test(title)) {
+        return false;
+      }
+    }
+    
+    // Look for positive indicators of event titles
+    const eventIndicators = [
+      /meeting/i,
+      /conference/i,
+      /workshop/i,
+      /seminar/i,
+      /training/i,
+      /celebration/i,
+      /festival/i,
+      /concert/i,
+      /performance/i,
+      /game/i,
+      /match/i,
+      /tournament/i,
+      /graduation/i,
+      /ceremony/i,
+      /fundraiser/i,
+      /dinner/i,
+      /lunch/i,
+      /breakfast/i,
+      /dance/i,
+      /party/i,
+      /reunion/i,
+      /expo/i,
+      /fair/i,
+      /show/i,
+      /exhibition/i,
+      /presentation/i,
+      /lecture/i,
+      /class/i,
+      /session/i,
+      /board/i,
+      /council/i,
+      /committee/i,
+      /hearing/i,
+      /forum/i,
+      /open house/i,
+      /orientation/i,
+      /registration/i,
+      /enrollment/i,
+      /back to school/i,
+      /parent/i,
+      /student/i,
+      /academic/i,
+      /sports/i,
+      /athletics/i,
+      /homecoming/i,
+      /prom/i,
+      /winter formal/i,
+      /spring break/i,
+      /summer/i,
+      /holiday/i,
+      /thanksgiving/i,
+      /christmas/i,
+      /new year/i,
+      /memorial day/i,
+      /labor day/i,
+      /independence day/i
+    ];
+    
+    // If title contains event indicators, it's likely valid
+    for (const indicator of eventIndicators) {
+      if (indicator.test(title)) {
+        return true;
+      }
+    }
+    
+    // Check if title contains date patterns (likely an event)
+    const datePatterns = [
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i,
+      /\d{1,2}\/\d{1,2}/,
+      /\d{4}/,
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
+    ];
+    
+    for (const pattern of datePatterns) {
+      if (pattern.test(title)) {
+        return true;
+      }
+    }
+    
+    // If title looks like a sentence or phrase (not just keywords), it might be valid
+    const words = title.split(/\s+/).filter(w => w.length > 2);
+    if (words.length >= 3 && words.length <= 15) {
+      // Check if it's not just generic website content
+      const genericWords = ['site', 'page', 'content', 'district', 'school', 'system', 'department'];
+      const genericCount = words.filter(word => 
+        genericWords.some(generic => word.toLowerCase().includes(generic))
+      ).length;
+      
+      // If less than half the words are generic, consider it potentially valid
+      return genericCount < words.length / 2;
+    }
+    
+    return false;
   }
 }
 
