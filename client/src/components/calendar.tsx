@@ -11,20 +11,30 @@ import {
   addMonths,
   subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Plus, Search } from "lucide-react";
 import { Event } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface CalendarProps {
   events: Event[];
   onEventClick: (event: Event) => void;
+  selectedLocations?: string[];
+  onAddLocation?: (location: string) => void;
 }
 
-export function Calendar({ events = [], onEventClick }: CalendarProps) {
+export function Calendar({ events = [], onEventClick, selectedLocations = [], onAddLocation }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showCitySelector, setShowCitySelector] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate]);
   const monthEnd = useMemo(() => endOfMonth(monthStart), [monthStart]);
@@ -59,6 +69,58 @@ export function Calendar({ events = [], onEventClick }: CalendarProps) {
 
   const selectedDateEvents = getEventsForDay(selectedDate);
 
+  // Handle city search
+  const handleCitySearch = (value: string) => {
+    setCitySearch(value);
+    
+    if (value && value.length >= 2) {
+      fetch(`/api/city-suggestions?q=${encodeURIComponent(value)}&limit=10`)
+        .then(res => res.json())
+        .then(data => {
+          setCitySuggestions(data.suggestions || []);
+        })
+        .catch(err => console.error('Failed to fetch city suggestions:', err));
+    } else {
+      setCitySuggestions([]);
+    }
+  };
+
+  // Handle adding a city
+  const handleAddCity = async (cityName: string) => {
+    if (onAddLocation) {
+      onAddLocation(cityName);
+      
+      // Discover feeds for this city
+      const parts = cityName.split(',').map(p => p.trim());
+      if (parts.length === 2) {
+        const [city, state] = parts;
+        try {
+          const response = await fetch('/api/discover-feeds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ city, state })
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.count > 0) {
+              toast({
+                title: "Calendar Sources Found",
+                description: `Found ${data.count} feeds for ${cityName}. Events will load automatically.`,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Feed discovery failed:', error);
+        }
+      }
+    }
+    
+    setCitySearch("");
+    setCitySuggestions([]);
+    setShowCitySelector(false);
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -84,6 +146,58 @@ export function Calendar({ events = [], onEventClick }: CalendarProps) {
                   <ChevronRight size={16} />
                 </Button>
               </div>
+            </div>
+            
+            {/* City Selector */}
+            <div className="relative">
+              {showCitySelector ? (
+                <div className="flex items-center space-x-2">
+                  <div className="relative">
+                    <Input
+                      placeholder="Add city (e.g., Austin, TX)"
+                      value={citySearch}
+                      onChange={(e) => handleCitySearch(e.target.value)}
+                      className="w-64"
+                      autoFocus
+                    />
+                    {citySuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg z-50 max-h-48 overflow-y-auto">
+                        {citySuggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            className="w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
+                            onClick={() => handleAddCity(suggestion)}
+                          >
+                            <MapPin className="inline h-3 w-3 mr-2" />
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowCitySelector(false);
+                      setCitySearch("");
+                      setCitySuggestions([]);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCitySelector(true)}
+                  className="flex items-center space-x-1"
+                >
+                  <Plus size={14} />
+                  <span>Add City</span>
+                </Button>
+              )}
             </div>
             <Button
               variant="outline"

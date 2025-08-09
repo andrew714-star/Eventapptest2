@@ -9,7 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, School, Globe, BookOpen, MapPin } from "lucide-react";
+import { Building2, School, Globe, BookOpen, MapPin, X } from "lucide-react";
 
 export default function Home() {
   const [filters, setFilters] = useState<EventFilter>({});
@@ -18,16 +18,18 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const { data: events = [], isLoading } = useQuery<Event[]>({
-    queryKey: ["/api/events/filter", filters.location],
+    queryKey: ["/api/events/filter", filters.location, filters.locations],
     queryFn: async () => {
-      // Only fetch events if location is provided
-      if (!filters.location || filters.location.trim() === '') {
+      // Only fetch events if location(s) are provided
+      const hasLocation = filters.location && filters.location.trim() !== '';
+      const hasLocations = filters.locations && filters.locations.length > 0;
+      if (!hasLocation && !hasLocations) {
         return [];
       }
       const response = await apiRequest("POST", "/api/events/filter", filters);
       return response.json();
     },
-    enabled: !!(filters.location && filters.location.trim() !== ''), // Only run query if location exists
+    enabled: !!(filters.location && filters.location.trim() !== '') || !!(filters.locations && filters.locations.length > 0), // Only run query if location exists
   });
 
   const handleEventClick = (event: Event) => {
@@ -42,6 +44,20 @@ export default function Home() {
 
   const handleFilterChange = (newFilters: EventFilter) => {
     setFilters(newFilters);
+  };
+
+  const handleRemoveLocation = (locationToRemove: string) => {
+    const updatedLocations = filters.locations?.filter(loc => loc !== locationToRemove) || [];
+    
+    if (updatedLocations.length === 0) {
+      // If no locations left, clear both location and locations
+      setFilters({ ...filters, location: '', locations: [] });
+    } else if (filters.location === locationToRemove) {
+      // If removing the current primary location, set the first remaining as primary
+      setFilters({ ...filters, location: updatedLocations[0], locations: updatedLocations });
+    } else {
+      setFilters({ ...filters, locations: updatedLocations });
+    }
   };
 
   const getSourceIcon = (source: string) => {
@@ -84,14 +100,42 @@ export default function Home() {
             <Card className="mb-6">
               <CardContent className="pt-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">
-                      {filters.location && filters.location.trim() !== '' ? `Showing ${events.length} events` : 'Select a location to view events'}
-                    </span>
-                    {filters.location && filters.location.trim() !== '' && (
-                      <div className="flex items-center space-x-1">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        <span className="text-xs text-gray-500">Auto-synced from city, school & community sources</span>
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex items-center space-x-4">
+                      <span className="text-sm text-gray-600">
+                        {(filters.location && filters.location.trim() !== '') || (filters.locations && filters.locations.length > 0) ? `Showing ${events.length} events` : 'Select a location to view events'}
+                      </span>
+                      {((filters.location && filters.location.trim() !== '') || (filters.locations && filters.locations.length > 0)) && (
+                        <div className="flex items-center space-x-1">
+                          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                          <span className="text-xs text-gray-500">Auto-synced from city, school & community sources</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Display selected locations */}
+                    {filters.locations && filters.locations.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {filters.locations.map((location, index) => (
+                          <Badge 
+                            key={location} 
+                            variant={location === filters.location ? "default" : "secondary"}
+                            className="flex items-center gap-1"
+                          >
+                            <MapPin className="h-3 w-3" />
+                            {location}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto p-0 ml-1 hover:bg-transparent"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveLocation(location);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -128,11 +172,25 @@ export default function Home() {
                     </CardContent>
                   </Card>
                 ) : null}
-                <Calendar events={events} onEventClick={handleEventClick} />
+                <Calendar 
+                  events={events} 
+                  onEventClick={handleEventClick}
+                  selectedLocations={filters.locations}
+                  onAddLocation={(location) => {
+                    const existingLocations = filters.locations || [];
+                    if (!existingLocations.includes(location)) {
+                      setFilters({
+                        ...filters,
+                        location: location,
+                        locations: [...existingLocations, location]
+                      });
+                    }
+                  }}
+                />
               </div>
             ) : (
               <div className="space-y-4">
-                {!filters.location || filters.location.trim() === '' ? (
+                {(!filters.location || filters.location.trim() === '') && (!filters.locations || filters.locations.length === 0) ? (
                   <Card>
                     <CardContent className="pt-6">
                       <div className="flex flex-col items-center justify-center h-64 text-center">

@@ -100,7 +100,23 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
   };
 
   const handleLocationChange = (location: string) => {
-    setLocalFilters(prev => ({ ...prev, location: location || undefined }));
+    // Add to multiple locations if not already present  
+    const existingLocations = localFilters.locations || [];
+    let updatedLocations = existingLocations;
+    
+    // If this is a valid city,state format, add it to the locations array
+    if (location) {
+      const parts = location.split(',').map(p => p.trim());
+      if (parts.length === 2 && !existingLocations.includes(location)) {
+        updatedLocations = [...existingLocations, location];
+      }
+    }
+    
+    setLocalFilters(prev => ({ 
+      ...prev, 
+      location: location || undefined,
+      locations: updatedLocations
+    }));
 
     // Fetch city suggestions as user types
     if (location && location.length >= 2) {

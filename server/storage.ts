@@ -54,10 +54,21 @@ export class MemStorage implements IStorage {
       events = events.filter(event => filters.categories!.includes(event.category));
     }
 
-    if (filters.location) {
+    // Location filter - support both single location and multiple locations
+    const locations: string[] = [];
+    if (filters.location && filters.location.trim() !== '') {
+      locations.push(filters.location);
+    }
+    if (filters.locations && Array.isArray(filters.locations)) {
+      locations.push(...filters.locations);
+    }
+    
+    if (locations.length > 0) {
       events = events.filter(event => 
-        event.location.toLowerCase().includes(filters.location!.toLowerCase()) ||
-        event.organizer.toLowerCase().includes(filters.location!.toLowerCase())
+        locations.some(location =>
+          event.location.toLowerCase().includes(location.toLowerCase()) ||
+          event.organizer.toLowerCase().includes(location.toLowerCase())
+        )
       );
     }
 
@@ -71,9 +82,7 @@ export class MemStorage implements IStorage {
       events = events.filter(event => new Date(event.startDate) <= endDate);
     }
 
-    if (filters.isFree !== undefined) {
-      events = events.filter(event => event.isFree === filters.isFree);
-    }
+
 
     return events;
   }
