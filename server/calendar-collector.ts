@@ -457,8 +457,13 @@ export class CalendarFeedCollector {
           const startDate = new Date((event as any).start);
           const endDate = (event as any).end ? new Date((event as any).end) : new Date(startDate.getTime() + 60 * 60 * 1000);
 
-          // Only include future events
-          if (startDate > new Date()) {
+          // Only include future events (compare dates only, not times)
+          const today = new Date();
+          today.setHours(0, 0, 0, 0); // Set to start of today
+          const eventDateOnly = new Date(startDate);
+          eventDateOnly.setHours(0, 0, 0, 0); // Set to start of event date
+          
+          if (eventDateOnly >= today) {
             parsedEvents.push({
               title: (event as any).summary,
               description: (event as any).description || 'Event details available on website',
@@ -477,7 +482,7 @@ export class CalendarFeedCollector {
 
             console.log(`✓ Added iCal event: ${(event as any).summary} on ${startDate.toDateString()}`);
           } else {
-            console.log(`Skipped past event: ${(event as any).summary} on ${startDate.toDateString()}`);
+            console.log(`Skipped past event: ${(event as any).summary} on ${startDate.toDateString()} (today: ${today.toDateString()})`);
           }
         } else {
           console.log(`Skipped calendar object: type=${event.type}, hasStart=${!!(event as any).start}, hasSummary=${!!(event as any).summary}`);
