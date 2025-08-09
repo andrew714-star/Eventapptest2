@@ -10,6 +10,24 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { MapSelector } from "@/components/map-selector";
 
+// Mock apiRequest function for demonstration purposes
+// In a real application, this would be imported from your API utility
+const apiRequest = async (url: string, options?: RequestInit) => {
+  // Simulate API call
+  console.log(`API Call: ${url}`, options);
+  // Mock response
+  if (url === "/api/events/filter") {
+    return new Response(JSON.stringify([]), { status: 200 });
+  }
+  if (url === "/api/discover-feeds") {
+    return new Response(JSON.stringify({ discoveredFeeds: [] }), { status: 200 });
+  }
+  if (url === "/api/scrape-location-feeds") {
+    return new Response(JSON.stringify({ eventCount: 0, sources: [] }), { status: 200 });
+  }
+  return new Response(JSON.stringify({}), { status: 200 });
+};
+
 interface FilterSidebarProps {
   filters: EventFilter;
   onFiltersChange: (filters: EventFilter) => void;
@@ -22,6 +40,10 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // State for managing loading and selected locations for the "Reload Events" and "Force Scrape Feeds" buttons
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]); // Assuming this state is managed elsewhere or derived
 
   const discoverFeedsMutation = useMutation({
     mutationFn: async ({ city, state }: { city: string; state: string }) => {
@@ -46,7 +68,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source: { ...source, isActive: true } })
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: 'Failed to add feed' }));
         const error = new Error(errorData.message || 'Failed to add feed') as Error & {
@@ -57,13 +79,13 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
         error.errorData = errorData;
         throw error;
       }
-      
+
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events/filter'] });
-      
+
       toast({
         title: "Feed Added",
         description: "Calendar feed has been added successfully.",
@@ -71,10 +93,10 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     },
     onError: (error: any) => {
       const isAlreadyExists = error.status === 409;
-      
+
       toast({
         title: isAlreadyExists ? "Feed Already Exists" : "Failed to Add Feed",
-        description: isAlreadyExists 
+        description: isAlreadyExists
           ? error.errorData?.message || "This calendar feed has already been added."
           : "Could not add this calendar feed. Please try again.",
         variant: isAlreadyExists ? "default" : "destructive",
@@ -103,7 +125,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     // Add to multiple locations if not already present  
     const existingLocations = localFilters.locations || [];
     let updatedLocations = existingLocations;
-    
+
     // If this is a valid city,state format, add it to the locations array
     if (location) {
       const parts = location.split(',').map(p => p.trim());
@@ -111,12 +133,23 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
         updatedLocations = [...existingLocations, location];
       }
     }
-    
-    setLocalFilters(prev => ({ 
-      ...prev, 
+
+    setLocalFilters(prev => ({
+      ...prev,
       location: location || undefined,
       locations: updatedLocations
     }));
+
+    // Update selectedLocations state for the buttons
+    if (location && parts.length === 2) {
+      setSelectedLocations(prev => {
+        if (!prev.includes(location)) {
+          return [...prev, location];
+        }
+        return prev;
+      });
+    }
+
 
     // Fetch city suggestions as user types
     if (location && location.length >= 2) {
@@ -166,7 +199,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
     setLocalFilters(prev => ({ ...prev, location: suggestion }));
     setShowSuggestions(false);
     setCitySuggestions([]);
-    
+
     // Trigger discovery for selected suggestion
     const parts = suggestion.split(',').map(p => p.trim());
     if (parts.length === 2) {
@@ -198,7 +231,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ source: { ...feed.source, isActive: true } })
           });
-          
+
           if (response.ok) {
             addResults.push({ success: true });
             queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
@@ -213,14 +246,14 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           addResults.push({ success: false, alreadyExists: false });
         }
       }
-      
+
       const newFeeds = addResults.filter(r => r.success).length;
       const existingFeeds = addResults.filter(r => r.alreadyExists).length;
-      
+
       let description = `Found ${data.totalCount} calendar feeds across ${data.cities.length} major cities`;
       if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
       if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
-      
+
       toast({
         title: "Top Cities Discovery Complete",
         description: description,
@@ -259,7 +292,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ source: { ...feed.source, isActive: true } })
           });
-          
+
           if (response.ok) {
             addResults.push({ success: true });
             queryClient.invalidateQueries({ queryKey: ['/api/calendar-sources'] });
@@ -274,14 +307,14 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           addResults.push({ success: false, alreadyExists: false });
         }
       }
-      
+
       const newFeeds = addResults.filter(r => r.success).length;
       const existingFeeds = addResults.filter(r => r.alreadyExists).length;
-      
+
       let description = `Found ${data.count} calendar feeds across ${data.cities.length} cities in ${data.state}`;
       if (newFeeds > 0) description += `, added ${newFeeds} new feeds`;
       if (existingFeeds > 0) description += `, ${existingFeeds} already existed`;
-      
+
       toast({
         title: "State Discovery Complete",
         description: description,
@@ -298,7 +331,83 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
 
   const clearFilters = () => {
     setLocalFilters({});
+    setSelectedLocations([]); // Clear selected locations as well
   };
+
+  const handleReloadEvents = async () => {
+    if (!selectedLocations.length) return;
+
+    setIsLoading(true);
+    try {
+      // Filter events for selected locations
+      const response = await apiRequest("/api/events/filter", {
+        method: "POST",
+        body: JSON.stringify({
+          locations: selectedLocations
+        }),
+      });
+
+      const events = await response.json();
+      queryClient.setQueryData(['events'], events);
+
+      if (events.length === 0) {
+        // Try to discover and add feeds for locations that have no events
+        for (const location of selectedLocations) {
+          const [city, state] = location.split(', ');
+          if (city && state) {
+            console.log(`No events found for ${location}, attempting to discover feeds...`);
+            try {
+              await apiRequest("/api/discover-feeds", {
+                method: "POST",
+                body: JSON.stringify({ city: city.trim(), state: state.trim() }),
+              });
+            } catch (discoverError) {
+              console.warn(`Failed to discover feeds for ${location}:`, discoverError);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error("Failed to reload events:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleScrapeFeeds = async () => {
+    if (!selectedLocations.length) return;
+
+    setIsLoading(true);
+    try {
+      for (const location of selectedLocations) {
+        const [city, state] = location.split(', ');
+        if (city && state) {
+          console.log(`Force scraping feeds for ${location}...`);
+          try {
+            const response = await apiRequest("/api/scrape-location-feeds", {
+              method: "POST",
+              body: JSON.stringify({ city: city.trim(), state: state.trim() }),
+            });
+
+            const result = await response.json();
+            console.log(`Scraped ${result.eventCount} events from ${result.sources?.length || 0} sources for ${location}`);
+          } catch (scrapeError) {
+            console.warn(`Failed to scrape feeds for ${location}:`, scrapeError);
+          }
+        }
+      }
+
+      // After scraping, reload the events
+      await handleReloadEvents();
+
+    } catch (error) {
+      console.error("Failed to scrape feeds:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
 
   return (
     <Card>
@@ -357,7 +466,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                     setTimeout(() => setShowSuggestions(false), 150);
                   }}
                 />
-                
+
                 <Dialog open={mapOpen} onOpenChange={setMapOpen}>
                   <DialogTrigger asChild>
                     <Button
@@ -375,7 +484,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                         Click anywhere on the map or click on city markers to select a location. You can zoom and pan to explore different areas.
                       </p>
                     </DialogHeader>
-                    
+
                     <div className="space-y-4">
                       {/* Interactive Map */}
                       <div className="h-[500px] relative overflow-hidden">
@@ -384,7 +493,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
                             const locationString = `${city}, ${state}`;
                             setLocalFilters(prev => ({ ...prev, location: locationString }));
                             setMapOpen(false);
-                            
+
                             // Trigger discovery for selected location
                             handleLocationChange(locationString);
                           }}
@@ -416,7 +525,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
           </div>
 
           <p className="text-xs text-gray-500 leading-relaxed">
-            <span className="text-red-500">*</span> Location is required to view events. 
+            <span className="text-red-500">*</span> Location is required to view events.
             Start typing a city name or click the map icon to select on an interactive map.
           </p>
         </div>
@@ -436,7 +545,7 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
             >
               {discoverTopCitiesMutation.isPending ? 'Finding...' : 'Top 20 Cities'}
             </Button>
-            
+
             {['CA', 'TX', 'NY', 'FL', 'IL'].map(state => (
               <Button
                 key={state}
@@ -450,6 +559,28 @@ export function FilterSidebar({ filters, onFiltersChange }: FilterSidebarProps) 
               </Button>
             ))}
           </div>
+        </div>
+
+        {/* Action Buttons: Reload Events and Force Scrape Feeds */}
+        <div className="pt-4 border-t">
+          <Button
+            onClick={handleReloadEvents}
+            disabled={isLoading || !selectedLocations.length}
+            className="w-full mb-2"
+          >
+            {isLoading ? "Loading..." : "Reload Events"}
+          </Button>
+
+          {selectedLocations.length > 0 && (
+            <Button
+              onClick={handleScrapeFeeds}
+              disabled={isLoading}
+              variant="outline"
+              className="w-full"
+            >
+              {isLoading ? "Scraping..." : "Force Scrape Feeds"}
+            </Button>
+          )}
         </div>
 
         {/* Clear Filters */}

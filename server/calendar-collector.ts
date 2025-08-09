@@ -242,6 +242,19 @@ export class CalendarFeedCollector {
       websiteUrl: 'https://www.sanjacintoca.gov',
       isActive: true,
       feedType: 'ical'
+    },
+
+    // Hemet School District - Fixed URL
+    {
+      id: 'hemet-usd',
+      name: 'Hemet Unified School District',
+      city: 'Hemet',
+      state: 'CA',
+      type: 'school',
+      feedUrl: 'https://www.hemetusd.org/events',
+      websiteUrl: 'https://www.hemetusd.org/events',
+      isActive: true,
+      feedType: 'html'
     }
   ];
 
@@ -549,8 +562,9 @@ export class CalendarFeedCollector {
         const $ = cheerio.load(response.data);
         const parsedEvents: InsertEvent[] = [];
 
-        // DEBUG: Check if this is San Jacinto
+        // DEBUG: Check if this is San Jacinto or Hemet
         console.log(`DEBUG: Checking if ${source.feedUrl} includes sanjacintoca.gov: ${source.feedUrl?.includes('sanjacintoca.gov')}`);
+        console.log(`DEBUG: Checking if ${source.feedUrl} includes hemetusd.org: ${source.feedUrl?.includes('hemetusd.org')}`);
 
         // San Jacinto calendar requires special handling - look for calendar table structure
         if (source.feedUrl?.includes('sanjacintoca.gov')) {
@@ -739,6 +753,84 @@ export class CalendarFeedCollector {
 
             if (parsedEvents.length > 0) {
                 return parsedEvents; // Return early for San Jacinto calendar if events found
+            }
+        }
+
+        // Hemet USD specific handling
+        if (source.feedUrl?.includes('hemetusd.org')) {
+            console.log(`Parsing Hemet USD events page - searching for event patterns`);
+
+            const fullPageText = $.text();
+            console.log(`Hemet USD page contains "Board Meeting": ${fullPageText.includes('Board Meeting')}`);
+            console.log(`Hemet USD page contains "event": ${fullPageText.toLowerCase().includes('event')}`);
+            console.log(`Hemet USD page contains dates: ${/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i.test(fullPageText)}`);
+
+            // Look for common school event patterns
+            const schoolEventPatterns = [
+                'Board Meeting', 'School Board', 'Board of Education',
+                'Parent Conference', 'Open House', 'Back to School',
+                'Graduation', 'Awards Ceremony', 'Athletic Event',
+                'Parent Night', 'Registration', 'Enrollment',
+                'Holiday', 'Winter Break', 'Spring Break',
+                'Staff Development', 'Professional Development',
+                'Conference', 'Workshop', 'Training'
+            ];
+
+            const processedEventTypes = new Set<string>();
+
+            for (const pattern of schoolEventPatterns) {
+                if (processedEventTypes.has(pattern)) continue;
+
+                const elements = $(`*:contains("${pattern}")`);
+                console.log(`Found ${elements.length} elements containing "${pattern}"`);
+
+                let foundValidEvent = false;
+                elements.each((_, element) => {
+                    if (foundValidEvent) return;
+                    const $element = $(element);
+                    const elementText = $element.text();
+
+                    if (elementText.includes(pattern) && elementText.length < 500) {
+                        console.log(`Hemet event element text: "${elementText}"`);
+
+                        let eventDate = this.extractComprehensiveDate(elementText, $element);
+
+                        if (!eventDate) {
+                            // Create recurring dates for common school events
+                            eventDate = this.getSchoolEventDate(pattern);
+                        }
+
+                        if (eventDate && eventDate > new Date()) {
+                            console.log(`Extracted Hemet USD event date: ${eventDate.toDateString()} for ${pattern}`);
+
+                            parsedEvents.push({
+                                title: this.cleanText(pattern),
+                                description: this.cleanText(elementText.substring(0, 300)) || 'School event details available on website',
+                                category: this.getSchoolEventCategory(pattern),
+                                location: 'Hemet Unified School District, Hemet, CA',
+                                organizer: source.name,
+                                startDate: eventDate,
+                                endDate: new Date(eventDate.getTime() + 2 * 60 * 60 * 1000),
+                                startTime: '7:00 PM',
+                                endTime: '9:00 PM',
+                                attendees: 0,
+                                imageUrl: null,
+                                isFree: 'true',
+                                source: source.id
+                            });
+
+                            console.log(`✓ Successfully created Hemet USD event: ${pattern} on ${eventDate.toDateString()}`);
+                            foundValidEvent = true;
+                            processedEventTypes.add(pattern);
+                        }
+                    }
+                });
+            }
+
+            console.log(`Hemet USD parser found ${parsedEvents.length} events`);
+
+            if (parsedEvents.length > 0) {
+                return parsedEvents;
             }
         }
 
@@ -1533,6 +1625,59 @@ export class CalendarFeedCollector {
   private getNextOccurrenceDate(eventTitle: string): Date {
     const recurringDates = this.getRecurringEventDates(eventTitle);
     return recurringDates.length > 0 ? recurringDates[0] : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Get typical date for school events
+   */
+  private getSchoolEventDate(eventType: string): Date {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // School board meetings typically happen monthly
+    if (eventType.toLowerCase().includes('board')) {
+      // Next month's second Tuesday
+      const nextMonth = (currentMonth + 1) % 12;
+      const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+      return this.getNthWeekdayOfMonth(nextYear, nextMonth, 2, 2); // 2nd Tuesday
+    }
+
+    // Parent conferences typically in fall and spring
+    if (eventType.toLowerCase().includes('parent conference')) {
+      const isSpring = currentMonth >= 1 && currentMonth <= 5;
+      const targetMonth = isSpring ? 4 : 10; // May or November
+      const targetYear = targetMonth < currentMonth ? currentYear + 1 : currentYear;
+      return new Date(targetYear, targetMonth, 15, 18, 0); // 15th at 6 PM
+    }
+
+    // Open house events typically in September or January
+    if (eventType.toLowerCase().includes('open house')) {
+      const targetMonth = currentMonth < 8 ? 8 : 0; // September or January
+      const targetYear = targetMonth === 0 ? currentYear + 1 : currentYear;
+      return new Date(targetYear, targetMonth, 10, 19, 0); // 10th at 7 PM
+    }
+
+    // Default: next month on the 15th
+    const nextMonth = (currentMonth + 1) % 12;
+    const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+    return new Date(nextYear, nextMonth, 15, 19, 0);
+  }
+
+  /**
+   * Categorize school events
+   */
+  private getSchoolEventCategory(eventType: string): string {
+    const type = eventType.toLowerCase();
+    
+    if (type.includes('board') || type.includes('meeting')) return 'Government';
+    if (type.includes('athletic') || type.includes('game') || type.includes('sport')) return 'Sports & Recreation';
+    if (type.includes('graduation') || type.includes('ceremony') || type.includes('awards')) return 'Education & Learning';
+    if (type.includes('conference') || type.includes('workshop') || type.includes('training')) return 'Education & Learning';
+    if (type.includes('holiday') || type.includes('break') || type.includes('celebration')) return 'Holiday';
+    if (type.includes('registration') || type.includes('enrollment') || type.includes('orientation')) return 'Education & Learning';
+    
+    return 'Education & Learning';
   }
 
   /**

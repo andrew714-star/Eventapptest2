@@ -164,10 +164,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/sync-events", async (req, res) => {
       try {
           const { locations } = req.body;
-          
+
           if (locations && Array.isArray(locations) && locations.length > 0) {
               console.log(`Starting event synchronization for specific locations: ${locations.join(', ')}`);
-              
+
               // Get active calendar sources that match the specified locations
               const allSources = calendarCollector.getSources();
               const relevantSources = allSources.filter(source => {
@@ -177,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       location.toLowerCase().includes(source.state.toLowerCase())
                   );
               });
-              
+
               console.log(`Found ${relevantSources.length} active sources for specified locations`);
-              
+
               if (relevantSources.length === 0) {
                   return res.json({ 
                       message: "No active calendar sources found for specified locations",
@@ -187,20 +187,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       timestamp: new Date().toISOString()
                   });
               }
-              
+
               // Sync events only from relevant sources
               let syncedCount = 0;
               for (const source of relevantSources) {
                   try {
                       console.log(`Syncing events from ${source.name} (${source.city}, ${source.state})`);
                       const events = await calendarCollector.collectFromSource(source);
-                      
+
                       // Add events to storage (check for duplicates)
                       const existingEvents = await storage.getAllEvents();
                       const existingEventKeys = new Set(existingEvents.map(event => 
                           `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
                       ));
-                      
+
                       for (const event of events) {
                           const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
                           if (!existingEventKeys.has(key)) {
@@ -213,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       console.error(`Failed to sync from ${source.name}:`, sourceError);
                   }
               }
-              
+
               res.json({ 
                   message: `Event synchronization completed for ${locations.length} location(s)`,
                   syncedCount,
@@ -315,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   async function loadRealCongressionalDistricts() {
     try {
       const geoJsonPath = path.join(process.cwd(), 'attached_assets/congressional-districts.geojson');
-      
+
       if (!fs.existsSync(geoJsonPath)) {
         console.log('GeoJSON file not found, using fallback data');
         return generateAllCongressionalDistricts();
@@ -323,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const geoJsonContent = fs.readFileSync(geoJsonPath, 'utf-8');
       const geoJsonData = JSON.parse(geoJsonContent);
-      
+
       if (!geoJsonData.features || !Array.isArray(geoJsonData.features)) {
         throw new Error('Invalid GeoJSON format');
       }
@@ -331,12 +331,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Process and standardize the features
       const districts: any[] = geoJsonData.features.map((feature: any) => {
         const props = feature.properties || {};
-        
+
         // Extract district info from various possible field names
         const cd = props.CD119FP || props.CD118FP || props.DISTRICT || props.district;
         const state = props.STUSPS || props.STATE || props.state || fipsToState[props.STATEFP] || fipsToState[props.GEOID?.substring(0, 2)];
         const namelsad = props.NAMELSAD || `Congressional District ${cd}`;
-        
+
         // Extract representative information from the accurate GeoJSON data
         const firstName = props.FIRSTNAME || '';
         const middleName = props.MIDDLENAME || '';
@@ -345,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const representativeName = firstName && lastName 
           ? `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim()
           : `Representative District ${cd}`;
-        
+
         return {
           type: "Feature",
           properties: {
@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           geometry: feature.geometry
         };
       });
-      
+
       console.log(`Loaded ${districts.length} congressional districts from GeoJSON`);
       return districts;
     } catch (error) {
@@ -563,7 +563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const city of cities) {
         try {
           console.log(`Discovering feeds for ${city.name}, ${state} - searching city, school district, and chamber events...`);
-          
+
           // Use the comprehensive discovery method that searches for:
           // - City government events
           // - School district events  
@@ -573,7 +573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             state: state,
             type: 'city'
           });
-          
+
           totalDiscovered += discoveredFeeds.length;
 
           // Auto-add discovered feeds and immediately sync them
@@ -581,18 +581,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const success = calendarCollector.addSource(feed.source);
             if (success) {
               totalAdded++;
-              
+
               // Immediately sync events from this new source
               try {
                 console.log(`Immediately syncing events from newly added source: ${feed.source.name}`);
                 const events = await calendarCollector.collectFromSource(feed.source);
-                
+
                 // Add events to storage with duplicate checking
                 const existingEvents = await storage.getAllEvents();
                 const existingEventKeys = new Set(existingEvents.map(event => 
                     `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`
                 ));
-                
+
                 for (const event of events) {
                     const key = `${event.title}::${event.location}::${event.organizer}::${event.source}::${event.startDate?.toDateString()}`;
                     if (!existingEventKeys.has(key)) {
@@ -630,7 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               confidence: df.confidence
             }))
           });
-          
+
           console.log(`Found ${discoveredFeeds.length} feeds for ${city.name}: ${cityFeeds.length} city, ${schoolFeeds.length} school, ${chamberFeeds.length} chamber, ${libraryFeeds.length} library, ${parksFeeds.length} parks`);
         } catch (error) {
           console.error(`Failed to discover feeds for ${city.name}, ${state}:`, error);
@@ -639,7 +639,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Events are now automatically synced immediately after feed discovery above
       const cityLocations = cities.map(city => `${city.name}, ${state}`);
-      
+
       // Initialize syncedCount if not already defined
       if (typeof syncedCount === 'undefined') {
         syncedCount = 0;
@@ -865,7 +865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Add the source
           const success = await dataCollector.addCalendarSource(source);
-          
+
           if (success) {
             results.push({
               source: source.name,
@@ -1009,6 +1009,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Feed priorities error:", error);
       res.status(500).json({ error: "Failed to get feed priorities" });
+    }
+  });
+
+  // Manual event collection from all sources
+  app.post("/api/collect-events", async (req, res) => {
+    try {
+      console.log("Manual event collection triggered...");
+      const events = await dataCollector.collectFromAllSources();
+
+      await storage.saveEvents(events);
+
+      res.json({
+        message: "Event collection completed",
+        eventCount: events.length,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Manual event collection failed:", error);
+      res.status(500).json({ message: "Event collection failed" });
+    }
+  });
+
+  // Force scrape feeds for a specific location
+  app.post("/api/scrape-location-feeds", async (req, res) => {
+    try {
+      const { city, state } = req.body;
+
+      if (!city || !state) {
+        return res.status(400).json({ message: "City and state are required" });
+      }
+
+      console.log(`Force scraping feeds for ${city}, ${state}...`);
+
+      // Get all active sources for this location
+      const allSources = calendarCollector.getSources();
+      const locationSources = allSources.filter(source => 
+        source.city.toLowerCase() === city.toLowerCase() && 
+        source.state.toUpperCase() === state.toUpperCase() && 
+        source.isActive
+      );
+
+      console.log(`Found ${locationSources.length} active sources for ${city}, ${state}`);
+
+      const allEvents: any[] = [];
+
+      for (const source of locationSources) {
+        try {
+          console.log(`Scraping source: ${source.name} (${source.feedType}) - ${source.feedUrl}`);
+          const events = await calendarCollector.collectFromSource(source);
+          allEvents.push(...events);
+          console.log(`✓ Collected ${events.length} events from ${source.name}`);
+        } catch (error) {
+          console.error(`✗ Failed to scrape ${source.name}:`, error);
+        }
+      }
+
+      // Save the events
+      if (allEvents.length > 0) {
+        await storage.saveEvents(allEvents);
+        console.log(`Saved ${allEvents.length} events to storage`);
+      }
+
+      res.json({
+        message: `Scraped ${locationSources.length} feeds for ${city}, ${state}`,
+        sources: locationSources.map(s => s.name),
+        eventCount: allEvents.length,
+        events: allEvents.slice(0, 10), // Return first 10 events as preview
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Force scraping failed:", error);
+      res.status(500).json({ message: "Force scraping failed" });
     }
   });
 
