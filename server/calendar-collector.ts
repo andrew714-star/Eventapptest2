@@ -813,43 +813,37 @@ export class CalendarFeedCollector {
             }
         }
 
-        // School district specific handling (flexible approach)
+        // Generic flexible handling for any organization type
         if (source.type === 'school' || source.feedUrl?.includes('usd.org') || source.feedUrl?.includes('schools') || source.name.toLowerCase().includes('school')) {
-            console.log(`Parsing school district events page - using flexible event detection for ${source.name}`);
+            console.log(`Parsing events page - using flexible event detection for ${source.name}`);
 
             const fullPageText = $.text();
-            console.log(`School page contains "event": ${fullPageText.toLowerCase().includes('event')}`);
-            console.log(`School page contains dates: ${/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i.test(fullPageText)}`);
+            console.log(`Page contains "event": ${fullPageText.toLowerCase().includes('event')}`);
+            console.log(`Page contains dates: ${/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i.test(fullPageText)}`);
 
-            // Use a more comprehensive approach - look for ANY content with dates and school-related keywords
-            const schoolRelatedKeywords = [
-                // Board/governance
-                'board', 'meeting', 'agenda', 'session', 'hearing', 'vote', 'policy',
+            // Use a more comprehensive approach - look for ANY content with dates and general event keywords
+            const generalEventKeywords = [
+                // Meetings and governance
+                'meeting', 'agenda', 'session', 'hearing', 'vote',
                 
-                // Academic events
-                'school', 'class', 'grade', 'student', 'parent', 'teacher', 'staff',
-                'graduation', 'ceremony', 'awards', 'recognition', 'honor', 'achievement',
+                // Events and activities
+                'event', 'activity', 'program', 'celebration', 'festival', 'fair',
+                'ceremony', 'awards', 'recognition', 'honor', 'achievement',
                 'conference', 'workshop', 'training', 'development', 'seminar',
-                
-                // Student activities
-                'game', 'match', 'tournament', 'athletic', 'sports', 'team', 'competition',
                 'performance', 'concert', 'play', 'drama', 'music', 'art', 'exhibition',
-                'dance', 'prom', 'homecoming', 'spirit', 'club', 'organization',
+                'game', 'match', 'tournament', 'athletic', 'sports', 'team', 'competition',
+                'dance', 'party', 'fundraiser', 'volunteer', 'community', 'family',
                 
                 // Administrative
-                'registration', 'enrollment', 'orientation', 'open house', 'back to school',
-                'information', 'session', 'presentation', 'forum', 'discussion',
+                'registration', 'enrollment', 'orientation', 'open house',
+                'information', 'presentation', 'forum', 'discussion',
                 
                 // Calendar/timing
                 'schedule', 'calendar', 'date', 'time', 'day', 'week', 'month',
-                'holiday', 'break', 'vacation', 'closed', 'early', 'release', 'dismissal',
-                
-                // General events
-                'event', 'activity', 'program', 'celebration', 'festival', 'fair',
-                'fundraiser', 'volunteer', 'community', 'family', 'night'
+                'holiday', 'break', 'vacation', 'closed', 'early', 'release'
             ];
 
-            // Find all content that contains both school keywords and dates
+            // Find all content that contains both general event keywords and dates
             const potentialEventElements = [];
 
             // Strategy 1: Look in structured content areas first
@@ -873,15 +867,15 @@ export class CalendarFeedCollector {
                     const hasDate = /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}\s*(AM|PM)|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i.test(elementText);
 
                     if (hasDate) {
-                        // Check for school-related content
+                        // Check for general event-related content
                         const lowerText = elementText.toLowerCase();
-                        const hasSchoolContent = schoolRelatedKeywords.some(keyword => lowerText.includes(keyword));
+                        const hasEventContent = generalEventKeywords.some(keyword => lowerText.includes(keyword));
 
-                        if (hasSchoolContent) {
+                        if (hasEventContent) {
                             potentialEventElements.push({
                                 element: $element,
                                 text: elementText,
-                                schoolKeywordCount: schoolRelatedKeywords.filter(keyword => lowerText.includes(keyword)).length
+                                eventKeywordCount: generalEventKeywords.filter(keyword => lowerText.includes(keyword)).length
                             });
                         }
                     }
@@ -891,10 +885,10 @@ export class CalendarFeedCollector {
                 if (potentialEventElements.length > 0) break;
             }
 
-            console.log(`Found ${potentialEventElements.length} potential school event elements`);
+            console.log(`Found ${potentialEventElements.length} potential event elements`);
 
-            // Sort by relevance (more school keywords = higher priority)
-            potentialEventElements.sort((a, b) => b.schoolKeywordCount - a.schoolKeywordCount);
+            // Sort by relevance (more event keywords = higher priority)
+            potentialEventElements.sort((a, b) => b.eventKeywordCount - a.eventKeywordCount);
 
             // Process the most relevant potential events
             for (const eventData of potentialEventElements.slice(0, 20)) {
@@ -909,13 +903,13 @@ export class CalendarFeedCollector {
 
                 if (eventDate && eventDate > new Date()) {
                     // Extract a meaningful title
-                    let title = this.extractSchoolEventTitle(elementText, $element);
+                    let title = this.extractEventTitle(elementText, $element);
 
                     if (title && title.length > 5 && title.length < 200) {
                         parsedEvents.push({
                             title: this.cleanText(title),
-                            description: this.cleanText(elementText.substring(0, 300)) || 'School event details available on website',
-                            category: this.getSchoolEventCategory(title),
+                            description: this.cleanText(elementText.substring(0, 300)) || 'Event details available on website',
+                            category: this.categorizeEvent(title, elementText),
                             location: `${source.city}, ${source.state}`,
                             organizer: source.name,
                             startDate: eventDate,
@@ -928,7 +922,7 @@ export class CalendarFeedCollector {
                             source: source.id
                         });
 
-                        console.log(`✓ Successfully created flexible school event: ${title} on ${eventDate.toDateString()}`);
+                        console.log(`✓ Successfully created flexible event: ${title} on ${eventDate.toDateString()}`);
 
                         // Limit to prevent too many events
                         if (parsedEvents.length >= 10) break;
@@ -936,7 +930,7 @@ export class CalendarFeedCollector {
                 }
             }
 
-            console.log(`Flexible school parser found ${parsedEvents.length} events for ${source.name}`);
+            console.log(`Flexible parser found ${parsedEvents.length} events for ${source.name}`);
 
             if (parsedEvents.length > 0) {
                 return parsedEvents;
@@ -1831,9 +1825,9 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Extract meaningful title from school event content
+   * Extract meaningful title from event content
    */
-  private extractSchoolEventTitle(text: string, $element: any): string {
+  private extractEventTitle(text: string, $element: any): string {
     // Strategy 1: Look for headings in the element
     const headings = $element.find('h1, h2, h3, h4, h5, h6, .title, .heading, .event-title').first();
     if (headings.length && headings.text().trim()) {
@@ -1866,7 +1860,7 @@ export class CalendarFeedCollector {
     
     // Look for lines that contain event-like patterns
     const eventPatterns = [
-      /\b(board meeting|school board|meeting|conference|workshop|seminar|training|graduation|ceremony|game|match|tournament|concert|performance|presentation|orientation|registration|open house|back to school|parent|night|day|event|activity|program|celebration|festival|fundraiser)\b/i
+      /\b(meeting|conference|workshop|seminar|training|ceremony|game|match|tournament|concert|performance|presentation|orientation|registration|open house|event|activity|program|celebration|festival|fundraiser)\b/i
     ];
 
     for (const line of lines.slice(0, 5)) {
@@ -1892,8 +1886,8 @@ export class CalendarFeedCollector {
     // Strategy 5: Fallback to first meaningful sentence
     const sentences = text.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 10 && s.length < 200);
     for (const sentence of sentences.slice(0, 3)) {
-      const schoolWords = ['school', 'student', 'parent', 'teacher', 'board', 'education', 'academic', 'grade', 'class'];
-      if (schoolWords.some(word => sentence.toLowerCase().includes(word))) {
+      const eventWords = ['meeting', 'event', 'program', 'activity', 'ceremony', 'conference', 'workshop', 'training'];
+      if (eventWords.some(word => sentence.toLowerCase().includes(word))) {
         return sentence.trim();
       }
     }
@@ -2615,7 +2609,7 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Validate if a title string represents a real upcoming event - STRICT VERSION
+   * Validate if a title string represents a real upcoming event - FLEXIBLE VERSION
    */
   private isValidEventTitle(title: string): boolean {
     if (!title || title.length < 5 || title.length > 300) return false;
@@ -2648,68 +2642,12 @@ export class CalendarFeedCollector {
       /previous/i,
       /old/i,
       /\d{4}.*through.*\d{4}/i, // Date ranges like "2022 through 2023"
-      /^board agenda.*\d{4}/i,
-      /employment/i,
-      /policy/i,
-      /procedure/i,
-      /form/i,
-      /application/i,
-      /document/i,
-      /guideline/i,
-      /manual/i,
-      /handbook/i,
-      /directory/i,
-      /staff/i,
-      /department/i,
-      /administration/i,
-      /superintendent/i,
-      /principal/i,
-      /teacher/i,
-      /communications/i,
-      /enrollment/i,
-      /registration/i,
-      /curriculum/i,
-      /resources/i,
-      /links/i,
-      /wellness center/i,
-      /nutrition services/i,
-      /student rights/i,
-      /nondiscrimination/i,
-      /complaint/i,
-      /harassment/i,
-      /bullying/i,
-      /prevention/i,
-      /covid/i,
-      /technology/i,
-      /google/i,
-      /clever/i,
-      /badge/i,
-      /classroom/i,
-      /faq/i,
-      /help/i,
-      /tutorial/i,
-      /how to/i,
-      /instructions/i,
-      /spotlight/i,
-      /valedictorian/i,
-      /graduate/i,
-      /awards/i,
-      /recognition/i,
-      /video gallery/i,
-      /photo gallery/i,
-      /gallery/i,
-      /image/i,
-      /video/i,
       /your browser/i,
       /browser does not support/i,
-      /end of/i,
       /find us/i,
       /stay connected/i,
       /powered by/i,
-      /visit us/i,
       /website/i,
-      /site/i,
-      /page/i,
       /navigation/i,
       /submenu/i,
       /show submenu/i,
@@ -2724,44 +2662,65 @@ export class CalendarFeedCollector {
       }
     }
 
-    // REQUIRE explicit event indicators - much more strict
-    const requiredEventIndicators = [
+    // Look for general event indicators - more flexible approach
+    const eventIndicators = [
       // Meetings and formal events
-      /\bboard meeting\b/i,
-      /\bcouncil meeting\b/i,
-      /\bschool board\b/i,
-      /\bmeeting\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
-      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*\bmeeting\b/i,
+      /\bmeeting\b/i,
+      /\bboard\b/i,
+      /\bcouncil\b/i,
+      /\bagenda\b/i,
+      /\bsession\b/i,
       
-      // School events with dates
-      /\b(game|match|tournament|graduation|ceremony|concert|performance|play|show)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
-      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec).*\b(game|match|tournament|graduation|ceremony|concert|performance|play|show)\b/i,
+      // Events and activities
+      /\bevent\b/i,
+      /\bactivity\b/i,
+      /\bprogram\b/i,
+      /\bceremony\b/i,
+      /\bconcert\b/i,
+      /\bperformance\b/i,
+      /\bshow\b/i,
+      /\bfestival\b/i,
+      /\bfair\b/i,
+      /\bfundraiser\b/i,
+      /\bdinner\b/i,
+      /\blunch\b/i,
+      /\bbreakfast\b/i,
+      /\bdance\b/i,
+      /\bparty\b/i,
+      /\breunion\b/i,
+      /\bexpo\b/i,
+      /\bexhibition\b/i,
+      /\bopen house\b/i,
+      /\bworkshop\b/i,
+      /\bseminar\b/i,
+      /\btraining\b/i,
+      /\bconference\b/i,
+      /\bpresentation\b/i,
+      /\blecture\b/i,
+      /\borientation\b/i,
+      /\bgame\b/i,
+      /\bmatch\b/i,
+      /\btournament\b/i,
+      /\bgraduation\b/i,
       
-      // Community events
-      /\b(festival|fair|fundraiser|dinner|lunch|breakfast|dance|party|reunion|expo|exhibition|open house)\b/i,
-      
-      // Educational events with timing
-      /\b(workshop|seminar|training|conference|presentation|lecture|class|session|orientation)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
-      
-      // Events with specific times
+      // Time indicators
       /\b\d{1,2}:\d{2}\s*(am|pm)\b/i,
+      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
+      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
+      /\b\d{1,2}\/\d{1,2}\/?\d{0,4}\b/i,
       
-      // Upcoming/scheduled events
-      /\bupcoming\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
-      /\bscheduled\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
-      /\bnext\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      // Action phrases
+      /\b(join us|attend|participate|register|rsvp|upcoming|scheduled|next)\b/i,
       
-      // Action phrases for events
-      /\b(join us|attend|participate|register|rsvp)\b.*\b(for|to)\b/i,
-      
-      // Specific future dates
-      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*\d{4}/i,
-      /\b\d{1,2}\/\d{1,2}\/\d{4}\b/i,
-      /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday),?\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}/i
+      // Calendar terms
+      /\bcalendar\b/i,
+      /\bschedule\b/i,
+      /\bdate\b/i
     ];
 
-    // Title must contain at least one required event indicator
-    return requiredEventIndicators.some(indicator => indicator.test(title));
+    // Title should contain at least one event indicator
+    return eventIndicators.some(indicator => indicator.test(title));
   }
 
   /**
