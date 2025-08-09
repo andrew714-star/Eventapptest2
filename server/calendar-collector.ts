@@ -748,8 +748,8 @@ export class CalendarFeedCollector {
         // Strategy 1: Look for structured event data with enhanced selectors
         const structuredSelectors = [
             // Primary event selectors
-            '.event-item, .event, .calendar-event, .event-listing, .event-card',
-            '.upcoming-events li, .events-list li, .event-list li',
+            '.event-item, .event, .calendar-event, .event-listing, .event-card, .event-list-item',
+            '.upcoming-events li, .events-list li, .event-list li, .event-list-item',
             
             // Calendar-specific selectors
             '.calendar-item, .calendar-entry, .calendar-listing',
