@@ -2609,12 +2609,12 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Validate if a title string represents a real upcoming event - FLEXIBLE VERSION
+   * Validate if a title string represents a real upcoming event - SPECIFIC EVENT ELEMENTS ONLY
    */
   private isValidEventTitle(title: string): boolean {
     if (!title || title.length < 5 || title.length > 300) return false;
 
-    // Exclude clearly invalid patterns first
+    // First, exclude clearly invalid patterns
     const invalidPatterns = [
       /^skip to/i,
       /^search$/i,
@@ -2634,7 +2634,13 @@ export class CalendarFeedCollector {
       /^terms of service$/i,
       /^copyright/i,
       /^all rights reserved/i,
-      /past.*agenda/i,
+      
+      // STRICT: Filter out page navigation and historical content
+      /^meetings? calendar$/i,
+      /^events? calendar$/i,
+      /^calendar$/i,
+      /^agenda$/i,
+      /^past.*agenda/i,
       /^past /i,
       /^prior to/i,
       /archive/i,
@@ -2653,7 +2659,17 @@ export class CalendarFeedCollector {
       /show submenu/i,
       /toggle/i,
       /expand/i,
-      /collapse/i
+      /collapse/i,
+      
+      // Filter out generic page titles and labels
+      /^more details$/i,
+      /^event location$/i,
+      /^upcoming$/i,
+      /^announcements$/i,
+      /^news$/i,
+      /^information$/i,
+      /^details$/i,
+      /^description$/i
     ];
 
     for (const pattern of invalidPatterns) {
@@ -2662,72 +2678,57 @@ export class CalendarFeedCollector {
       }
     }
 
-    // Look for general event indicators - more flexible approach
-    const eventIndicators = [
-      // Meetings and formal events
-      /\bmeeting\b/i,
-      /\bboard\b/i,
-      /\bcouncil\b/i,
-      /\bagenda\b/i,
-      /\bsession\b/i,
+    // SPECIFIC: Only accept titles that contain SPECIFIC event types with context
+    const specificEventPatterns = [
+      // Specific meeting types with proper context
+      /\b(city council|school board|board of trustees|planning commission|city commission|town council|borough council)\s+(meeting|session)\b/i,
+      /\b(pta|pto|parent teacher)\s+(meeting|conference)\b/i,
+      /\b(annual|monthly|quarterly|special|emergency)\s+(meeting|session)\b/i,
       
-      // Events and activities
-      /\bevent\b/i,
-      /\bactivity\b/i,
-      /\bprogram\b/i,
-      /\bceremony\b/i,
-      /\bconcert\b/i,
-      /\bperformance\b/i,
-      /\bshow\b/i,
-      /\bfestival\b/i,
-      /\bfair\b/i,
-      /\bfundraiser\b/i,
-      /\bdinner\b/i,
-      /\blunch\b/i,
-      /\bbreakfast\b/i,
-      /\bdance\b/i,
-      /\bparty\b/i,
-      /\breunion\b/i,
-      /\bexpo\b/i,
-      /\bexhibition\b/i,
-      /\bopen house\b/i,
-      /\bworkshop\b/i,
-      /\bseminar\b/i,
-      /\btraining\b/i,
-      /\bconference\b/i,
-      /\bpresentation\b/i,
-      /\blecture\b/i,
-      /\borientation\b/i,
-      /\bgame\b/i,
-      /\bmatch\b/i,
-      /\btournament\b/i,
-      /\bgraduation\b/i,
+      // Specific named events
+      /\b[A-Z][a-z]+\s+(festival|fair|celebration|concert|show|performance|tournament|championship|expo|exhibition)\b/i,
+      /\b(holiday|christmas|halloween|thanksgiving|fourth of july|memorial day|labor day)\s+(celebration|event|party|festival)\b/i,
       
-      // Time indicators
-      /\b\d{1,2}:\d{2}\s*(am|pm)\b/i,
-      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
-      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
-      /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b/i,
-      /\b\d{1,2}\/\d{1,2}\/?\d{0,4}\b/i,
+      // Educational events with specificity
+      /\b(graduation|commencement)\s+(ceremony|exercises?)\b/i,
+      /\b(open house|orientation|registration|enrollment)\s+(event|night|day)\b/i,
+      /\b(parent|teacher|student)\s+(conference|meeting|night)\b/i,
       
-      // Action phrases
-      /\b(join us|attend|participate|register|rsvp|upcoming|scheduled|next)\b/i,
+      // Sports with team names or specificity
+      /\b(basketball|football|soccer|baseball|volleyball|tennis|track|swimming|wrestling|golf)\s+(game|match|tournament|meet)\b/i,
+      /\b(varsity|jv|junior varsity)\s+(basketball|football|soccer|baseball|volleyball|tennis|track|swimming|wrestling|golf)\b/i,
       
-      // Calendar terms
-      /\bcalendar\b/i,
-      /\bschedule\b/i,
-      /\bdate\b/i
+      // Community events with specificity
+      /\b(farmers|craft|art|book|health|job)\s+(market|fair|festival|expo)\b/i,
+      /\b(blood drive|vaccination clinic|health screening|flu shots)\b/i,
+      /\b(fundraiser|charity|benefit)\s+(dinner|lunch|breakfast|event|concert|auction)\b/i,
+      
+      // Cultural events
+      /\b(art|music|theater|drama|choir|band|orchestra)\s+(show|performance|concert|recital|exhibition)\b/i,
+      
+      // Workshops and classes with specificity
+      /\b(computer|technology|cooking|art|music|fitness|health|parenting|financial)\s+(class|workshop|seminar|training)\b/i,
+      
+      // Specific time-bound events
+      /\b(back to school|end of year|spring break|summer camp|winter break)\s+(event|night|celebration|program)\b/i,
+      
+      // Events with specific dates (likely real events)
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*\b(meeting|event|show|concert|game|festival)\b/i,
+      /\b\d{1,2}\/\d{1,2}\/\d{4}.*\b(meeting|event|show|concert|game|festival)\b/i,
+      
+      // Events with times (likely real events)
+      /\b\d{1,2}:\d{2}\s*(am|pm).*\b(meeting|event|show|concert|game|festival)\b/i
     ];
 
-    // Title should contain at least one event indicator
-    return eventIndicators.some(indicator => indicator.test(title));
+    // Title must match at least one specific event pattern
+    return specificEventPatterns.some(pattern => pattern.test(title));
   }
 
   /**
-   * Validate if the content represents a valid upcoming event - STRICT VERSION
+   * Validate if the content represents a valid upcoming event - VERY STRICT FOR SPECIFIC ELEMENTS
    */
   private isValidEventContent(elementText: string, title: string): boolean {
-    // Filter out obvious administrative/non-event content
+    // Filter out obvious administrative/non-event content with expanded patterns
     const invalidContentPatterns = [
       /^skip to/i,
       /^search$/i,
@@ -2737,6 +2738,11 @@ export class CalendarFeedCollector {
       /copyright.*all rights reserved/i,
       /privacy policy/i,
       /terms of service/i,
+      
+      // STRICT: Filter out calendar navigation and historical content
+      /^meetings? calendar$/i,
+      /^events? calendar$/i,
+      /^calendar$/i,
       /past.*agenda/i,
       /prior to/i,
       /archive/i,
@@ -2744,6 +2750,10 @@ export class CalendarFeedCollector {
       /previous/i,
       /old/i,
       /\d{4}.*through.*\d{4}/i,
+      /june 2022 through march 2023/i,
+      /prior to june 2022/i,
+      
+      // Administrative content
       /employment/i,
       /policy/i,
       /procedure/i,
@@ -2785,7 +2795,15 @@ export class CalendarFeedCollector {
       /powered by/i,
       /visit us/i,
       /navigation/i,
-      /submenu/i
+      /submenu/i,
+      
+      // Generic page elements
+      /more details/i,
+      /event location/i,
+      /^upcoming$/i,
+      /^announcements$/i,
+      /^news$/i,
+      /^information$/i
     ];
 
     for (const pattern of invalidContentPatterns) {
@@ -2795,36 +2813,37 @@ export class CalendarFeedCollector {
     }
 
     // Require length to be reasonable for an event description
-    if (elementText.length < 15 || elementText.length > 1000) return false;
+    if (elementText.length < 25 || elementText.length > 1000) return false;
 
-    // Must contain explicit event content indicators with timing
+    // VERY STRICT: Must contain SPECIFIC event patterns with concrete details
     const validEventContentPatterns = [
-      // Events with specific dates/times
-      /\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b.*\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2})\b/i,
-      /\b(tonight|today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2})\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      // Specific meeting types with dates/times
+      /\b(city council|school board|board of trustees|planning commission)\s+(meeting|session)\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})\b/i,
       
-      // Upcoming/scheduled events
-      /\b(upcoming|scheduled|next)\b.*\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser)\b/i,
+      // Named events with dates/times
+      /\b[A-Z][a-z]+\s+(festival|fair|celebration|concert|show|performance|tournament|expo)\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})\b/i,
       
-      // Action phrases for events
-      /\b(join us|attend|participate|register|rsvp)\b.*\b(for|to)\b/i,
-      /\b(will be held|takes place|is scheduled|happening)\b/i,
+      // Educational events with specific dates/times
+      /\b(graduation|open house|orientation|parent conference)\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})\b/i,
       
-      // Board/council meetings
-      /\b(board|council)\s+(meeting|session)\b/i,
+      // Sports with specific dates/times
+      /\b(basketball|football|soccer|baseball|volleyball|tennis|track|swimming|wrestling|golf)\s+(game|match|tournament)\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})\b/i,
       
-      // School events
-      /\b(school board|pta|pto)\s+(meeting|event)\b/i,
+      // Action phrases with specific dates/times
+      /\b(join us|attend|participate|register|rsvp)\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})\b/i,
       
-      // Specific times
-      /\b\d{1,2}:\d{2}\s*(am|pm)\b/i,
+      // Time and location specific content
+      /\b\d{1,2}:\d{2}\s*(am|pm)\b.*\b(at|@|location|address|room|building|hall|center|library|school|church|park)\b/i,
       
-      // Future dates
-      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}.*\d{4}/i,
-      /\b\d{1,2}\/\d{1,2}\/\d{4}\b/i
+      // Future specific dates with years
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2},?\s+202[5-9]\b/i,
+      /\b\d{1,2}\/\d{1,2}\/202[5-9]\b/i,
+      
+      // Scheduled events with specific details
+      /\b(scheduled|will be held|takes place|happening)\b.*\b(at|on|from|starting|beginning)\s+\d/i
     ];
 
-    // Content must match at least one valid event pattern
+    // Content must match at least one SPECIFIC valid event pattern
     return validEventContentPatterns.some(pattern => pattern.test(elementText));
   }
 }
