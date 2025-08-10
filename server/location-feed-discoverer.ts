@@ -315,9 +315,19 @@ export class LocationFeedDiscoverer {
         maxRedirects: 3 // Limit redirects
       });
 
-      if (response.status === 404) {
-        return feeds; // Domain doesn't exist
+      // Check if website actually exists and is accessible
+      if (response.status === 404 || response.status >= 400) {
+        console.log(`Website ${domain} returned status ${response.status} - skipping feed discovery`);
+        return feeds; // Domain doesn't exist or is not accessible
       }
+
+      // Verify we got actual website content, not just a redirect or error page
+      if (!response.data || typeof response.data !== 'string' || response.data.length < 100) {
+        console.log(`Website ${domain} returned insufficient content - skipping feed discovery`);
+        return feeds;
+      }
+
+      console.log(`✓ Confirmed website ${domain} exists and is accessible - proceeding with feed discovery`);
 
       // Parse the homepage to look for calendar/events links
       const $ = cheerio.load(response.data);
@@ -499,6 +509,24 @@ export class LocationFeedDiscoverer {
       // Skip API endpoints that are likely to be client-side only
       if (feedUrl.includes('/api/v') || feedUrl.includes('/cms/') || feedUrl.includes('section_ids=')) {
         console.log(`Skipping client-side API endpoint: ${feedUrl}`);
+        return null;
+      }
+
+      // First verify the domain/website exists before checking feed URLs
+      const baseUrl = new URL(feedUrl).origin;
+      try {
+        const domainCheck = await axios.get(baseUrl, {
+          timeout: 2000,
+          headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
+          validateStatus: (status) => status < 500
+        });
+        
+        if (domainCheck.status >= 400) {
+          console.log(`Domain ${baseUrl} not accessible (${domainCheck.status}) - skipping feed: ${feedUrl}`);
+          return null;
+        }
+      } catch (error) {
+        console.log(`Domain ${baseUrl} not accessible - skipping feed: ${feedUrl}`);
         return null;
       }
 
@@ -764,6 +792,24 @@ export class LocationFeedDiscoverer {
 
   private async parseSubscriptionPageForFeeds(subscriptionUrl: string): Promise<string[]> {
     try {
+      // First verify the website exists
+      const baseUrl = new URL(subscriptionUrl).origin;
+      try {
+        const domainCheck = await axios.get(baseUrl, {
+          timeout: 2000,
+          headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
+          validateStatus: (status) => status < 500
+        });
+        
+        if (domainCheck.status >= 400) {
+          console.log(`Domain ${baseUrl} not accessible - skipping subscription page parsing`);
+          return [];
+        }
+      } catch (error) {
+        console.log(`Domain ${baseUrl} not accessible - skipping subscription page parsing`);
+        return [];
+      }
+
       const response = await axios.get(subscriptionUrl, {
         timeout: 5000,
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
@@ -904,6 +950,24 @@ export class LocationFeedDiscoverer {
     console.log(`🔍 Analyzing calendar page for subscription buttons: ${calendarPageUrl}`);
     
     try {
+      // First verify the website exists
+      const baseUrl = new URL(calendarPageUrl).origin;
+      try {
+        const domainCheck = await axios.get(baseUrl, {
+          timeout: 2000,
+          headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
+          validateStatus: (status) => status < 500
+        });
+        
+        if (domainCheck.status >= 400) {
+          console.log(`❌ Domain ${baseUrl} not accessible - skipping calendar page analysis`);
+          return [];
+        }
+      } catch (error) {
+        console.log(`❌ Domain ${baseUrl} not accessible - skipping calendar page analysis`);
+        return [];
+      }
+
       const response = await axios.get(calendarPageUrl, {
         timeout: 5000,
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
