@@ -533,6 +533,14 @@ export class LocationFeedDiscoverer {
         }
       }
 
+      // Check if this is a calendar page that might have subscription buttons
+      if (feedUrl.includes('calendar') || feedUrl.includes('events')) {
+        const subscriptionFeeds = await this.findSubscriptionFeedsOnCalendarPage(feedUrl, location);
+        if (subscriptionFeeds.length > 0) {
+          return subscriptionFeeds[0]; // Return first working subscription feed
+        }
+      }
+
       // For potential feeds that might be behind download buttons, try GET instead of HEAD
       const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') || isSubscriptionPage ? 'get' : 'head';
       
@@ -879,6 +887,148 @@ export class LocationFeedDiscoverer {
       };
     } catch (error) {
       return null;
+    }
+  }
+
+  private async findSubscriptionFeedsOnCalendarPage(calendarPageUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
+    console.log(`🔍 Analyzing calendar page for subscription buttons: ${calendarPageUrl}`);
+    
+    try {
+      const response = await axios.get(calendarPageUrl, {
+        timeout: 5000,
+        headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
+      });
+      
+      const html = response.data;
+      const baseUrl = new URL(calendarPageUrl);
+      
+      // Look for subscription buttons/links on the calendar page
+      const subscriptionPatterns = [
+        // Look for RSS subscription buttons
+        /href=["']([^"']*\/rss\.aspx[^"']*)["']/gi,
+        /href=["']([^"']*\/RSSFeed\.aspx[^"']*)["']/gi,
+        // Look for iCalendar subscription buttons
+        /href=["']([^"']*\/iCalendar\.aspx[^"']*)["']/gi,
+        /href=["']([^"']*\/iCalendarFeed\.aspx[^"']*)["']/gi,
+        // Look for generic subscription/download buttons
+        /href=["']([^"']*subscribe[^"']*)["']/gi,
+        /href=["']([^"']*download[^"']*calendar[^"']*)["']/gi,
+        /href=["']([^"']*export[^"']*calendar[^"']*)["']/gi
+      ];
+      
+      const subscriptionUrls = new Set<string>();
+      
+      for (const pattern of subscriptionPatterns) {
+        const matches = html.match(pattern) || [];
+        for (const match of matches) {
+          const urlMatch = match.match(/href=["']([^"']*)["']/i);
+          if (urlMatch) {
+            let subscriptionUrl = urlMatch[1];
+            
+            // Convert to absolute URL
+            if (!subscriptionUrl.startsWith('http')) {
+              if (subscriptionUrl.startsWith('/')) {
+                subscriptionUrl = `${baseUrl.protocol}//${baseUrl.host}${subscriptionUrl}`;
+              } else {
+                subscriptionUrl = `${baseUrl.protocol}//${baseUrl.host}/${subscriptionUrl}`;
+              }
+            }
+            
+            subscriptionUrls.add(subscriptionUrl);
+          }
+        }
+      }
+      
+      console.log(`📋 Found ${subscriptionUrls.size} subscription URLs on calendar page`);
+      
+      // Now follow each subscription URL to find "All" or "All Events" buttons
+      const workingFeeds: DiscoveredFeed[] = [];
+      
+      for (const subscriptionUrl of subscriptionUrls) {
+        console.log(`🔎 Checking subscription page: ${subscriptionUrl}`);
+        
+        try {
+          const allEventsFeeds = await this.findAllEventsButtonsOnSubscriptionPage(subscriptionUrl, location);
+          workingFeeds.push(...allEventsFeeds);
+          
+          if (workingFeeds.length >= 2) break; // Limit to prevent too many requests
+        } catch (error) {
+          console.log(`⚠️ Failed to analyze subscription page ${subscriptionUrl}:`, error.message);
+        }
+      }
+      
+      return workingFeeds;
+    } catch (error) {
+      console.log(`❌ Error analyzing calendar page ${calendarPageUrl}:`, error.message);
+      return [];
+    }
+  }
+
+  private async findAllEventsButtonsOnSubscriptionPage(subscriptionUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
+    try {
+      const response = await axios.get(subscriptionUrl, {
+        timeout: 5000,
+        headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
+      });
+      
+      const html = response.data;
+      const baseUrl = new URL(subscriptionUrl);
+      
+      // Look specifically for "All" or "All Events" buttons that link to actual feeds
+      const allEventsPatterns = [
+        // Look for "All" links in calendar sections
+        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
+        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
+        // More flexible "All" patterns
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
+        // Look for "All Events" specifically
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*Events[^"']*)["'][^>]*>All Events[^<]*<\/a>/gi,
+        // Calendar-specific "All" buttons
+        /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi
+      ];
+      
+      const feedUrls: string[] = [];
+      
+      for (const pattern of allEventsPatterns) {
+        const matches = html.match(pattern) || [];
+        for (const match of matches) {
+          const urlMatch = match.match(/href=["']([^"']*)["']/i);
+          if (urlMatch) {
+            let feedUrl = urlMatch[1];
+            
+            // Convert to absolute URL
+            if (!feedUrl.startsWith('http')) {
+              if (feedUrl.startsWith('/')) {
+                feedUrl = `${baseUrl.protocol}//${baseUrl.host}${feedUrl}`;
+              } else {
+                feedUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedUrl}`;
+              }
+            }
+            
+            feedUrls.push(feedUrl);
+          }
+        }
+      }
+      
+      console.log(`🎯 Found ${feedUrls.length} "All Events" feed URLs: ${feedUrls.slice(0, 3).join(', ')}`);
+      
+      // Test each discovered feed URL to see if it returns actual feed content
+      const workingFeeds: DiscoveredFeed[] = [];
+      
+      for (const feedUrl of feedUrls.slice(0, 3)) { // Limit testing to prevent too many requests
+        const workingFeed = await this.validateAndCreateFeed(feedUrl, location);
+        if (workingFeed) {
+          console.log(`✅ Validated working feed: ${feedUrl}`);
+          workingFeeds.push(workingFeed);
+        } else {
+          console.log(`❌ Invalid feed: ${feedUrl}`);
+        }
+      }
+      
+      return workingFeeds;
+    } catch (error) {
+      console.log(`Error analyzing subscription page ${subscriptionUrl}:`, error.message);
+      return [];
     }
   }
 

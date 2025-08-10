@@ -10,12 +10,16 @@ Event loading behavior: Events should not load or be searched until after a user
 # Recent Changes
 
 **2025-01-10**: Enhanced Interactive Feed Discovery System
-- Implemented sophisticated subscription page parsing that automatically discovers RSS and iCalendar feeds requiring user interaction
+- Implemented sophisticated calendar-first discovery approach that follows the complete user workflow:
+  1. Finds calendar pages first (e.g., `/calendar.aspx`, `/events`)
+  2. Looks for subscription buttons (`/rss.aspx`, `/iCalendar.aspx`) on those pages
+  3. Follows those links to find "All" or "All Events" buttons with actual feed URLs
 - Added support for ModID/CID parameter patterns (e.g., `/RSSFeed.aspx?ModID=58&CID=All-calendar.xml`) found in government CMS systems
 - Enhanced feed validation to distinguish actual feed content from HTML subscription pages 
 - Created flexible regex patterns to extract feed URLs from various subscription page formats
 - Successfully validated working feeds from Hemet City Government showing real calendar events
 - System now handles feeds that traditionally required clicking download buttons or navigating category selection interfaces
+- Multi-step discovery process matches actual user behavior on government websites
 
 **2025-01-09**: Complete District-to-Calendar Integration
 - Implemented full congressional district click functionality - clicking a district automatically discovers feeds for all cities within that district
