@@ -564,14 +564,27 @@ export class LocationFeedDiscoverer {
         actualContent = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
       }
 
+      // Check for actual calendar/event content in the feed
+      const hasCalendarContent = actualContent.includes('VEVENT') || 
+                                actualContent.includes('DTSTART') ||
+                                actualContent.includes('SUMMARY') ||
+                                actualContent.includes('<title>') ||
+                                actualContent.includes('<description>') ||
+                                actualContent.includes('event') ||
+                                actualContent.includes('meeting') ||
+                                actualContent.includes('council') ||
+                                actualContent.includes('calendar');
+
       // Determine feed type and confidence based on content type, URL, and actual content
       if (contentType.includes('text/calendar') || feedUrl.endsWith('.ics') || actualContent.includes('BEGIN:VCALENDAR') || actualContent.includes('BEGIN:VEVENT')) {
         feedType = 'ical';
-        confidence = actualContent.includes('BEGIN:VCALENDAR') ? 0.95 : 0.9;
+        confidence = actualContent.includes('BEGIN:VCALENDAR') && hasCalendarContent ? 0.95 : 
+                    actualContent.includes('BEGIN:VCALENDAR') ? 0.85 : 0.9;
       } else if (contentType.includes('application/rss') || contentType.includes('xml') || feedUrl.includes('rss') || feedUrl.includes('.xml') || 
                  actualContent.includes('<rss') || actualContent.includes('<feed') || actualContent.includes('<item') || actualContent.includes('<entry')) {
         feedType = 'rss';
-        confidence = actualContent.includes('<rss') || actualContent.includes('<feed') ? 0.85 : 0.8;
+        confidence = (actualContent.includes('<rss') || actualContent.includes('<feed')) && hasCalendarContent ? 0.85 : 
+                    actualContent.includes('<rss') || actualContent.includes('<feed') ? 0.75 : 0.8;
       } else if (contentType.includes('application/json') || feedUrl.includes('api') || feedUrl.includes('.json')) {
         feedType = 'json';
         try {
@@ -600,8 +613,9 @@ export class LocationFeedDiscoverer {
         return null;
       }
 
-      // Require minimum confidence for discovery
-      if (confidence < 0.5) {
+      // Require minimum confidence for discovery - higher threshold for calendar feeds
+      const minConfidence = feedUrl.includes('calendar') || feedUrl.includes('events') ? 0.6 : 0.5;
+      if (confidence < minConfidence) {
         console.log(`Feed validation failed for ${feedUrl}: Low confidence (${confidence})`);
         return null;
       }
@@ -969,27 +983,29 @@ export class LocationFeedDiscoverer {
       const html = response.data;
       const baseUrl = new URL(subscriptionUrl);
       
-      // Look specifically for "All" or "All Events" buttons that link to actual feeds
-      const allEventsPatterns = [
-        // Look for "All" links in calendar sections
-        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
-        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
-        // More flexible "All" patterns
-        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
-        // Look for "All Events" specifically
-        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*Events[^"']*)["'][^>]*>All Events[^<]*<\/a>/gi,
-        // Calendar-specific "All" buttons
-        /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
-        // Generic calendar feed patterns without requiring ModID
-        /<a[^>]+href=["']([^"']*?RSSFeed\.aspx\?[^"']*?CID=All[^"']*?)["'][^>]*>All[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*?iCalendarFeed\.aspx\?[^"']*?CID=All[^"']*?)["'][^>]*>All[^<]*<\/a>/gi,
-        // Look for feed links without "All" text but with calendar-related parameters
-        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?(?:CID|calendar)[^"']*?)["'][^>]*>[^<]*(?:calendar|events)[^<]*<\/a>/gi
+      // Look specifically for calendar and events feeds, not just "All" buttons
+      const calendarFeedPatterns = [
+        // Look for calendar-specific feed links
+        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|ical)[^<]*<\/a>/gi,
+        // Look for events-specific feed links
+        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|ical)[^<]*<\/a>/gi,
+        // Look for "All Calendar" or "All Events" specifically
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*(?:All.*calendar|calendar.*All|All.*events|events.*All)[^"']*)["'][^>]*>[^<]*<\/a>/gi,
+        // Look for main calendar feeds with CID parameters
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?CID=[^"']*?)["'][^>]*>[^<]*(?:main|primary|city|government|official|master).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for department calendar feeds
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?)["'][^>]*>[^<]*(?:department|council|planning|public works|fire|police|library|parks).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for comprehensive calendar feeds with broader text patterns
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?)["'][^>]*>[^<]*(?:view all|complete|full|comprehensive|master|entire).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for download/export calendar links
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx[^"']*?)["'][^>]*>[^<]*(?:download|export|subscribe to).*(?:calendar|events)[^<]*<\/a>/gi
       ];
       
       const feedUrls: string[] = [];
       
-      for (const pattern of allEventsPatterns) {
+      for (const pattern of calendarFeedPatterns) {
         const matches = html.match(pattern) || [];
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
@@ -1010,12 +1026,12 @@ export class LocationFeedDiscoverer {
         }
       }
       
-      console.log(`🎯 Found ${feedUrls.length} "All Events" feed URLs: ${feedUrls.slice(0, 3).join(', ')}`);
+      console.log(`🎯 Found ${feedUrls.length} calendar-specific feed URLs: ${feedUrls.slice(0, 3).join(', ')}`);
       
       // Test each discovered feed URL to see if it returns actual feed content
       const workingFeeds: DiscoveredFeed[] = [];
       
-      for (const feedUrl of feedUrls.slice(0, 3)) { // Limit testing to prevent too many requests
+      for (const feedUrl of feedUrls.slice(0, 5)) { // Increased limit for calendar-specific feeds
         const workingFeed = await this.validateAndCreateFeed(feedUrl, location);
         if (workingFeed) {
           console.log(`✅ Validated working feed: ${feedUrl}`);
