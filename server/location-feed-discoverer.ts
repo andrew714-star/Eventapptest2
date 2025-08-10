@@ -984,7 +984,9 @@ export class LocationFeedDiscoverer {
         // Look for "All Events" specifically
         /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*Events[^"']*)["'][^>]*>All Events[^<]*<\/a>/gi,
         // Calendar-specific "All" buttons
-        /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi
+        /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*?RSSFeed\.aspx\?[^"']*?CID=All-calendar\.xml[^"']*?)["'][^>]*>All calendar[^<]*<\/a>/gi
+
       ];
       
       const feedUrls: string[] = [];
