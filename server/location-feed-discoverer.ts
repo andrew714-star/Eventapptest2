@@ -55,27 +55,37 @@ export class LocationFeedDiscoverer {
     '/download/events',
     '/export/calendar',
     '/export/events',
-    // Common API endpoints for downloadable feeds
-    '/api/calendar/export',
-    '/api/events/export',
-    '/api/calendar/download',
-    '/api/events/download',
-    '/api/calendar.ics',
-    '/api/events.ics',
-    '/api/calendar.rss',
-    '/api/events.rss',
+    // Common CMS feed patterns (skip client-side API endpoints)
+    '/calendar/rss',
+    '/events/rss',
+    '/calendar/feed.xml',
+    '/events/feed.xml',
     // WordPress and common CMS patterns
     '/wp-content/uploads/calendar.ics',
     '/?feed=calendar',
     '/?feed=events',
     '/feed/?post_type=event',
     '/feed/?post_type=calendar',
-    // Government-specific patterns
+    // Government-specific patterns  
     '/modules/calendar/calendar.ics',
     '/modules/events/events.ics',
     '/departments/events/calendar.ics',
     '/calendar/icalendar',
     '/events/icalendar',
+    // School district CMS patterns
+    '/calendar/feed',
+    '/events/feed', 
+    '/calendar/calendar.rss',
+    '/events/events.rss',
+    '/calendar/index.rss',
+    '/events/index.rss',
+    // Apptegy CMS (common for school districts)
+    '/calendar.rss',
+    '/events.rss',
+    '/news/feed',
+    // Finalsite CMS patterns
+    '/calendar/feed.rss',
+    '/events/feed.rss',
     // Common query parameter patterns
     '/calendar?format=ics',
     '/events?format=ics',
@@ -354,23 +364,22 @@ export class LocationFeedDiscoverer {
         }
       });
 
-      // Look for JavaScript-generated links in script tags
+      // Look for JavaScript-generated links in script tags (only for actual feed files)
       $('script').each((_, element) => {
         const scriptContent = $(element).html() || '';
-        if (scriptContent.includes('calendar') || scriptContent.includes('events') || scriptContent.includes('.ics') || scriptContent.includes('.rss')) {
-          // Extract URLs from common JavaScript patterns
-          const urlPatterns = [
+        if (scriptContent.includes('.ics') || scriptContent.includes('.rss') || scriptContent.includes('.xml')) {
+          // Extract URLs for actual feed files (not API endpoints)
+          const feedFilePatterns = [
             /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
-            /(['"])(\/[^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
-            /url\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
-            /href\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
-            /action\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g
+            /(['"])(\/[^'"]*(?:calendar|events)\/[^'"]*\.(?:ics|rss|xml))\1/g,
+            /url\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
+            /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g
           ];
           
-          urlPatterns.forEach(pattern => {
+          feedFilePatterns.forEach(pattern => {
             let match;
             while ((match = pattern.exec(scriptContent)) !== null) {
-              if (match[2]) {
+              if (match[2] && !match[2].includes('/api/') && !match[2].includes('/v2/') && !match[2].includes('/v4/')) {
                 const path = match[2].startsWith('/') ? match[2] : new URL(match[2], baseUrl).pathname;
                 discoveredPaths.add(path);
               }
@@ -399,11 +408,23 @@ export class LocationFeedDiscoverer {
 
   private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
+      // Skip API endpoints that are likely to be client-side only
+      if (feedUrl.includes('/api/v') || feedUrl.includes('/cms/') || feedUrl.includes('section_ids=')) {
+        console.log(`Skipping client-side API endpoint: ${feedUrl}`);
+        return null;
+      }
+
+      // Skip URLs that are clearly not feed files
+      if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
+          !feedUrl.includes('calendar') && !feedUrl.includes('events') && !feedUrl.includes('feed')) {
+        return null;
+      }
+
       // For potential feeds that might be behind download buttons, try GET instead of HEAD
       const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') ? 'get' : 'head';
       
       const response = await axios[method](feedUrl, {
-        timeout: 3000,
+        timeout: 4000,
         headers: { 
           'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0',
           'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, application/json, text/html, */*'
@@ -443,9 +464,25 @@ export class LocationFeedDiscoverer {
         confidence = 0.5;
       }
 
-      // Lower confidence for feeds that returned errors but might still work
+      // Reject feeds that returned errors
       if (response.status >= 400) {
-        confidence *= 0.5;
+        console.log(`Feed validation failed for ${feedUrl}: HTTP ${response.status}`);
+        return null;
+      }
+
+      // If this is supposed to be a calendar/RSS feed but has HTML content, likely not a real feed
+      if ((feedUrl.includes('.ics') || feedUrl.includes('.rss')) && 
+          contentType.includes('text/html') && 
+          !actualContent.includes('BEGIN:VCALENDAR') && 
+          !actualContent.includes('<rss')) {
+        console.log(`Feed validation failed for ${feedUrl}: Expected feed format but got HTML`);
+        return null;
+      }
+
+      // Require minimum confidence for discovery
+      if (confidence < 0.5) {
+        console.log(`Feed validation failed for ${feedUrl}: Low confidence (${confidence})`);
+        return null;
       }
 
       // Boost confidence for government domains
