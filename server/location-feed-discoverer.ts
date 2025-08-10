@@ -639,42 +639,27 @@ export class LocationFeedDiscoverer {
     const variations: DiscoveredFeed[] = [];
     
     try {
-      const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
-      
       if (feedUrl.includes('iCalendar.aspx')) {
-        // Dynamic iCalendar parameter combinations based on common patterns
+        // Try common iCalendar parameter combinations - including the ModID pattern
+        const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
         const iCalVariations = [
-          // ModID/CID patterns (common in government CMS)
           `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=All-calendar.ics`,
           `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=1&CID=All-calendar.ics`,
           `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=30&CID=All-calendar.ics`,
-          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=76&CID=All-0`, // Common pattern
           `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=41`,
-          
-          // catID patterns (like your example)
-          `${baseUrl}?catID=41&feed=calendar`,
-          `${baseUrl}?catID=0&feed=calendar`, 
-          `${baseUrl}?catID=all&feed=calendar`,
-          `${baseUrl}?catID=1&feed=calendar`,
-          
-          // Simple parameter patterns
           `${baseUrl}?format=ics`,
           `${baseUrl}?CID=all`,
           `${baseUrl}?calendar=all`,
           `${baseUrl}?type=all`,
           `${baseUrl}?category=all`,
           `${baseUrl}?feed=calendar`,
-          `${baseUrl}?feed=ical`,
-          
-          // Common ID patterns found in various CMS systems
+          // Try with specific calendar IDs that are common
           `${baseUrl}?CID=1`,
-          `${baseUrl}?CID=41`,
-          `${baseUrl}?CID=0`,
-          `${baseUrl}?categoryID=0`,
-          `${baseUrl}?calendarID=1`
+          `${baseUrl}?CID=41`, // Found this ID in Hemet's calendar
+          `${baseUrl}?CID=0`
         ];
         
-        for (const variation of iCalVariations.slice(0, 8)) { // Test more variations
+        for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
           try {
             const response = await axios.get(variation, {
               timeout: 3000,
@@ -709,43 +694,24 @@ export class LocationFeedDiscoverer {
         }
       }
       
-      if (feedUrl.includes('rss.aspx') || feedUrl.includes('RSS')) {
-        // Dynamic RSS parameter combinations
+      if (feedUrl.includes('rss.aspx')) {
+        // Try RSS parameter combinations - including the ModID pattern you mentioned
+        const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
         const rssVariations = [
-          // ModID/CID patterns (common in government CMS)
           `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=All-calendar.xml`,
           `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=1&CID=All-calendar.xml`,
           `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=30&CID=All-calendar.xml`,
-          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=76&CID=All-0`, // Pattern like Hemet
           `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=41`,
-          
-          // catID patterns (like your example)
-          `${baseUrl}?catID=41&feed=calendar`,
-          `${baseUrl}?catID=0&feed=calendar`,
-          `${baseUrl}?catID=all&feed=calendar`,
-          `${baseUrl}?catID=1&feed=calendar`,
-          
-          // Simple parameter patterns
           `${baseUrl}?format=rss`,
           `${baseUrl}?calendar=all`,
           `${baseUrl}?CID=all`,
           `${baseUrl}?type=calendar`,
           `${baseUrl}?feed=xml`,
-          `${baseUrl}?feed=rss`,
-          
-          // Hash to parameter conversion
-          feedUrl.replace('#calendar', '?calendar=all'),
-          feedUrl.replace('#events', '?events=all'),
-          feedUrl.replace('#calendar', '?CID=41'),
-          
-          // Common ID patterns
-          `${baseUrl}?CID=1`,
-          `${baseUrl}?CID=0`,
-          `${baseUrl}?categoryID=0`,
-          `${baseUrl}?calendarID=1`
+          feedUrl.replace('#calendar', '?calendar=all'), // Convert anchor to parameter
+          feedUrl.replace('#calendar', '?CID=41')
         ];
         
-        for (const variation of rssVariations.slice(0, 8)) { // Test more variations
+        for (const variation of rssVariations.slice(0, 5)) {
           try {
             const response = await axios.get(variation, {
               timeout: 3000,
@@ -1008,96 +974,54 @@ export class LocationFeedDiscoverer {
       const html = response.data;
       const baseUrl = new URL(subscriptionUrl);
       
-      // Dynamic iCalendar and RSS feed patterns - handles various URL structures
-      const dynamicFeedPatterns = [
-        // iCalendar patterns with various parameter combinations
-        /<a[^>]+href=["']([^"']*\/(?:common\/modules\/)?iCalendar\/iCalendar\.aspx[^"']*)["'][^>]*>(?:All|All Events|Calendar|iCal|Subscribe)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*\/iCalendar\.aspx[^"']*(?:catID|feed|calendar)[^"']*)["'][^>]*>(?:All|All Events|Calendar|iCal|Subscribe)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*(?:All|calendar)[^"']*)["'][^>]*>(?:All|All Events|Calendar|iCal)[^<]*<\/a>/gi,
-        
-        // RSS patterns with various parameter combinations  
-        /<a[^>]+href=["']([^"']*\/(?:common\/modules\/)?RSS\/rss\.aspx[^"']*)["'][^>]*>(?:All|All Events|RSS|Feed)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*(?:All|calendar)[^"']*)["'][^>]*>(?:All|All Events|RSS|Feed)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*\/rss\.aspx[^"']*(?:catID|feed|calendar)[^"']*)["'][^>]*>(?:All|All Events|RSS|Feed)[^<]*<\/a>/gi,
-        
-        // Generic calendar feed patterns
-        /<a[^>]+href=["']([^"']*calendar[^"']*\.(?:ics|rss|xml)[^"']*)["'][^>]*>(?:All|All Events|Calendar|Download|Export|Subscribe)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*events[^"']*\.(?:ics|rss|xml)[^"']*)["'][^>]*>(?:All|All Events|Events|Download|Export|Subscribe)[^<]*<\/a>/gi,
-        
-        // Parameter-based patterns (like the example you provided)
-        /<a[^>]+href=["']([^"']*\.aspx[^"']*(?:catID|feed|calendar|CID|ModID)[^"']*)["'][^>]*>(?:All|All Events|Calendar|Events|Subscribe|Download)[^<]*<\/a>/gi,
-        
-        // Common government CMS patterns
-        /<a[^>]+href=["']([^"']*\/modules\/[^"']*\.aspx[^"']*(?:calendar|events)[^"']*)["'][^>]*>(?:All|Calendar|Events)[^<]*<\/a>/gi
+      // Look specifically for "All" or "All Events" buttons that link to actual feeds
+      const allEventsPatterns = [
+        // Look for "All" links in calendar sections
+        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
+        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*All[^"']*)["'][^>]*>All<\/a>/gi,
+        // More flexible "All" patterns
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
+        // Look for "All Events" specifically
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*Events[^"']*)["'][^>]*>All Events[^<]*<\/a>/gi,
+        // Calendar-specific "All" buttons
+        /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi
       ];
       
       const feedUrls: string[] = [];
       
-      // Also look for any links with feed-like parameters in href attributes
-      const $html = require('cheerio').load(html);
-      
-      // Find links with calendar/feed-related parameters
-      $html('a[href*=".aspx"]').each((_, element) => {
-        const href = $html(element).attr('href');
-        const text = $html(element).text().toLowerCase();
-        
-        if (href && (
-          href.includes('catID=') || 
-          href.includes('feed=') || 
-          href.includes('calendar') || 
-          href.includes('CID=') ||
-          href.includes('ModID=') ||
-          href.includes('iCalendar') ||
-          href.includes('RSS')
-        ) && (
-          text.includes('all') || 
-          text.includes('calendar') || 
-          text.includes('events') || 
-          text.includes('subscribe') ||
-          text.includes('download') ||
-          text.includes('export') ||
-          text.includes('ical') ||
-          text.includes('rss')
-        )) {
-          feedUrls.push(href);
-        }
-      });
-      
-      // Apply the regex patterns as well
-      for (const pattern of dynamicFeedPatterns) {
+      for (const pattern of allEventsPatterns) {
         const matches = html.match(pattern) || [];
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
           if (urlMatch) {
-            feedUrls.push(urlMatch[1]);
+            let feedUrl = urlMatch[1];
+            
+            // Convert to absolute URL
+            if (!feedUrl.startsWith('http')) {
+              if (feedUrl.startsWith('/')) {
+                feedUrl = `${baseUrl.protocol}//${baseUrl.host}${feedUrl}`;
+              } else {
+                feedUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedUrl}`;
+              }
+            }
+            
+            feedUrls.push(feedUrl);
           }
         }
       }
       
-      // Convert to absolute URLs and remove duplicates
-      const absoluteFeedUrls = [...new Set(feedUrls)].map(feedUrl => {
-        if (!feedUrl.startsWith('http')) {
-          if (feedUrl.startsWith('/')) {
-            return `${baseUrl.protocol}//${baseUrl.host}${feedUrl}`;
-          } else {
-            return `${baseUrl.protocol}//${baseUrl.host}/${feedUrl}`;
-          }
-        }
-        return feedUrl;
-      });
-      
-      console.log(`🎯 Found ${absoluteFeedUrls.length} dynamic feed URLs: ${absoluteFeedUrls.slice(0, 5).join(', ')}`);
+      console.log(`🎯 Found ${feedUrls.length} "All Events" feed URLs: ${feedUrls.slice(0, 3).join(', ')}`);
       
       // Test each discovered feed URL to see if it returns actual feed content
       const workingFeeds: DiscoveredFeed[] = [];
       
-      for (const feedUrl of absoluteFeedUrls.slice(0, 5)) { // Limit testing to prevent too many requests
+      for (const feedUrl of feedUrls.slice(0, 3)) { // Limit testing to prevent too many requests
         const workingFeed = await this.validateAndCreateFeed(feedUrl, location);
         if (workingFeed) {
-          console.log(`✅ Validated working dynamic feed: ${feedUrl}`);
+          console.log(`✅ Validated working feed: ${feedUrl}`);
           workingFeeds.push(workingFeed);
         } else {
-          console.log(`❌ Invalid dynamic feed: ${feedUrl}`);
+          console.log(`❌ Invalid feed: ${feedUrl}`);
         }
       }
       
