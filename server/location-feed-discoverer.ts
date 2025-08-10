@@ -333,7 +333,7 @@ export class LocationFeedDiscoverer {
       });
 
       // Look for download buttons and links that commonly contain feeds
-      $('a[href*=".ics"], a[href*=".rss"], a[href*="download"], a[href*="export"], a[href*="subscribe"]').each((_, element) => {
+      $('a[href*=".ics"], a[href*=".rss"], a[href*=".xml"], a[href*="download"], a[href*="export"], a[href*="subscribe"]').each((_, element) => {
         const href = $(element).attr('href');
         if (href) {
           const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
@@ -371,19 +371,19 @@ export class LocationFeedDiscoverer {
       });
 
       // Look for RSS feed icons and iCalendar subscribe links (like in the screenshots)
-      $('a[href*="ical"], a[title*="iCalendar"], a[title*="Subscribe"], img[src*="rss"], img[alt*="RSS"], a[href*="rss"]').each((_, element) => {
+      $('a[href*="ical"], a[title*="iCalendar"], a[title*="Subscribe"], img[src*="rss"], img[alt*="RSS"], a[href*="rss"], a[href*=".xml"]').each((_, element) => {
         const $el = $(element);
         const href = $el.attr('href');
         const parentHref = $el.parent('a').attr('href');
         
         // Check the link itself
-        if (href && (href.includes('.ics') || href.includes('.rss') || href.includes('feed') || href.includes('ical'))) {
+        if (href && (href.includes('.ics') || href.includes('.rss') || href.includes('.xml') || href.includes('feed') || href.includes('ical'))) {
           const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
           discoveredPaths.add(path);
         }
         
         // Check parent link (for images inside links)
-        if (parentHref && (parentHref.includes('.ics') || parentHref.includes('.rss') || parentHref.includes('feed') || parentHref.includes('ical'))) {
+        if (parentHref && (parentHref.includes('.ics') || parentHref.includes('.rss') || parentHref.includes('.xml') || parentHref.includes('feed') || parentHref.includes('ical'))) {
           const path = parentHref.startsWith('/') ? parentHref : new URL(parentHref, baseUrl).pathname;
           discoveredPaths.add(path);
         }
@@ -439,7 +439,8 @@ export class LocationFeedDiscoverer {
             /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
             /(['"])(\/[^'"]*(?:calendar|events)\/[^'"]*\.(?:ics|rss|xml))\1/g,
             /url\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
-            /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g
+            /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
+            /(['"])(\/[^'"]*(?:calendar|events)[^'"]*\.xml)\1/g
           ];
           
           feedFilePatterns.forEach(pattern => {
