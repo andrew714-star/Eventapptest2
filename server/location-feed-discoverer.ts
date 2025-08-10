@@ -41,8 +41,48 @@ export class LocationFeedDiscoverer {
     '/rss.aspx#calendar',
     '/rss.aspx#events',
     '/calendar.xml',
-    '/events.xml'
-    
+    '/events.xml',
+    // Common download/export patterns
+    '/calendar/download',
+    '/calendar/export',
+    '/events/download',
+    '/events/export',
+    '/calendar/subscribe',
+    '/events/subscribe',
+    '/calendar/ical',
+    '/events/ical',
+    '/download/calendar',
+    '/download/events',
+    '/export/calendar',
+    '/export/events',
+    // Common API endpoints for downloadable feeds
+    '/api/calendar/export',
+    '/api/events/export',
+    '/api/calendar/download',
+    '/api/events/download',
+    '/api/calendar.ics',
+    '/api/events.ics',
+    '/api/calendar.rss',
+    '/api/events.rss',
+    // WordPress and common CMS patterns
+    '/wp-content/uploads/calendar.ics',
+    '/?feed=calendar',
+    '/?feed=events',
+    '/feed/?post_type=event',
+    '/feed/?post_type=calendar',
+    // Government-specific patterns
+    '/modules/calendar/calendar.ics',
+    '/modules/events/events.ics',
+    '/departments/events/calendar.ics',
+    '/calendar/icalendar',
+    '/events/icalendar',
+    // Common query parameter patterns
+    '/calendar?format=ics',
+    '/events?format=ics',
+    '/calendar?export=ics',
+    '/events?export=ics',
+    '/calendar?download=1',
+    '/events?download=1'
   ];
 
   private governmentDomainPatterns = [
@@ -254,8 +294,90 @@ export class LocationFeedDiscoverer {
         }
       });
 
+      // Look for download buttons and links that commonly contain feeds
+      $('a[href*=".ics"], a[href*=".rss"], a[href*="download"], a[href*="export"], a[href*="subscribe"]').each((_, element) => {
+        const href = $(element).attr('href');
+        if (href) {
+          const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Look for buttons with common download/export text
+      $('button:contains("Download"), a:contains("Download"), button:contains("Export"), a:contains("Export"), button:contains("Subscribe"), a:contains("Subscribe")').each((_, element) => {
+        const $el = $(element);
+        // Check for onclick handlers or data attributes that might reveal feed URLs
+        const onclick = $el.attr('onclick');
+        const dataUrl = $el.attr('data-url') || $el.attr('data-href');
+        
+        if (onclick && (onclick.includes('.ics') || onclick.includes('.rss') || onclick.includes('calendar') || onclick.includes('feed'))) {
+          // Extract URL from onclick handler
+          const urlMatch = onclick.match(/['"]([^'"]*\.(?:ics|rss|xml)|[^'"]*(?:calendar|feed)[^'"]*)['"]/) || 
+                           onclick.match(/window\.open\(['"]([^'"]*)['"]/) || 
+                           onclick.match(/location\.href\s*=\s*['"]([^'"]*)['"]/) ||
+                           onclick.match(/downloadFile\(['"]([^'"]*)['"]/) ||
+                           onclick.match(/export\w*\(['"]([^'"]*)['"]/) ||
+                           onclick.match(/subscribe\w*\(['"]([^'"]*)['"]/) ||
+                           onclick.match(/['"]([^'"]*(?:api|download|export)[^'"]*)['"]/)
+                           
+          if (urlMatch && urlMatch[1]) {
+            const path = urlMatch[1].startsWith('/') ? urlMatch[1] : new URL(urlMatch[1], baseUrl).pathname;
+            discoveredPaths.add(path);
+          }
+        }
+        
+        if (dataUrl) {
+          const path = dataUrl.startsWith('/') ? dataUrl : new URL(dataUrl, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Look for form submissions that might generate feeds
+      $('form[action*="calendar"], form[action*="events"], form[action*="export"], form[action*="download"]').each((_, element) => {
+        const action = $(element).attr('action');
+        if (action) {
+          const path = action.startsWith('/') ? action : new URL(action, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
       // Add common paths to check
       this.commonFeedPaths.forEach(path => discoveredPaths.add(path));
+
+      // Look for meta tags that might indicate RSS/Calendar feeds
+      $('link[rel="alternate"]').each((_, element) => {
+        const href = $(element).attr('href');
+        const type = $(element).attr('type');
+        if (href && (type?.includes('calendar') || type?.includes('rss') || type?.includes('xml') || href.includes('.ics') || href.includes('.rss'))) {
+          const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Look for JavaScript-generated links in script tags
+      $('script').each((_, element) => {
+        const scriptContent = $(element).html() || '';
+        if (scriptContent.includes('calendar') || scriptContent.includes('events') || scriptContent.includes('.ics') || scriptContent.includes('.rss')) {
+          // Extract URLs from common JavaScript patterns
+          const urlPatterns = [
+            /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
+            /(['"])(\/[^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
+            /url\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
+            /href\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g,
+            /action\s*:\s*(['"])([^'"]*(?:calendar|events|download|export)[^'"]*)\1/g
+          ];
+          
+          urlPatterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(scriptContent)) !== null) {
+              if (match[2]) {
+                const path = match[2].startsWith('/') ? match[2] : new URL(match[2], baseUrl).pathname;
+                discoveredPaths.add(path);
+              }
+            }
+          });
+        }
+      });
 
       // Check each discovered path for feeds
       for (const path of Array.from(discoveredPaths).slice(0, 10)) { // Limit to 10 paths per domain
@@ -277,29 +399,53 @@ export class LocationFeedDiscoverer {
 
   private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
-      const response = await axios.head(feedUrl, {
-        timeout: 2000, // Reduced from 3000ms
-        headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
-        maxRedirects: 3
+      // For potential feeds that might be behind download buttons, try GET instead of HEAD
+      const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') ? 'get' : 'head';
+      
+      const response = await axios[method](feedUrl, {
+        timeout: 3000,
+        headers: { 
+          'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0',
+          'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, application/json, text/html, */*'
+        },
+        maxRedirects: 5, // Allow more redirects for download links
+        validateStatus: (status) => status < 500 // Accept 404s but check content
       });
 
       const contentType = response.headers['content-type'] || '';
       let feedType: 'ical' | 'rss' | 'json' | 'html' = 'html';
       let confidence = 0.3; // Base confidence
 
-      // Determine feed type and confidence based on content type and URL
-      if (contentType.includes('text/calendar') || feedUrl.endsWith('.ics')) {
+      // For GET requests, we have actual content to validate
+      let actualContent = '';
+      if (method === 'get' && response.data) {
+        actualContent = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      }
+
+      // Determine feed type and confidence based on content type, URL, and actual content
+      if (contentType.includes('text/calendar') || feedUrl.endsWith('.ics') || actualContent.includes('BEGIN:VCALENDAR') || actualContent.includes('BEGIN:VEVENT')) {
         feedType = 'ical';
-        confidence = 0.9;
-      } else if (contentType.includes('application/rss') || contentType.includes('xml') || feedUrl.includes('rss') || feedUrl.includes('.xml')) {
+        confidence = actualContent.includes('BEGIN:VCALENDAR') ? 0.95 : 0.9;
+      } else if (contentType.includes('application/rss') || contentType.includes('xml') || feedUrl.includes('rss') || feedUrl.includes('.xml') || 
+                 actualContent.includes('<rss') || actualContent.includes('<feed') || actualContent.includes('<item') || actualContent.includes('<entry')) {
         feedType = 'rss';
-        confidence = 0.8;
+        confidence = actualContent.includes('<rss') || actualContent.includes('<feed') ? 0.85 : 0.8;
       } else if (contentType.includes('application/json') || feedUrl.includes('api') || feedUrl.includes('.json')) {
         feedType = 'json';
-        confidence = 0.7;
+        try {
+          const jsonData = JSON.parse(actualContent || '{}');
+          confidence = (jsonData.events || jsonData.items || jsonData.data || Array.isArray(jsonData)) ? 0.75 : 0.7;
+        } catch {
+          confidence = 0.7;
+        }
       } else if (feedUrl.includes('calendar') || feedUrl.includes('events')) {
         feedType = 'html';
         confidence = 0.5;
+      }
+
+      // Lower confidence for feeds that returned errors but might still work
+      if (response.status >= 400) {
+        confidence *= 0.5;
       }
 
       // Boost confidence for government domains

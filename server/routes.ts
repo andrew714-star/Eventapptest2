@@ -6,6 +6,8 @@ import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
 import { feedDiscoverer } from './location-feed-discoverer';
 import { cityDiscoverer } from './us-cities-database';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -958,6 +960,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Add discovered feed error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Debug endpoint to test feed discovery patterns on specific websites
+  app.post("/api/debug-feed-discovery", async (req, res) => {
+    try {
+      const { websiteUrl } = req.body;
+      
+      if (!websiteUrl) {
+        return res.status(400).json({ error: "websiteUrl is required" });
+      }
+
+      console.log(`\n=== DEBUG: Analyzing ${websiteUrl} for downloadable feeds ===`);
+
+      const response = await axios.get(websiteUrl, {
+        timeout: 5000,
+        headers: { 
+          'User-Agent': 'CityWide Events Calendar Debug Bot 1.0',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        maxRedirects: 3
+      });
+
+      const $ = cheerio.load(response.data);
+      const discoveredPatterns: {
+        directLinks: { href: string; text: string }[];
+        downloadButtons: { href: string; text: string }[];
+        exportButtons: { onclick: string | undefined; dataUrl: string | undefined; text: string }[];
+        subscribeButtons: { href: string | undefined; onclick: string | undefined; text: string }[];
+        metaLinks: { href: string | undefined; type: string | undefined; title: string | undefined }[];
+        jsPatterns: string[];
+        formActions: { action: string | undefined; method: string }[];
+        commonPaths: string[];
+      } = {
+        directLinks: [],
+        downloadButtons: [],
+        exportButtons: [],
+        subscribeButtons: [],
+        metaLinks: [],
+        jsPatterns: [],
+        formActions: [],
+        commonPaths: []
+      };
+
+      // Direct calendar/events links
+      $('a[href*="calendar"], a[href*="events"]').each((_, element) => {
+        const href = $(element).attr('href');
+        const text = $(element).text().trim();
+        if (href) {
+          discoveredPatterns.directLinks.push({ href, text });
+        }
+      });
+
+      // Download-related links
+      $('a[href*=".ics"], a[href*=".rss"], a[href*="download"], a[href*="export"], a[href*="subscribe"]').each((_, element) => {
+        const href = $(element).attr('href');
+        const text = $(element).text().trim();
+        if (href) {
+          discoveredPatterns.downloadButtons.push({ href, text });
+        }
+      });
+
+      // Buttons with download/export text
+      $('button:contains("Download"), a:contains("Download")').each((_, element) => {
+        const $el = $(element);
+        const onclick = $el.attr('onclick');
+        const dataUrl = $el.attr('data-url') || $el.attr('data-href');
+        const text = $el.text().trim();
+        discoveredPatterns.exportButtons.push({ onclick, dataUrl, text });
+      });
+
+      // Subscribe buttons
+      $('button:contains("Subscribe"), a:contains("Subscribe")').each((_, element) => {
+        const $el = $(element);
+        const href = $el.attr('href');
+        const onclick = $el.attr('onclick');
+        const text = $el.text().trim();
+        discoveredPatterns.subscribeButtons.push({ href, onclick, text });
+      });
+
+      // Meta links
+      $('link[rel="alternate"]').each((_, element) => {
+        const href = $(element).attr('href');
+        const type = $(element).attr('type');
+        const title = $(element).attr('title');
+        discoveredPatterns.metaLinks.push({ href, type, title });
+      });
+
+      // JavaScript patterns
+      $('script').each((_, element) => {
+        const scriptContent = $(element).html() || '';
+        if (scriptContent.includes('calendar') || scriptContent.includes('events') || scriptContent.includes('.ics') || scriptContent.includes('.rss')) {
+          const matches: string[] = [];
+          const patterns = [
+            /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
+            /(['"])(\/[^'"]*(?:calendar|events|download|export)[^'"]*)\1/g
+          ];
+          
+          patterns.forEach(pattern => {
+            let match;
+            while ((match = pattern.exec(scriptContent)) !== null) {
+              if (match[2]) matches.push(match[2]);
+            }
+          });
+          
+          if (matches.length > 0) {
+            discoveredPatterns.jsPatterns.push(...matches);
+          }
+        }
+      });
+
+      // Form actions
+      $('form[action*="calendar"], form[action*="events"], form[action*="export"], form[action*="download"]').each((_, element) => {
+        const action = $(element).attr('action');
+        const method = $(element).attr('method') || 'GET';
+        discoveredPatterns.formActions.push({ action, method });
+      });
+
+      res.json({
+        success: true,
+        websiteUrl,
+        discoveredPatterns,
+        totalPatterns: Object.values(discoveredPatterns).flat().length,
+        recommendations: {
+          highConfidenceFeeds: [
+            ...discoveredPatterns.metaLinks.map(meta => ({ type: 'meta', ...meta })),
+            ...discoveredPatterns.downloadButtons.map(btn => ({ type: 'download', ...btn }))
+          ],
+          mediumConfidenceFeeds: [
+            ...discoveredPatterns.directLinks.map(link => ({ type: 'direct', ...link })),
+            ...discoveredPatterns.jsPatterns.map(pattern => ({ type: 'js', href: pattern, text: 'JavaScript Pattern' }))
+          ],
+          requiresInteraction: [
+            ...discoveredPatterns.exportButtons.map(btn => ({ type: 'export', ...btn })),
+            ...discoveredPatterns.formActions.map(form => ({ type: 'form', ...form, text: 'Form Action' }))
+          ]
+        }
+      });
+
+    } catch (error) {
+      console.error("Debug feed discovery error:", error);
+      res.status(500).json({ error: "Failed to analyze website", details: String(error) });
     }
   });
 
