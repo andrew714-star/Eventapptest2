@@ -513,20 +513,20 @@ export class LocationFeedDiscoverer {
       }
 
       // First verify the domain/website exists before checking feed URLs
-      const baseUrl = new URL(feedUrl).origin;
+      const feedDomain = new URL(feedUrl).origin;
       try {
-        const domainCheck = await axios.get(baseUrl, {
+        const domainCheck = await axios.get(feedDomain, {
           timeout: 2000,
           headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
           validateStatus: (status) => status < 500
         });
         
         if (domainCheck.status >= 400) {
-          console.log(`Domain ${baseUrl} not accessible (${domainCheck.status}) - skipping feed: ${feedUrl}`);
+          console.log(`Domain ${feedDomain} not accessible (${domainCheck.status}) - skipping feed: ${feedUrl}`);
           return null;
         }
       } catch (error) {
-        console.log(`Domain ${baseUrl} not accessible - skipping feed: ${feedUrl}`);
+        console.log(`Domain ${feedDomain} not accessible - skipping feed: ${feedUrl}`);
         return null;
       }
 
@@ -793,20 +793,20 @@ export class LocationFeedDiscoverer {
   private async parseSubscriptionPageForFeeds(subscriptionUrl: string): Promise<string[]> {
     try {
       // First verify the website exists
-      const baseUrl = new URL(subscriptionUrl).origin;
+      const subscriptionDomain = new URL(subscriptionUrl).origin;
       try {
-        const domainCheck = await axios.get(baseUrl, {
+        const domainCheck = await axios.get(subscriptionDomain, {
           timeout: 2000,
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
         
         if (domainCheck.status >= 400) {
-          console.log(`Domain ${baseUrl} not accessible - skipping subscription page parsing`);
+          console.log(`Domain ${subscriptionDomain} not accessible - skipping subscription page parsing`);
           return [];
         }
       } catch (error) {
-        console.log(`Domain ${baseUrl} not accessible - skipping subscription page parsing`);
+        console.log(`Domain ${subscriptionDomain} not accessible - skipping subscription page parsing`);
         return [];
       }
 
@@ -951,20 +951,20 @@ export class LocationFeedDiscoverer {
     
     try {
       // First verify the website exists
-      const baseUrl = new URL(calendarPageUrl).origin;
+      const calendarDomain = new URL(calendarPageUrl).origin;
       try {
-        const domainCheck = await axios.get(baseUrl, {
+        const domainCheck = await axios.get(calendarDomain, {
           timeout: 2000,
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
         
         if (domainCheck.status >= 400) {
-          console.log(`❌ Domain ${baseUrl} not accessible - skipping calendar page analysis`);
+          console.log(`❌ Domain ${calendarDomain} not accessible - skipping calendar page analysis`);
           return [];
         }
       } catch (error) {
-        console.log(`❌ Domain ${baseUrl} not accessible - skipping calendar page analysis`);
+        console.log(`❌ Domain ${calendarDomain} not accessible - skipping calendar page analysis`);
         return [];
       }
 
