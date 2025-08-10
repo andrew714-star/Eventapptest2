@@ -92,7 +92,35 @@ export class LocationFeedDiscoverer {
     '/calendar?export=ics',
     '/events?export=ics',
     '/calendar?download=1',
-    '/events?download=1'
+    '/events?download=1',
+    // Department-specific calendar patterns (based on screenshots)
+    '/calendar/building-department/rss',
+    '/calendar/city-council/rss',
+    '/calendar/fire-department/rss',
+    '/calendar/police-department/rss',
+    '/calendar/public-works/rss',
+    '/calendar/planning-department/rss',
+    '/calendar/main-calendar/rss',
+    '/calendar/all/rss',
+    '/calendar/housing/rss',
+    // Alternative department feed formats
+    '/calendar/building-department.rss',
+    '/calendar/city-council.rss',
+    '/calendar/fire-department.rss',
+    '/calendar/police-department.rss',
+    '/calendar/public-works.rss',
+    '/calendar/planning-department.rss',
+    '/calendar/main-calendar.rss',
+    '/calendar/all.rss',
+    // iCalendar versions of department feeds
+    '/calendar/building-department.ics',
+    '/calendar/city-council.ics',
+    '/calendar/fire-department.ics',
+    '/calendar/police-department.ics',
+    '/calendar/public-works.ics',
+    '/calendar/planning-department.ics',
+    '/calendar/main-calendar.ics',
+    '/calendar/all.ics'
   ];
 
   private governmentDomainPatterns = [
@@ -342,6 +370,44 @@ export class LocationFeedDiscoverer {
         }
       });
 
+      // Look for RSS feed icons and iCalendar subscribe links (like in the screenshots)
+      $('a[href*="ical"], a[title*="iCalendar"], a[title*="Subscribe"], img[src*="rss"], img[alt*="RSS"], a[href*="rss"]').each((_, element) => {
+        const $el = $(element);
+        const href = $el.attr('href');
+        const parentHref = $el.parent('a').attr('href');
+        
+        // Check the link itself
+        if (href && (href.includes('.ics') || href.includes('.rss') || href.includes('feed') || href.includes('ical'))) {
+          const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+        
+        // Check parent link (for images inside links)
+        if (parentHref && (parentHref.includes('.ics') || parentHref.includes('.rss') || parentHref.includes('feed') || parentHref.includes('ical'))) {
+          const path = parentHref.startsWith('/') ? parentHref : new URL(parentHref, baseUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Look for calendar category links that might have individual RSS feeds
+      $('a:contains("Calendar"), a:contains("Department"), a[href*="calendar"]').each((_, element) => {
+        const $el = $(element);
+        const href = $el.attr('href');
+        const text = $el.text().toLowerCase();
+        
+        if (href && (text.includes('calendar') || text.includes('department') || text.includes('city'))) {
+          // Try common feed variations for calendar category pages
+          const basePath = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
+          
+          // Add potential feed URLs for this calendar category
+          discoveredPaths.add(`${basePath}/feed`);
+          discoveredPaths.add(`${basePath}.rss`);
+          discoveredPaths.add(`${basePath}/rss`);
+          discoveredPaths.add(`${basePath}.ics`);
+          discoveredPaths.add(`${basePath}/ical`);
+        }
+      });
+
       // Look for form submissions that might generate feeds
       $('form[action*="calendar"], form[action*="events"], form[action*="export"], form[action*="download"]').each((_, element) => {
         const action = $(element).attr('action');
@@ -388,8 +454,29 @@ export class LocationFeedDiscoverer {
         }
       });
 
+      // Add department-specific feed patterns if we detect a calendar system
+      const hasCalendarSystem = response.data.includes('calendar') || 
+                                response.data.includes('Calendar') ||
+                                discoveredPaths.size > 0;
+      
+      if (hasCalendarSystem) {
+        // Add common department feed patterns that might not be linked but exist
+        const commonDepartments = [
+          'all', 'main-calendar', 'city-calendar', 'city-council', 'planning',
+          'building', 'fire', 'police', 'public-works', 'parks', 'library',
+          'utilities', 'administration', 'mayor', 'clerk'
+        ];
+        
+        commonDepartments.forEach(dept => {
+          discoveredPaths.add(`/calendar/${dept}.rss`);
+          discoveredPaths.add(`/calendar/${dept}.ics`);
+          discoveredPaths.add(`/calendar/${dept}/rss`);
+          discoveredPaths.add(`/calendar/${dept}/ical`);
+        });
+      }
+
       // Check each discovered path for feeds
-      for (const path of Array.from(discoveredPaths).slice(0, 10)) { // Limit to 10 paths per domain
+      for (const path of Array.from(discoveredPaths).slice(0, 20)) { // Increased limit for department feeds
         const feedUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
         const feed = await this.validateFeedUrl(feedUrl, location);
         
@@ -414,14 +501,40 @@ export class LocationFeedDiscoverer {
         return null;
       }
 
-      // Skip URLs that are clearly not feed files
+      // Skip URLs that are clearly not feed files (but allow common subscription pages)
+      const isSubscriptionPage = feedUrl.includes('iCalendar.aspx') || 
+                                 feedUrl.includes('rss.aspx') || 
+                                 feedUrl.includes('calendar.aspx') ||
+                                 feedUrl.includes('subscribe');
+      
       if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
-          !feedUrl.includes('calendar') && !feedUrl.includes('events') && !feedUrl.includes('feed')) {
+          !feedUrl.includes('calendar') && !feedUrl.includes('events') && !feedUrl.includes('feed') && 
+          !isSubscriptionPage) {
         return null;
       }
 
+      // Handle subscription pages by parsing them to find actual feed URLs
+      if (isSubscriptionPage) {
+        const discoveredUrls = await this.parseSubscriptionPageForFeeds(feedUrl);
+        if (discoveredUrls.length > 0) {
+          // Try each discovered URL to see if it works
+          for (const discoveredUrl of discoveredUrls) {
+            const workingFeed = await this.validateAndCreateFeed(discoveredUrl, location);
+            if (workingFeed) {
+              return workingFeed;
+            }
+          }
+        }
+        
+        // If no feeds found in the page, try common parameter variations
+        const parameterVariations = await this.trySubscriptionPageParameters(feedUrl, location);
+        if (parameterVariations.length > 0) {
+          return parameterVariations[0];
+        }
+      }
+
       // For potential feeds that might be behind download buttons, try GET instead of HEAD
-      const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') ? 'get' : 'head';
+      const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') || isSubscriptionPage ? 'get' : 'head';
       
       const response = await axios[method](feedUrl, {
         timeout: 4000,
@@ -509,6 +622,261 @@ export class LocationFeedDiscoverer {
         lastChecked: new Date()
       };
 
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private async trySubscriptionPageParameters(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
+    const variations: DiscoveredFeed[] = [];
+    
+    try {
+      if (feedUrl.includes('iCalendar.aspx')) {
+        // Try common iCalendar parameter combinations - including the ModID pattern
+        const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
+        const iCalVariations = [
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=All-calendar.ics`,
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=1&CID=All-calendar.ics`,
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=30&CID=All-calendar.ics`,
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=41`,
+          `${baseUrl}?format=ics`,
+          `${baseUrl}?CID=all`,
+          `${baseUrl}?calendar=all`,
+          `${baseUrl}?type=all`,
+          `${baseUrl}?category=all`,
+          `${baseUrl}?feed=calendar`,
+          // Try with specific calendar IDs that are common
+          `${baseUrl}?CID=1`,
+          `${baseUrl}?CID=41`, // Found this ID in Hemet's calendar
+          `${baseUrl}?CID=0`
+        ];
+        
+        for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
+          try {
+            const response = await axios.get(variation, {
+              timeout: 3000,
+              headers: { 
+                'User-Agent': 'CityWide Events Calendar Bot 1.0',
+                'Accept': 'text/calendar, application/calendar, text/plain, */*'
+              },
+              maxRedirects: 3
+            });
+            
+            // Check if this returns actual calendar data
+            if (response.data.includes('BEGIN:VCALENDAR') || response.headers['content-type']?.includes('text/calendar')) {
+              variations.push({
+                source: {
+                  id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-ical-${Date.now()}`,
+                  name: `${this.generateSourceName(location)} (iCalendar)`,
+                  city: location.city,
+                  state: location.state,
+                  type: location.organizationType as any,
+                  feedUrl: variation,
+                  websiteUrl: new URL(variation).origin,
+                  isActive: true,
+                  feedType: 'ical' as const
+                },
+                confidence: 0.9,
+                lastChecked: new Date()
+              });
+            }
+          } catch (error) {
+            // Continue trying other variations
+          }
+        }
+      }
+      
+      if (feedUrl.includes('rss.aspx')) {
+        // Try RSS parameter combinations - including the ModID pattern you mentioned
+        const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
+        const rssVariations = [
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=All-calendar.xml`,
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=1&CID=All-calendar.xml`,
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=30&CID=All-calendar.xml`,
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=41`,
+          `${baseUrl}?format=rss`,
+          `${baseUrl}?calendar=all`,
+          `${baseUrl}?CID=all`,
+          `${baseUrl}?type=calendar`,
+          `${baseUrl}?feed=xml`,
+          feedUrl.replace('#calendar', '?calendar=all'), // Convert anchor to parameter
+          feedUrl.replace('#calendar', '?CID=41')
+        ];
+        
+        for (const variation of rssVariations.slice(0, 5)) {
+          try {
+            const response = await axios.get(variation, {
+              timeout: 3000,
+              headers: { 
+                'User-Agent': 'CityWide Events Calendar Bot 1.0',
+                'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+              },
+              maxRedirects: 3
+            });
+            
+            // Check if this returns actual RSS data
+            if (response.data.includes('<rss') || response.data.includes('<feed') || response.headers['content-type']?.includes('xml')) {
+              variations.push({
+                source: {
+                  id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-rss-${Date.now()}`,
+                  name: `${this.generateSourceName(location)} (RSS)`,
+                  city: location.city,
+                  state: location.state,
+                  type: location.organizationType as any,
+                  feedUrl: variation,
+                  websiteUrl: new URL(variation).origin,
+                  isActive: true,
+                  feedType: 'rss' as const
+                },
+                confidence: 0.85,
+                lastChecked: new Date()
+              });
+            }
+          } catch (error) {
+            // Continue trying other variations
+          }
+        }
+      }
+    } catch (error) {
+      console.log(`Error trying subscription page parameters for ${feedUrl}:`, error);
+    }
+    
+    return variations;
+  }
+
+  private async parseSubscriptionPageForFeeds(subscriptionUrl: string): Promise<string[]> {
+    try {
+      const response = await axios.get(subscriptionUrl, {
+        timeout: 5000,
+        headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
+      });
+      
+      const feedUrls: string[] = [];
+      const html = response.data;
+      const baseUrl = new URL(subscriptionUrl);
+      
+      // Look for any RSS/iCalendar feed URLs with parameters (flexible pattern)
+      const patterns = [
+        // RSS Feed patterns
+        /RSSFeed\.aspx\?[^"'>\s]+/g,
+        /rssfeed\.aspx\?[^"'>\s]+/gi,
+        /rss\.aspx\?[^"'>\s]+/gi,
+        // iCalendar patterns  
+        /iCalendarFeed\.aspx\?[^"'>\s]+/g,
+        /icalendarfeed\.aspx\?[^"'>\s]+/gi,
+        /iCalendar\.aspx\?[^"'>\s]+/gi,
+        /icalendar\.aspx\?[^"'>\s]+/gi,
+        // Generic calendar feed patterns
+        /calendar\.aspx\?[^"'>\s]*(?:format|export|rss|ical|xml)[^"'>\s]*/gi,
+        // Direct file patterns in href attributes
+        /href=["']([^"']*(?:ModID|CID)[^"']*\.(?:xml|ics))[^"']*/gi,
+        /href=["']([^"']*(?:\.ics|\.xml|calendar\.xml|events\.xml|rss\.xml)[^"']*)["']/gi
+      ];
+      
+      for (const pattern of patterns) {
+        const matches = html.match(pattern) || [];
+        for (const match of matches) {
+          let feedPath = match;
+          
+          // Extract URL from href attribute if needed
+          if (match.includes('href=')) {
+            const hrefMatch = match.match(/href=["']([^"']*)["']/i);
+            if (hrefMatch) {
+              feedPath = hrefMatch[1];
+            }
+          }
+          
+          // Clean up the path
+          feedPath = feedPath.replace(/^["']|["']$/g, '');
+          
+          // Convert to absolute URL
+          let fullUrl: string;
+          if (feedPath.startsWith('http')) {
+            fullUrl = feedPath;
+          } else if (feedPath.startsWith('/')) {
+            fullUrl = `${baseUrl.protocol}//${baseUrl.host}${feedPath}`;
+          } else {
+            fullUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedPath}`;
+          }
+          
+          feedUrls.push(fullUrl);
+        }
+      }
+      
+      // Also look for JavaScript variables that might contain feed URLs
+      const jsPatterns = [
+        /feedUrl\s*[:=]\s*["']([^"']+)["']/gi,
+        /rssUrl\s*[:=]\s*["']([^"']+)["']/gi,
+        /calendarUrl\s*[:=]\s*["']([^"']+)["']/gi
+      ];
+      
+      for (const jsPattern of jsPatterns) {
+        const matches = html.match(jsPattern) || [];
+        for (const match of matches) {
+          const urlMatch = match.match(/["']([^"']+)["']/);
+          if (urlMatch) {
+            const jsUrl = urlMatch[1];
+            if (jsUrl.includes('aspx') && (jsUrl.includes('ModID') || jsUrl.includes('CID'))) {
+              const fullUrl = jsUrl.startsWith('http') ? jsUrl : `${baseUrl.protocol}//${baseUrl.host}${jsUrl.startsWith('/') ? '' : '/'}${jsUrl}`;
+              feedUrls.push(fullUrl);
+            }
+          }
+        }
+      }
+      
+      console.log(`Found ${feedUrls.length} potential feed URLs in subscription page:`, feedUrls.slice(0, 3));
+      return [...new Set(feedUrls)]; // Remove duplicates
+    } catch (error) {
+      console.log(`Error parsing subscription page ${subscriptionUrl}:`, error);
+      return [];
+    }
+  }
+
+  private async validateAndCreateFeed(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
+    try {
+      const response = await axios.get(feedUrl, {
+        timeout: 4000,
+        headers: { 
+          'User-Agent': 'CityWide Events Calendar Bot 1.0',
+          'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, */*'
+        },
+        maxRedirects: 3
+      });
+
+      // Check if this is actual feed content
+      const isValidFeed = response.data.includes('BEGIN:VCALENDAR') || 
+                         response.data.includes('<rss') || 
+                         response.data.includes('<feed') ||
+                         response.headers['content-type']?.includes('text/calendar') ||
+                         response.headers['content-type']?.includes('xml');
+
+      if (!isValidFeed) {
+        return null;
+      }
+
+      // Determine feed type
+      let feedType: 'rss' | 'ical' | 'html' = 'html';
+      if (response.data.includes('BEGIN:VCALENDAR') || response.headers['content-type']?.includes('text/calendar')) {
+        feedType = 'ical';
+      } else if (response.data.includes('<rss') || response.data.includes('<feed') || response.headers['content-type']?.includes('xml')) {
+        feedType = 'rss';
+      }
+
+      return {
+        source: {
+          id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-${feedType}-${Date.now()}`,
+          name: `${this.generateSourceName(location)} (${feedType.toUpperCase()})`,
+          city: location.city,
+          state: location.state,
+          type: location.organizationType as any,
+          feedUrl: feedUrl,
+          websiteUrl: new URL(feedUrl).origin,
+          isActive: true,
+          feedType: feedType
+        },
+        confidence: 0.95, // High confidence since we validated the content
+        lastChecked: new Date()
+      };
     } catch (error) {
       return null;
     }
