@@ -490,7 +490,7 @@ export class CalendarFeedCollector {
       }
 
       console.log(`Successfully parsed ${parsedEvents.length} future events from iCal feed: ${source.feedUrl}`);
-      return parsedEvents.slice(0, 10); // Limit to 10 events per source
+      return parsedEvents.slice(0, 100); // Limit to 10 events per source
     } catch (error) {
       console.error(`Failed to parse iCal feed ${source.feedUrl}:`, error);
       throw new Error(`Failed to parse iCal feed: ${error}`);
@@ -827,7 +827,7 @@ export class CalendarFeedCollector {
             // Use a more comprehensive approach - look for ANY content with dates and general event keywords
             const generalEventKeywords = [
                 // Meetings and governance
-                'meeting', 'agenda', 'session', 'hearing', 'vote',
+                'meeting', 'session', 'hearing', 'vote',
 
                 // Events and activities
                 'event', 'activity', 'program', 'celebration', 'festival', 'fair',
@@ -842,7 +842,7 @@ export class CalendarFeedCollector {
                 'information', 'presentation', 'forum', 'discussion',
 
                 // Calendar/timing
-                'schedule', 'calendar', 'date', 'time', 'day', 'week', 'month',
+                'schedule', 'calendar', 'date', 'time', 'day', 'week', 'month', 'activity',
                 'holiday', 'break', 'vacation', 'closed', 'early', 'release'
             ];
 
@@ -851,7 +851,7 @@ export class CalendarFeedCollector {
 
             // Strategy 1: Look in structured content areas first
             const contentSelectors = [
-                '.calendar,.events-list, .event-list-item, .events, .news, .announcements, .activities, .event-cal-content',
+                '.calendar,.events-list, .event-list-item, .events, .news, .announcements, .activities, .event-cal-content .event-card .event-content-card .event-info',
                 '.content, .main-content, .page-content',
                 'article, section, .post, .item',
                 'table tr, li, .row, .card, .box',
@@ -1660,7 +1660,7 @@ export class CalendarFeedCollector {
    */
   private extractEventTitle(text: string, $element: any): string {
     // Strategy 1: Look for headings in the element
-    const headings = $element.find('h1, h2, h3, h4, h5, h6, .title, .heading, .event-title').first();
+    const headings = $element.find('h1, h2, h3, h4, h5, h6, .title, .heading, .event-title .event-list-item.events-card').first();
     if (headings.length && headings.text().trim()) {
       const headingText = headings.text().trim();
       if (headingText.length > 5 && headingText.length < 150) {

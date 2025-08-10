@@ -37,7 +37,12 @@ export class LocationFeedDiscoverer {
     '/api/calendar',
     '/feeds/calendar',
     '/feeds/events',
-    '/ICalendarHandler?calendarId=12712452'
+    '/ICalendarHandler?calendarId=12712452',
+    '/rss.aspx#calendar',
+    '/rss.aspx#events',
+    '/calendar.xml',
+    '/events.xml'
+    
   ];
 
   private governmentDomainPatterns = [
