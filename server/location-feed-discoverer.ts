@@ -640,23 +640,19 @@ export class LocationFeedDiscoverer {
     
     try {
       if (feedUrl.includes('iCalendar.aspx')) {
-        // Try common iCalendar parameter combinations - including the ModID pattern
+        // Try common iCalendar parameter combinations without hardcoded ModIDs
         const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
         const iCalVariations = [
-          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=All-calendar.ics`,
-          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=1&CID=All-calendar.ics`,
-          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=30&CID=All-calendar.ics`,
-          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?ModID=58&CID=41`,
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?CID=All-calendar.ics`,
+          `${baseUrl.replace('iCalendar.aspx', 'iCalendarFeed.aspx')}?CID=all`,
           `${baseUrl}?format=ics`,
-          `${baseUrl}?CID=all`,
           `${baseUrl}?calendar=all`,
           `${baseUrl}?type=all`,
           `${baseUrl}?category=all`,
           `${baseUrl}?feed=calendar`,
-          // Try with specific calendar IDs that are common
           `${baseUrl}?CID=1`,
-          `${baseUrl}?CID=41`, // Found this ID in Hemet's calendar
-          `${baseUrl}?CID=0`
+          `${baseUrl}?CID=0`,
+          `${baseUrl}?export=ics`
         ];
         
         for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
@@ -695,20 +691,19 @@ export class LocationFeedDiscoverer {
       }
       
       if (feedUrl.includes('rss.aspx')) {
-        // Try RSS parameter combinations - including the ModID pattern you mentioned
+        // Try RSS parameter combinations without hardcoded ModIDs
         const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
         const rssVariations = [
-          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=All-calendar.xml`,
-          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=1&CID=All-calendar.xml`,
-          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=30&CID=All-calendar.xml`,
-          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?ModID=58&CID=41`,
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?CID=All-calendar.xml`,
+          `${baseUrl.replace('rss.aspx', 'RSSFeed.aspx')}?CID=all`,
           `${baseUrl}?format=rss`,
           `${baseUrl}?calendar=all`,
           `${baseUrl}?CID=all`,
           `${baseUrl}?type=calendar`,
           `${baseUrl}?feed=xml`,
           feedUrl.replace('#calendar', '?calendar=all'), // Convert anchor to parameter
-          feedUrl.replace('#calendar', '?CID=41')
+          feedUrl.replace('#calendar', '?CID=all'),
+          `${baseUrl}?export=xml`
         ];
         
         for (const variation of rssVariations.slice(0, 5)) {
@@ -985,8 +980,11 @@ export class LocationFeedDiscoverer {
         /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*Events[^"']*)["'][^>]*>All Events[^<]*<\/a>/gi,
         // Calendar-specific "All" buttons
         /<a[^>]+href=["']([^"']*calendar[^"']*All[^"']*)["'][^>]*>All[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*?RSSFeed\.aspx\?[^"']*?CID=All-calendar\.xml[^"']*?)["'][^>]*>All calendar[^<]*<\/a>/gi
-
+        // Generic calendar feed patterns without requiring ModID
+        /<a[^>]+href=["']([^"']*?RSSFeed\.aspx\?[^"']*?CID=All[^"']*?)["'][^>]*>All[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*?iCalendarFeed\.aspx\?[^"']*?CID=All[^"']*?)["'][^>]*>All[^<]*<\/a>/gi,
+        // Look for feed links without "All" text but with calendar-related parameters
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?(?:CID|calendar)[^"']*?)["'][^>]*>[^<]*(?:calendar|events)[^<]*<\/a>/gi
       ];
       
       const feedUrls: string[] = [];
