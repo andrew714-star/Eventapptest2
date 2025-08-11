@@ -234,6 +234,12 @@ export class LocationFeedDiscoverer {
   private async discoverSchoolFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
     
+    // Skip Hemet Unified School District from auto-discovery
+    if (citySlug === 'hemet' && stateSlug === 'ca') {
+      console.log(`Skipping Hemet Unified School District from auto-discovery as requested`);
+      return feeds;
+    }
+    
     for (const domainPattern of this.schoolDistrictPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
