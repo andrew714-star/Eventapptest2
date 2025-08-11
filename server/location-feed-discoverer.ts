@@ -375,6 +375,7 @@ export class LocationFeedDiscoverer {
         'button[title*="Subscribe"]', 'a[title*="Subscribe"]',
         'button[title*="RSS"]', 'a[title*="RSS"]',
         'button[title*="iCal"]', 'a[title*="iCal"]',
+        'button[aria-label*="Subscribe"]', 'a[aria-label*="Subscribe"]',
         'input[type="button"][value*="Download"]',
         'input[type="submit"][value*="Subscribe"]'
       ];
@@ -472,7 +473,7 @@ export class LocationFeedDiscoverer {
         'a[title*="iCalendar"]', 'a[title*="Subscribe"]', 'a[title*="RSS"]', 'a[title*="Feed"]',
         'img[src*="rss"]', 'img[alt*="RSS"]', 'img[alt*="Feed"]', 'img[alt*="Calendar"]',
         'a[class*="rss"]', 'a[class*="feed"]', 'a[class*="calendar"]', 'a[class*="subscribe"]',
-        'span[class*="rss"] a', 'div[class*="feed"] a', 'li[class*="subscribe"] a'
+        'span[class*="rss"] a', 'div[class*="feed"] a', 'li[class*="subscribe"] a', 'a.ImageLink'
       ];
 
       $(feedLinkSelectors.join(', ')).each((_, element) => {
@@ -1189,7 +1190,13 @@ export class LocationFeedDiscoverer {
         /href=["']([^"']*export[^"']*calendar[^"']*)["']/gi,
         /<a\b[^>]*(onclick=["'][^"']*showWindow\(\s*['"]subscribe['"]\)[^"']*["']|title=["'][^"']*subscribe[^"']*["']|aria-label=["'][^"']*subscribe[^"']*["'])[^>]*>/gi,
          /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe[^<]*<\/a>/gi,
-         /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe to calendar[^<]*<\/a>/gi
+         /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe to calendar[^<]*<\/a>/gi,
+        /href=["']([^"']*\/generate_ical[^"']*)["']/gi,
+        /href=["']([^"']*\/ics[^"']*)["']/gi,
+        /href=["']([^"']*\/calendar.*[^"']*)["']/gi,
+        /href=["']([^"']*\/feed[^"']*)["']/gi,
+        /href=["']([^"']*subscribe[^"']*)["']/gi,
+        /href=["']([^"']*ical[^"']*)["']/gi
 
       ];
       
