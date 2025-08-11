@@ -502,12 +502,15 @@ export class CalendarFeedCollector {
 
     try {
       const response = await axios.get(source.feedUrl, {
-        timeout: 6000, // Reduced from 10000ms
+        timeout: 6000,
         headers: {
           'User-Agent': 'CityWide Events Aggregator 1.0'
         },
         maxRedirects: 3
       });
+
+      console.log(`RSS Response Status: ${response.status}, Content-Type: ${response.headers['content-type']}`);
+      console.log(`RSS Response Data (first 1000 chars): ${response.data.substring(0, 1000)}`);
 
       return new Promise((resolve, reject) => {
         parseString(response.data, (err: any, result: any) => {
@@ -519,35 +522,157 @@ export class CalendarFeedCollector {
           const parsedEvents: InsertEvent[] = [];
           const items = result.rss?.channel?.[0]?.item || result.feed?.entry || [];
 
-          for (const item of items.slice(0, 10)) {
-            const title = item.title?.[0] || item.title?._ || 'Untitled Event';
-            const description = item.description?.[0] || item.summary?.[0] || 'Event details available on website';
-            const pubDate = item.pubDate?.[0] || item.published?.[0] || new Date().toISOString();
+          console.log(`Found ${items.length} RSS items to process`);
 
-            const startDate = new Date(pubDate);
-            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default
+          for (const item of items.slice(0, 20)) { // Increased from 10
+            console.log(`Processing RSS item:`, JSON.stringify(item, null, 2).substring(0, 500));
 
-            parsedEvents.push({
-              title: this.cleanText(title),
-              description: this.cleanText(description),
-              category: this.categorizeEvent(title, description),
-              location: `${source.city}, ${source.state}`,
+            // Extract title with better handling
+            let title = '';
+            if (typeof item.title === 'string') {
+              title = item.title;
+            } else if (item.title?.[0]) {
+              title = typeof item.title[0] === 'string' ? item.title[0] : item.title[0]._ || '';
+            } else {
+              title = 'Untitled Event';
+            }
+
+            // Extract description with better handling
+            let description = '';
+            if (typeof item.description === 'string') {
+              description = item.description;
+            } else if (item.description?.[0]) {
+              description = typeof item.description[0] === 'string' ? item.description[0] : item.description[0]._ || '';
+            } else if (item.summary?.[0]) {
+              description = typeof item.summary[0] === 'string' ? item.summary[0] : item.summary[0]._ || '';
+            } else {
+              description = 'Event details available on website';
+            }
+
+            // Try to extract date/time information from multiple sources
+            let eventDate: Date | null = null;
+            let eventTime = '';
+
+            // 1. Try pubDate first (standard RSS date)
+            const pubDateStr = item.pubDate?.[0] || item.published?.[0] || item.date?.[0];
+            if (pubDateStr) {
+              console.log(`Trying to parse pubDate: "${pubDateStr}"`);
+              eventDate = this.parseEventDateFromString(pubDateStr);
+            }
+
+            // 2. Try to extract date from title
+            if (!eventDate) {
+              console.log(`Trying to extract date from title: "${title}"`);
+              eventDate = this.extractDateFromEventTitle(title);
+            }
+
+            // 3. Try to extract date from description
+            if (!eventDate) {
+              console.log(`Trying to extract date from description: "${description.substring(0, 200)}"`);
+              eventDate = this.extractDateFromDescription(description);
+            }
+
+            // 4. Look for event-specific date fields
+            if (!eventDate && (item['event:startdate'] || item['event:date'] || item.startdate || item.eventdate)) {
+              const eventDateStr = item['event:startdate']?.[0] || item['event:date']?.[0] || 
+                                  item.startdate?.[0] || item.eventdate?.[0];
+              if (eventDateStr) {
+                console.log(`Trying to parse event date field: "${eventDateStr}"`);
+                eventDate = this.parseEventDateFromString(eventDateStr);
+              }
+            }
+
+            // 5. Fallback to current date if still no date found
+            if (!eventDate) {
+              console.log(`No date found, using current date as fallback`);
+              eventDate = new Date();
+            }
+
+            // Ensure the event is in the future
+            if (eventDate <= new Date()) {
+              // If the date is in the past, try to find if it's a recurring event
+              const isRecurring = this.isRecurringEvent(title, description);
+              if (isRecurring) {
+                eventDate = this.getNextRecurringDate(title, description, eventDate);
+              } else {
+                // Skip past events unless they're very recent (within 24 hours)
+                const hoursDiff = (new Date().getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+                if (hoursDiff > 24) {
+                  console.log(`Skipping past event: "${title}" on ${eventDate.toDateString()}`);
+                  continue;
+                }
+              }
+            }
+
+            // Try to extract time from description or title
+            const timeMatch = (title + ' ' + description).match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+            if (timeMatch) {
+              eventTime = timeMatch[1];
+              console.log(`Found time in content: ${eventTime}`);
+              
+              // Update the event date with the extracted time
+              const timeParts = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+              if (timeParts) {
+                let hours = parseInt(timeParts[1]);
+                const minutes = parseInt(timeParts[2]);
+                const ampm = timeParts[3].toUpperCase();
+                
+                if (ampm === 'PM' && hours !== 12) hours += 12;
+                if (ampm === 'AM' && hours === 12) hours = 0;
+                
+                eventDate.setHours(hours, minutes, 0, 0);
+              }
+            } else {
+              // Default time if none found
+              eventTime = '7:00 PM';
+              eventDate.setHours(19, 0, 0, 0);
+            }
+
+            const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default
+            const endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+            // Clean up title and description
+            const cleanTitle = this.cleanText(title);
+            const cleanDescription = this.cleanText(description);
+
+            // Extract location if present in description
+            let eventLocation = `${source.city}, ${source.state}`;
+            const locationMatch = description.match(/(?:location|address|venue):\s*([^.]+)/i) ||
+                                 description.match(/at\s+([^,]+(?:hall|building|center|library|park|room|ave|street|blvd|dr|rd)[^,]*)/i);
+            if (locationMatch) {
+              eventLocation = locationMatch[1].trim();
+              if (!eventLocation.includes(source.city)) {
+                eventLocation += `, ${source.city}, ${source.state}`;
+              }
+            }
+
+            // Create the event
+            const parsedEvent: InsertEvent = {
+              title: cleanTitle,
+              description: cleanDescription.substring(0, 500), // Limit description length
+              category: this.categorizeEvent(cleanTitle, cleanDescription),
+              location: eventLocation,
               organizer: source.name,
-              startDate,
-              endDate,
-              startTime: startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
-              endTime: endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+              startDate: eventDate,
+              endDate: endDate,
+              startTime: eventTime,
+              endTime: endTime,
               attendees: 0,
               imageUrl: null,
-              isFree: description.toLowerCase().includes('free') ? 'true' : 'false',
+              isFree: cleanDescription.toLowerCase().includes('free') ? 'true' : 'false',
               source: source.id
-            });
+            };
+
+            parsedEvents.push(parsedEvent);
+            console.log(`✓ Created RSS event: "${cleanTitle}" on ${eventDate.toDateString()} at ${eventTime}`);
           }
 
+          console.log(`Successfully parsed ${parsedEvents.length} future events from RSS feed: ${source.feedUrl}`);
           resolve(parsedEvents);
         });
       });
     } catch (error) {
+      console.error(`Failed to parse RSS feed ${source.feedUrl}:`, error);
       throw new Error(`Failed to parse RSS feed: ${error}`);
     }
   }
@@ -1017,9 +1142,161 @@ export class CalendarFeedCollector {
     return text
       .replace(/<[^>]*>/g, '') // Remove HTML tags
       .replace(/&[^;]+;/g, ' ') // Remove HTML entities
+      .replace(/&nbsp;/g, ' ') // Remove non-breaking spaces
+      .replace(/&amp;/g, '&') // Convert common entities
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
       .replace(/\s+/g, ' ') // Collapse whitespace
       .trim()
-      .substring(0, 300); // Limit length
+      .substring(0, 500); // Increased length limit
+  }
+
+  /**
+   * Parse date from various string formats
+   */
+  private parseEventDateFromString(dateStr: string): Date | null {
+    if (!dateStr) return null;
+
+    try {
+      // Clean the date string
+      const cleanDateStr = dateStr.trim().replace(/\s+/g, ' ');
+      
+      // Try direct parsing first
+      const directDate = new Date(cleanDateStr);
+      if (!isNaN(directDate.getTime())) {
+        return directDate;
+      }
+
+      // Try parsing RFC 2822 format (common in RSS)
+      const rfc2822Match = cleanDateStr.match(/^(\w{3}),?\s+(\d{1,2})\s+(\w{3})\s+(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*([+-]\d{4}|\w{3})?/);
+      if (rfc2822Match) {
+        const parsedDate = new Date(cleanDateStr);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+
+      // Try ISO format
+      const isoMatch = cleanDateStr.match(/(\d{4}-\d{2}-\d{2})/);
+      if (isoMatch) {
+        const parsedDate = new Date(isoMatch[1]);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.log(`Failed to parse date string: "${dateStr}"`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract date from event title
+   */
+  private extractDateFromEventTitle(title: string): Date | null {
+    if (!title) return null;
+
+    // Look for date patterns in title
+    const datePatterns = [
+      /(\w+day),?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})/i,
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})/i,
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})/i,
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+      /(\d{1,2})\/(\d{1,2})/
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = title.match(pattern);
+      if (match) {
+        const extractedDate = this.parseEventDate(match[0]);
+        if (extractedDate) {
+          return extractedDate;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract date from event description
+   */
+  private extractDateFromDescription(description: string): Date | null {
+    if (!description) return null;
+
+    // Look for date patterns in description
+    const datePatterns = [
+      /(?:date|when|time):\s*(\w+day,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?)/i,
+      /(?:date|when|time):\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?)/i,
+      /(?:date|when|time):\s*(\d{1,2}\/\d{1,2}\/?\d{0,4})/i,
+      /(\w+day),?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s+(\d{4}))?/i
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = description.match(pattern);
+      if (match) {
+        const dateStr = match[1] || match[0];
+        const extractedDate = this.parseEventDate(dateStr);
+        if (extractedDate) {
+          return extractedDate;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if event appears to be recurring
+   */
+  private isRecurringEvent(title: string, description: string): boolean {
+    const text = (title + ' ' + description).toLowerCase();
+    const recurringKeywords = [
+      'every', 'weekly', 'monthly', 'quarterly', 'annually',
+      'recurring', 'regular', 'ongoing', 'scheduled',
+      'first', 'second', 'third', 'fourth', 'last',
+      'monday', 'tuesday', 'wednesday', 'thursday', 'friday'
+    ];
+
+    return recurringKeywords.some(keyword => text.includes(keyword));
+  }
+
+  /**
+   * Get next occurrence for recurring events
+   */
+  private getNextRecurringDate(title: string, description: string, originalDate: Date): Date {
+    const text = (title + ' ' + description).toLowerCase();
+    const today = new Date();
+
+    // For meetings that happen monthly (like city council, planning commission)
+    if (text.includes('council') || text.includes('commission') || text.includes('board')) {
+      const nextMonth = new Date(today);
+      nextMonth.setMonth(today.getMonth() + 1);
+      nextMonth.setDate(originalDate.getDate());
+      nextMonth.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
+      return nextMonth;
+    }
+
+    // For weekly events
+    if (text.includes('weekly') || text.includes('every week')) {
+      const nextWeek = new Date(today);
+      nextWeek.setDate(today.getDate() + 7);
+      nextWeek.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
+      return nextWeek;
+    }
+
+    // Default: add one month
+    const nextOccurrence = new Date(originalDate);
+    nextOccurrence.setMonth(originalDate.getMonth() + 1);
+    if (nextOccurrence <= today) {
+      nextOccurrence.setMonth(today.getMonth() + 1);
+    }
+    return nextOccurrence;
   }
 
   private parseEventDate(dateText: string): Date | null {
