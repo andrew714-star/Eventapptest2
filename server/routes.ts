@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { eventFilterSchema, insertEventSchema, citySearchSchema } from "@shared/schema";
+import { WebsiteValidator } from "./website-validator";
 import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
 import { feedDiscoverer } from './location-feed-discoverer';
@@ -1315,6 +1316,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error in /api/cities:", error);
       res.status(500).json({ message: "Failed to fetch cities" });
+    }
+  });
+
+  // Validate websites
+  app.post("/api/cities/validate-websites", async (req, res) => {
+    try {
+      const { urls } = req.body;
+      
+      if (!Array.isArray(urls)) {
+        return res.status(400).json({ message: "URLs must be an array" });
+      }
+
+      const validator = new WebsiteValidator();
+      const validations: Record<string, any> = {};
+
+      // Validate each URL (limit to 10 to prevent abuse)
+      const urlsToValidate = urls.slice(0, 10);
+      
+      for (const url of urlsToValidate) {
+        try {
+          const validation = await validator.validateWebsite(url);
+          validations[url] = validation;
+        } catch (error) {
+          console.error(`Error validating ${url}:`, error);
+          validations[url] = {
+            isValid: false,
+            status: 'error',
+            error: 'Failed to validate website'
+          };
+        }
+      }
+
+      res.json({ validations });
+    } catch (error) {
+      console.error("Error in /api/cities/validate-websites:", error);
+      res.status(500).json({ message: "Failed to validate websites" });
+    }
+  });
+
+  app.post("/api/cities/validate-websites", async (req, res) => {
+    try {
+      const { urls } = req.body;
+      if (!Array.isArray(urls) || urls.length === 0) {
+        return res.status(400).json({ message: "URLs array is required" });
+      }
+      
+      if (urls.length > 10) {
+        return res.status(400).json({ message: "Maximum 10 URLs can be validated at once" });
+      }
+
+      console.log(`Validating ${urls.length} website URLs...`);
+      const validationResults = await WebsiteValidator.validateMultiple(urls);
+      
+      const results = Object.fromEntries(validationResults);
+      res.json({ validations: results });
+    } catch (error) {
+      console.error("Error in /api/cities/validate-websites:", error);
+      res.status(500).json({ message: "Failed to validate websites" });
     }
   });
 

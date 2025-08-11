@@ -9,6 +9,15 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
+**2025-01-11**: City Website Database Integration
+- Added comprehensive US city website database with 19,000+ cities from CSV data
+- Built city search functionality with filters for city name, state, and website availability 
+- Created website validation system to identify parked domains, expired sites, and redirects
+- Added visual indicators showing website status (valid, parked, expired, redirects)
+- Integrated website checker that validates URLs and detects common issues like domain parking and "for sale" pages
+- Enhanced navigation with dedicated City Search page accessible from header
+- Provided detailed status messages to help users identify legitimate city websites vs parked domains
+
 **2025-01-10**: Enhanced Interactive Feed Discovery System
 - Implemented sophisticated calendar-first discovery approach that follows the complete user workflow:
   1. Finds calendar pages first (e.g., `/calendar.aspx`, `/events`)
