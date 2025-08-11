@@ -1105,10 +1105,27 @@ export class LocationFeedDiscoverer {
       // Test each discovered feed URL to see if it returns actual feed content
       const workingFeeds: DiscoveredFeed[] = [];
       
-      for (const feedUrl of feedUrls.slice(0, 5)) { // Increased limit for calendar-specific feeds
+      // Sort feeds to prioritize "All-calendar" feeds over category-specific ones
+      const sortedFeedUrls = feedUrls.sort((a, b) => {
+        const aHasAllCalendar = a.includes('All-calendar') || a.includes('all-calendar') || a.includes('CID=All');
+        const bHasAllCalendar = b.includes('All-calendar') || b.includes('all-calendar') || b.includes('CID=All');
+        
+        if (aHasAllCalendar && !bHasAllCalendar) return -1;
+        if (!aHasAllCalendar && bHasAllCalendar) return 1;
+        return 0;
+      });
+      
+      for (const feedUrl of sortedFeedUrls.slice(0, 5)) { // Increased limit for calendar-specific feeds
         const workingFeed = await this.validateAndCreateFeed(feedUrl, location);
         if (workingFeed) {
           console.log(`✅ Validated working feed: ${feedUrl}`);
+          
+          // Boost confidence for "All-calendar" feeds
+          if (feedUrl.includes('All-calendar') || feedUrl.includes('all-calendar') || feedUrl.includes('CID=All')) {
+            workingFeed.confidence = Math.min(workingFeed.confidence + 0.3, 1.0);
+            console.log(`🎯 Boosted confidence for All-calendar feed: ${feedUrl} (confidence: ${workingFeed.confidence})`);
+          }
+          
           workingFeeds.push(workingFeed);
         } else {
           console.log(`❌ Invalid feed: ${feedUrl}`);

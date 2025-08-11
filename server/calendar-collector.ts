@@ -1132,6 +1132,7 @@ export class CalendarFeedCollector {
     );
 
     if (existingSource) {
+      console.log(`Source already exists: ${source.name} with URL: ${source.feedUrl}`);
       return false; // Source already exists
     }
 
@@ -1143,8 +1144,21 @@ export class CalendarFeedCollector {
       s.isActive
     );
 
-    // If there are already active feeds for this city, disable this one by default
-    if (sameCityFeeds.length > 0) {
+    // Check if this is a comprehensive feed (All-calendar, all events)
+    const isComprehensiveFeed = source.feedUrl && (
+      source.feedUrl.includes('All-calendar') || 
+      source.feedUrl.includes('all-calendar') ||
+      source.feedUrl.includes('CID=All') ||
+      source.feedUrl.includes('all-events') ||
+      source.name.toLowerCase().includes('all events') ||
+      source.name.toLowerCase().includes('all calendar')
+    );
+
+    // If this is a comprehensive feed or no active feeds exist, enable by default
+    if (isComprehensiveFeed || sameCityFeeds.length === 0) {
+      source.isActive = true;
+      console.log(`Enabling ${isComprehensiveFeed ? 'comprehensive' : 'first'} feed for ${source.city}, ${source.state}: ${source.name}`);
+    } else {
       console.log(`Found ${sameCityFeeds.length} existing active feeds for ${source.city}, ${source.state}. New feed will be disabled by default.`);
       source.isActive = false;
     }
@@ -1182,7 +1196,20 @@ export class CalendarFeedCollector {
       'html': 1     // Lowest priority - requires scraping
     };
 
-    const newSourcePriority = feedTypePriority[newSource.feedType] || 0;
+    let newSourcePriority = feedTypePriority[newSource.feedType] || 0;
+    
+    // Boost priority for comprehensive feeds (All-calendar, all events, etc.)
+    if (newSource.feedUrl && (
+      newSource.feedUrl.includes('All-calendar') || 
+      newSource.feedUrl.includes('all-calendar') ||
+      newSource.feedUrl.includes('CID=All') ||
+      newSource.feedUrl.includes('all-events') ||
+      newSource.name.toLowerCase().includes('all events') ||
+      newSource.name.toLowerCase().includes('all calendar')
+    )) {
+      newSourcePriority += 2; // Significant boost for comprehensive feeds
+      console.log(`🎯 Boosted priority for comprehensive feed: ${newSource.name} (priority: ${newSourcePriority})`);
+    }
 
     // Find the highest priority active feed for this city
     const activeFeeds = sameCityFeeds.filter(s => s.isActive);
