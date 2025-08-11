@@ -553,39 +553,46 @@ export class CalendarFeedCollector {
             let eventDate: Date | null = null;
             let eventTime = '';
 
-            // 1. Try pubDate first (standard RSS date)
-            const pubDateStr = item.pubDate?.[0] || item.published?.[0] || item.date?.[0];
-            if (pubDateStr) {
-              console.log(`Trying to parse pubDate: "${pubDateStr}"`);
-              eventDate = this.parseEventDateFromString(pubDateStr);
+            // 1. PRIORITY: Look for event-specific date fields first (these are more reliable than pubDate)
+            if (item['calendarEvent:EventDates'] || item['event:startdate'] || item['event:date'] || item.startdate || item.eventdate) {
+              const eventDateStr = item['calendarEvent:EventDates']?.[0] || item['event:startdate']?.[0] || 
+                                  item['event:date']?.[0] || item.startdate?.[0] || item.eventdate?.[0];
+              if (eventDateStr) {
+                console.log(`Trying to parse calendar event date field: "${eventDateStr}"`);
+                eventDate = this.parseEventDateFromString(eventDateStr.trim());
+              }
             }
 
-            // 2. Try to extract date from title
-            if (!eventDate) {
-              console.log(`Trying to extract date from title: "${title}"`);
-              eventDate = this.extractDateFromEventTitle(title);
-            }
-
-            // 3. Try to extract date from description
+            // 2. Extract date from description (often contains the actual event date)
             if (!eventDate) {
               console.log(`Trying to extract date from description: "${description.substring(0, 200)}"`);
               eventDate = this.extractDateFromDescription(description);
             }
 
-            // 4. Look for event-specific date fields
-            if (!eventDate && (item['event:startdate'] || item['event:date'] || item.startdate || item.eventdate)) {
-              const eventDateStr = item['event:startdate']?.[0] || item['event:date']?.[0] || 
-                                  item.startdate?.[0] || item.eventdate?.[0];
-              if (eventDateStr) {
-                console.log(`Trying to parse event date field: "${eventDateStr}"`);
-                eventDate = this.parseEventDateFromString(eventDateStr);
+            // 3. Try to extract date from title
+            if (!eventDate) {
+              console.log(`Trying to extract date from title: "${title}"`);
+              eventDate = this.extractDateFromEventTitle(title);
+            }
+
+            // 4. Try pubDate LAST (this is often the publication date, not event date)
+            if (!eventDate) {
+              const pubDateStr = item.pubDate?.[0] || item.published?.[0] || item.date?.[0];
+              if (pubDateStr) {
+                console.log(`Trying to parse pubDate as last resort: "${pubDateStr}"`);
+                const pubDate = this.parseEventDateFromString(pubDateStr);
+                // Only use pubDate if it's in the future
+                if (pubDate && pubDate > new Date()) {
+                  eventDate = pubDate;
+                }
               }
             }
 
-            // 5. Fallback to current date if still no date found
+            // 5. Fallback to next week if still no date found
             if (!eventDate) {
-              console.log(`No date found, using current date as fallback`);
+              console.log(`No valid future date found, using next week as fallback`);
               eventDate = new Date();
+              eventDate.setDate(eventDate.getDate() + 7); // Next week
             }
 
             // Ensure the event is in the future
@@ -604,14 +611,61 @@ export class CalendarFeedCollector {
               }
             }
 
-            // Try to extract time from description or title
-            const timeMatch = (title + ' ' + description).match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
-            if (timeMatch) {
-              eventTime = timeMatch[1];
-              console.log(`Found time in content: ${eventTime}`);
+            // Extract event time from RSS-specific fields or description
+            let startTime = '';
+            let endTime = '';
+
+            // 1. Check for event time fields first
+            if (item['calendarEvent:EventTimes']) {
+              const eventTimes = item['calendarEvent:EventTimes'][0];
+              console.log(`Found event times field: "${eventTimes}"`);
               
-              // Update the event date with the extracted time
-              const timeParts = eventTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+              // Parse time range like "02:00 PM - 04:00 PM"
+              const timeRangeMatch = eventTimes.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+              if (timeRangeMatch) {
+                startTime = timeRangeMatch[1];
+                endTime = timeRangeMatch[2];
+                console.log(`Extracted time range: ${startTime} - ${endTime}`);
+              }
+            }
+
+            // 2. If no time fields, try to extract from description or title
+            if (!startTime) {
+              // Look for time patterns in description and title
+              const timeText = description + ' ' + title;
+              
+              // Time range pattern
+              const timeRangeMatch = timeText.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:-|to)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+              if (timeRangeMatch) {
+                startTime = timeRangeMatch[1];
+                endTime = timeRangeMatch[2];
+                console.log(`Found time range in content: ${startTime} - ${endTime}`);
+              } else {
+                // Single time pattern
+                const singleTimeMatch = timeText.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
+                if (singleTimeMatch) {
+                  startTime = singleTimeMatch[1];
+                  console.log(`Found single time in content: ${startTime}`);
+                }
+              }
+            }
+
+            // Set default times if none found
+            if (!startTime) {
+              startTime = '7:00 PM';
+              endTime = '9:00 PM';
+              console.log(`No time found, using default: ${startTime} - ${endTime}`);
+            } else if (!endTime) {
+              // If we have start time but no end time, default to 2 hours later
+              const startDate = new Date(`1/1/2000 ${startTime}`);
+              const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+              endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+              console.log(`Generated end time: ${endTime}`);
+            }
+
+            // Update event date with the extracted start time
+            if (startTime !== '7:00 PM') { // Only if we found actual time
+              const timeParts = startTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
               if (timeParts) {
                 let hours = parseInt(timeParts[1]);
                 const minutes = parseInt(timeParts[2]);
@@ -621,15 +675,39 @@ export class CalendarFeedCollector {
                 if (ampm === 'AM' && hours === 12) hours = 0;
                 
                 eventDate.setHours(hours, minutes, 0, 0);
+                console.log(`Updated event date with extracted time: ${eventDate}`);
               }
             } else {
-              // Default time if none found
-              eventTime = '7:00 PM';
+              // Set default time
               eventDate.setHours(19, 0, 0, 0);
             }
 
-            const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000); // 2 hour default
-            const endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            eventTime = startTime;
+
+            // Calculate end date based on extracted or default end time
+            let endDate: Date;
+            if (endTime && endTime !== startTime) {
+              // Parse the end time and set it to the same day
+              const endTimeParts = endTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+              if (endTimeParts) {
+                let endHours = parseInt(endTimeParts[1]);
+                const endMinutes = parseInt(endTimeParts[2]);
+                const endAmPm = endTimeParts[3].toUpperCase();
+                
+                if (endAmPm === 'PM' && endHours !== 12) endHours += 12;
+                if (endAmPm === 'AM' && endHours === 12) endHours = 0;
+                
+                endDate = new Date(eventDate);
+                endDate.setHours(endHours, endMinutes, 0, 0);
+              } else {
+                // Fallback to 2 hours later
+                endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000);
+              }
+            } else {
+              // Default to 2 hours later
+              endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000);
+              endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            }
 
             // Clean up title and description
             const cleanTitle = this.cleanText(title);
@@ -1228,21 +1306,37 @@ export class CalendarFeedCollector {
   private extractDateFromDescription(description: string): Date | null {
     if (!description) return null;
 
-    // Look for date patterns in description
+    // Clean HTML tags from description for better pattern matching
+    const cleanDescription = description.replace(/<[^>]*>/g, ' ').replace(/&[^;]+;/g, ' ');
+
+    // Look for date patterns in description - prioritize event-specific formats
     const datePatterns = [
+      // Event date with HTML formatting: "Event date:</strong> August 21, 2025"
+      /(?:event\s+date|date):\s*(?:<[^>]*>)?\s*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
+      // Standard date patterns
       /(?:date|when|time):\s*(\w+day,?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?)/i,
       /(?:date|when|time):\s*((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?)/i,
       /(?:date|when|time):\s*(\d{1,2}\/\d{1,2}\/?\d{0,4})/i,
+      // Full month name with day and year (most common in event descriptions)
+      /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})\b/i,
+      // Short month name with day and year
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2}),?\s+(\d{4})\b/i,
+      // Date with weekday
       /(\w+day),?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s+(\d{4}))?/i,
-      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})(?:,?\s+(\d{4}))?/i
+      // Basic month and day (will add current/next year)
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{1,2})\b/i
     ];
 
+    console.log(`Analyzing description for dates: "${cleanDescription.substring(0, 200)}"`);
+
     for (const pattern of datePatterns) {
-      const match = description.match(pattern);
+      const match = cleanDescription.match(pattern);
       if (match) {
         const dateStr = match[1] || match[0];
+        console.log(`Found date pattern in description: "${dateStr}"`);
         const extractedDate = this.parseEventDate(dateStr);
         if (extractedDate) {
+          console.log(`Successfully extracted date from description: ${extractedDate.toDateString()}`);
           return extractedDate;
         }
       }
