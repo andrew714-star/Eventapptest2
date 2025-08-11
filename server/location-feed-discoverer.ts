@@ -42,6 +42,7 @@ export class LocationFeedDiscoverer {
     '/rss.aspx#events',
     '/calendar.xml',
     '/events.xml',
+    'iCalendar.aspx',
     // Common download/export patterns
     '/calendar/download',
     '/calendar/export',
@@ -130,7 +131,15 @@ export class LocationFeedDiscoverer {
     'www.{city}.{state}.gov',
     '{city}{state}.gov',
     'city{city}.gov',
-    'cityof{city}.gov'
+    'cityof{city}.gov', 
+    '{city}.us',
+    '{city}.{state}.us', 
+    'www.{city}.us',
+    'www.{city}.{state}.us',
+    '{city}{state}.us',
+    'city{city}.us',
+    'cityof{city}.us',
+    
   ];
 
   private schoolDistrictPatterns = [
