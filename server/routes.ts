@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { eventFilterSchema, insertEventSchema } from "@shared/schema";
+import { eventFilterSchema, insertEventSchema, citySearchSchema } from "@shared/schema";
 import { dataCollector } from "./data-collector";
 import { calendarCollector } from "./calendar-collector";
 import { feedDiscoverer } from './location-feed-discoverer';
@@ -1274,6 +1274,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Regional feed discovery error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // City search routes
+  app.post("/api/cities/search", async (req, res) => {
+    try {
+      const search = citySearchSchema.parse(req.body);
+      console.log(`API /api/cities/search called with query: ${search.query}`);
+      const cities = await storage.searchCities(search);
+      console.log(`Found ${cities.length} cities matching search criteria`);
+      res.json(cities);
+    } catch (error) {
+      console.error("Error in /api/cities/search:", error);
+      res.status(400).json({ message: "Invalid search parameters" });
+    }
+  });
+
+  app.get("/api/cities/:geoid", async (req, res) => {
+    try {
+      const { geoid } = req.params;
+      const city = await storage.getCityByGeoid(geoid);
+      if (!city) {
+        return res.status(404).json({ message: "City not found" });
+      }
+      res.json(city);
+    } catch (error) {
+      console.error("Error in /api/cities/:geoid:", error);
+      res.status(500).json({ message: "Failed to fetch city" });
+    }
+  });
+
+  app.get("/api/cities", async (req, res) => {
+    try {
+      const cities = await storage.getAllCities();
+      res.json({ 
+        cities: cities.slice(0, 100), // Limit to first 100 for performance
+        totalCount: cities.length 
+      });
+    } catch (error) {
+      console.error("Error in /api/cities:", error);
+      res.status(500).json({ message: "Failed to fetch cities" });
     }
   });
 

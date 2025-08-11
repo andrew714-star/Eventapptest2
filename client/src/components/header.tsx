@@ -1,4 +1,4 @@
-import { Calendar, Bell, Settings, Menu, Database, RefreshCw } from "lucide-react";
+import { Calendar, Bell, Settings, Menu, Database, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { DataSourcesModal } from "@/components/data-sources-modal";
@@ -7,11 +7,13 @@ import { LocationSelector } from "@/components/location-selector";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link, useLocation } from "wouter";
 
 export function Header() {
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [location] = useLocation();
 
   const syncMutation = useMutation({
     mutationFn: async () => {
@@ -54,6 +56,30 @@ export function Header() {
                   <p className="text-xs text-gray-500 dark:text-gray-400">Real-time events from cities, schools & chambers nationwide</p>
                 </div>
               </div>
+              
+              {/* Navigation */}
+              <nav className="hidden lg:flex items-center space-x-1 ml-6">
+                <Link href="/">
+                  <Button 
+                    variant={location === "/" ? "default" : "ghost"} 
+                    size="sm"
+                    data-testid="nav-events"
+                  >
+                    <Calendar className="mr-2" size={16} />
+                    Events
+                  </Button>
+                </Link>
+                <Link href="/city-search">
+                  <Button 
+                    variant={location === "/city-search" ? "default" : "ghost"} 
+                    size="sm"
+                    data-testid="nav-city-search"
+                  >
+                    <Search className="mr-2" size={16} />
+                    City Search
+                  </Button>
+                </Link>
+              </nav>
             </div>
             <div className="hidden md:flex items-center space-x-2">
               <Button 

@@ -20,12 +20,24 @@ export const events = pgTable("events", {
   source: text("source").notNull(), // city website, school, community center, etc.
 });
 
+export const cities = pgTable("cities", {
+  geoid: text("geoid").primaryKey(),
+  municipality: text("municipality").notNull(),
+  state: text("state").notNull(),
+  websiteAvailable: integer("website_available").notNull(),
+  websiteUrl: text("website_url"),
+});
+
 export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
 });
 
+export const insertCitySchema = createInsertSchema(cities);
+
 export type InsertEvent = z.infer<typeof insertEventSchema>;
 export type Event = typeof events.$inferSelect;
+export type InsertCity = z.infer<typeof insertCitySchema>;
+export type City = typeof cities.$inferSelect;
 
 // Additional schemas for filtering
 export const eventFilterSchema = z.object({
@@ -38,6 +50,15 @@ export const eventFilterSchema = z.object({
 });
 
 export type EventFilter = z.infer<typeof eventFilterSchema>;
+
+// City search schema
+export const citySearchSchema = z.object({
+  query: z.string().min(1),
+  state: z.string().optional(),
+  websiteRequired: z.boolean().optional(),
+});
+
+export type CitySearch = z.infer<typeof citySearchSchema>;
 
 export const categories = [
   "Music & Concerts",

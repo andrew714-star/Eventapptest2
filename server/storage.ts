@@ -1,5 +1,6 @@
-import { type Event, type InsertEvent, type EventFilter } from "@shared/schema";
+import { type Event, type InsertEvent, type EventFilter, type City, type CitySearch } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { CityDataLoader } from "./city-data-loader";
 
 export interface IStorage {
   getEvent(id: string): Promise<Event | undefined>;
@@ -11,6 +12,11 @@ export interface IStorage {
   clearAllEvents(): Promise<void>;
   getEventsByDateRange(startDate: string, endDate: string): Promise<Event[]>;
   getEventsByCategory(category: string): Promise<Event[]>;
+  
+  // City methods
+  searchCities(search: CitySearch): Promise<City[]>;
+  getCityByGeoid(geoid: string): Promise<City | undefined>;
+  getAllCities(): Promise<City[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -158,6 +164,50 @@ export class MemStorage implements IStorage {
     return Array.from(this.events.values()).filter(event => 
       event.category === category
     );
+  }
+
+  // City methods
+  async searchCities(search: CitySearch): Promise<City[]> {
+    const cities = await CityDataLoader.loadCities();
+    const query = search.query.toLowerCase();
+    
+    let results = Array.from(cities.values()).filter(city => {
+      const matchesName = city.municipality.toLowerCase().includes(query);
+      const matchesState = city.state.toLowerCase().includes(query);
+      return matchesName || matchesState;
+    });
+
+    // Filter by state if specified
+    if (search.state) {
+      const stateFilter = search.state.toLowerCase();
+      results = results.filter(city => city.state.toLowerCase().includes(stateFilter));
+    }
+
+    // Filter by website requirement if specified
+    if (search.websiteRequired) {
+      results = results.filter(city => city.websiteAvailable === 1 && city.websiteUrl);
+    }
+
+    // Limit results and prioritize exact matches
+    return results
+      .sort((a, b) => {
+        const aExact = a.municipality.toLowerCase() === query;
+        const bExact = b.municipality.toLowerCase() === query;
+        if (aExact && !bExact) return -1;
+        if (!aExact && bExact) return 1;
+        return a.municipality.localeCompare(b.municipality);
+      })
+      .slice(0, 50); // Limit to 50 results
+  }
+
+  async getCityByGeoid(geoid: string): Promise<City | undefined> {
+    const cities = await CityDataLoader.loadCities();
+    return cities.get(geoid);
+  }
+
+  async getAllCities(): Promise<City[]> {
+    const cities = await CityDataLoader.loadCities();
+    return Array.from(cities.values());
   }
 }
 
