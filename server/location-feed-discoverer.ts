@@ -738,16 +738,32 @@ export class LocationFeedDiscoverer {
         return null;
       }
 
-      // Skip URLs that are clearly not feed files (but allow common subscription pages)
-      const isSubscriptionPage = feedUrl.includes('iCalendar.aspx') || 
+      // Identify direct download/API endpoints vs subscription pages
+      const isDirectDownloadAPI = feedUrl.includes('generate_ical') || 
+                                  feedUrl.includes('generate_calendar') || 
+                                  feedUrl.includes('export_ical') ||
+                                  feedUrl.includes('/api/') && (feedUrl.includes('ical') || feedUrl.includes('calendar') || feedUrl.includes('events')) ||
+                                  feedUrl.endsWith('.ics') ||
+                                  feedUrl.endsWith('.rss') ||
+                                  feedUrl.endsWith('.xml');
+      
+      const isSubscriptionPage = !isDirectDownloadAPI && (
+                                 feedUrl.includes('iCalendar.aspx') || 
                                  feedUrl.includes('rss.aspx') || 
                                  feedUrl.includes('calendar.aspx') ||
-                                 feedUrl.includes('subscribe');
+                                 feedUrl.includes('subscribe')
+                                );
       
       if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
           !feedUrl.includes('calendar') && !feedUrl.includes('events') && !feedUrl.includes('feed') && 
-          !isSubscriptionPage) {
+          !isSubscriptionPage && !isDirectDownloadAPI) {
         return null;
+      }
+
+      // Handle direct download/API endpoints first (bypass subscription page parsing)
+      if (isDirectDownloadAPI) {
+        console.log(`🎯 Direct download/API endpoint detected: ${feedUrl}`);
+        return await this.validateAndCreateFeed(feedUrl, location);
       }
 
       // Handle subscription pages by parsing them to find actual feed URLs
@@ -1106,6 +1122,7 @@ export class LocationFeedDiscoverer {
 
   private async validateDynamicCalendarAPI(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
+      console.log(`🔗 Validating direct download API endpoint: ${feedUrl}`);
       // Try the URL as-is first
       let testUrl = feedUrl;
       
@@ -1127,16 +1144,19 @@ export class LocationFeedDiscoverer {
         ];
         
         for (const variation of variations) {
+          console.log(`🧪 Testing API parameter variation: ${variation}`);
           const result = await this.testCalendarAPIUrl(variation, location);
           if (result) {
-            console.log(`✅ Dynamic calendar API working with URL: ${variation}`);
+            console.log(`✅ Direct download API working with URL: ${variation}`);
             return result;
           }
         }
       } else {
         // For other dynamic APIs, try the URL directly
+        console.log(`🧪 Testing direct API endpoint: ${testUrl}`);
         const result = await this.testCalendarAPIUrl(testUrl, location);
         if (result) {
+          console.log(`✅ Direct download API working: ${testUrl}`);
           return result;
         }
       }

@@ -17,6 +17,7 @@ Event loading behavior: Events should not load or be searched until after a user
   - Enhanced parameter extraction for government CMS systems (ModID, CID, categoryId patterns)
   - Added detection of template variables and dynamic URL construction
   - Improved parsing of subscription pages with multiple feed format options
+- Fixed critical feed discovery issue where direct download APIs (like generate_ical endpoints) were incorrectly treated as subscription pages
 - Fixed SelectItem error in city search interface by properly handling "All States" option
 - Added comprehensive US city website database with 19,000+ cities from CSV data
 - Built city search functionality with filters for city name, state, and website availability 
