@@ -745,13 +745,20 @@ export class LocationFeedDiscoverer {
                                   feedUrl.includes('/api/') && (feedUrl.includes('ical') || feedUrl.includes('calendar') || feedUrl.includes('events')) ||
                                   feedUrl.endsWith('.ics') ||
                                   feedUrl.endsWith('.rss') ||
-                                  feedUrl.endsWith('.xml');
+                                  feedUrl.endsWith('.xml') ||
+                                  // Check for direct feed URLs with parameters that might return calendar data
+                                  (feedUrl.includes('Feed.aspx') && feedUrl.includes('CID=')) ||
+                                  (feedUrl.includes('RSSFeed.aspx') && feedUrl.includes('ModID=')) ||
+                                  (feedUrl.includes('iCalendarFeed.aspx') && feedUrl.includes('CID=')) ||
+                                  // Common download/export patterns with parameters
+                                  (feedUrl.includes('download') && (feedUrl.includes('calendar') || feedUrl.includes('events'))) ||
+                                  (feedUrl.includes('export') && (feedUrl.includes('calendar') || feedUrl.includes('events')));
       
       const isSubscriptionPage = !isDirectDownloadAPI && (
-                                 feedUrl.includes('iCalendar.aspx') || 
-                                 feedUrl.includes('rss.aspx') || 
-                                 feedUrl.includes('calendar.aspx') ||
-                                 feedUrl.includes('subscribe')
+                                 (feedUrl.includes('iCalendar.aspx') && !feedUrl.includes('CID=')) || 
+                                 (feedUrl.includes('rss.aspx') && !feedUrl.includes('ModID=')) || 
+                                 (feedUrl.includes('calendar.aspx') && !feedUrl.includes('CID=')) ||
+                                 (feedUrl.includes('subscribe') && !feedUrl.includes('.ics') && !feedUrl.includes('.rss'))
                                 );
       
       if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
@@ -768,6 +775,15 @@ export class LocationFeedDiscoverer {
 
       // Handle subscription pages by parsing them to find actual feed URLs
       if (isSubscriptionPage) {
+        // First, check if the subscription page itself might be a direct download/API endpoint
+        console.log(`🔍 Checking if subscription page is actually a direct endpoint: ${feedUrl}`);
+        const directEndpointFeed = await this.validateAndCreateFeed(feedUrl, location);
+        if (directEndpointFeed) {
+          console.log(`✅ Subscription page is actually a direct feed endpoint: ${feedUrl}`);
+          return directEndpointFeed;
+        }
+
+        // If not a direct endpoint, parse it for feed links
         const discoveredUrls = await this.parseSubscriptionPageForFeeds(feedUrl);
         if (discoveredUrls.length > 0) {
           // Try each discovered URL to see if it works
