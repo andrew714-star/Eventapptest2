@@ -31,7 +31,7 @@ export default function CitySearchPage() {
       
       const searchParams: CitySearch = {
         query: searchTerm.trim(),
-        state: selectedState || undefined,
+        state: selectedState && selectedState !== "all" ? selectedState : undefined,
         websiteRequired: websiteRequired || undefined
       };
 
@@ -195,7 +195,7 @@ export default function CitySearchPage() {
                   <SelectValue placeholder="Filter by state (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All States</SelectItem>
+                  <SelectItem value="all">All States</SelectItem>
                   {states.map((state) => (
                     <SelectItem key={state} value={state}>
                       {state}

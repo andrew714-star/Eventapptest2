@@ -362,51 +362,161 @@ export class LocationFeedDiscoverer {
         }
       });
 
-      // Look for buttons with common download/export text
-      $('button:contains("Download"), a:contains("Download"), button:contains("Export"), a:contains("Export"), button:contains("Subscribe"), a:contains("Subscribe"), button:contains("iCalender"), a:contains("iCalendar")').each((_, element) => {
+      // Enhanced button detection for RSS/iCal feeds - more dynamic approach
+      const buttonSelectors = [
+        'button:contains("Download")', 'a:contains("Download")',
+        'button:contains("Export")', 'a:contains("Export")', 
+        'button:contains("Subscribe")', 'a:contains("Subscribe")',
+        'button:contains("iCalendar")', 'a:contains("iCalendar")',
+        'button:contains("RSS")', 'a:contains("RSS")',
+        'button:contains("Feed")', 'a:contains("Feed")',
+        'button:contains("Calendar")', 'a:contains("Calendar")',
+        'button[title*="Download"]', 'a[title*="Download"]',
+        'button[title*="Subscribe"]', 'a[title*="Subscribe"]',
+        'button[title*="RSS"]', 'a[title*="RSS"]',
+        'button[title*="iCal"]', 'a[title*="iCal"]',
+        'input[type="button"][value*="Download"]',
+        'input[type="submit"][value*="Subscribe"]'
+      ];
+
+      $(buttonSelectors.join(', ')).each((_, element) => {
         const $el = $(element);
-        // Check for onclick handlers or data attributes that might reveal feed URLs
-        const onclick = $el.attr('onclick');
-        const dataUrl = $el.attr('data-url') || $el.attr('data-href');
+        const tagName = (element as any).tagName?.toLowerCase() || 'unknown';
         
-        if (onclick && (onclick.includes('.ics') || onclick.includes('.rss') || onclick.includes('calendar') || onclick.includes('feed'))) {
-          // Extract URL from onclick handler
-          const urlMatch = onclick.match(/['"]([^'"]*\.(?:ics|rss|xml)|[^'"]*(?:calendar|feed)[^'"]*)['"]/) || 
-                           onclick.match(/window\.open\(['"]([^'"]*)['"]/) || 
-                           onclick.match(/location\.href\s*=\s*['"]([^'"]*)['"]/) ||
-                           onclick.match(/downloadFile\(['"]([^'"]*)['"]/) ||
-                           onclick.match(/export\w*\(['"]([^'"]*)['"]/) ||
-                           onclick.match(/subscribe\w*\(['"]([^'"]*)['"]/) ||
-                           onclick.match(/['"]([^'"]*(?:api|download|export)[^'"]*)['"]/)
-                           
-          if (urlMatch && urlMatch[1]) {
-            const path = urlMatch[1].startsWith('/') ? urlMatch[1] : new URL(urlMatch[1], baseUrl).pathname;
+        // Extract potential URLs from various attributes and handlers
+        const onclick = $el.attr('onclick') || '';
+        const dataUrl = $el.attr('data-url') || $el.attr('data-href') || $el.attr('data-link');
+        const formAction = $el.closest('form').attr('action');
+        const href = $el.attr('href');
+        
+        // Enhanced onclick handler parsing
+        if (onclick) {
+          const urlPatterns = [
+            // Standard URL patterns
+            /['"]([^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
+            /['"]([^'"]*(?:calendar|feed|events)[^'"]*)['"]/, 
+            // Function calls that might contain URLs
+            /window\.open\(['"]([^'"]*)['"]/, 
+            /location\.(?:href|replace)\s*=\s*['"]([^'"]*)['"]/, 
+            /downloadFile\(['"]([^'"]*)['"]/, 
+            /exportCalendar\(['"]([^'"]*)['"]/, 
+            /subscribe\w*\(['"]([^'"]*)['"]/, 
+            /getDownloadURL\(['"]([^'"]*)['"]/, 
+            /redirectTo\(['"]([^'"]*)['"]/, 
+            /openLink\(['"]([^'"]*)['"]/, 
+            // AJAX or fetch calls
+            /(?:fetch|ajax)\(['"]([^'"]*(?:calendar|feed|download)[^'"]*)['"]/, 
+            // Generic URL extraction with common feed keywords
+            /['"]([^'"]*(?:download|export|subscribe|icalendar)[^'"]*)['"]/, 
+            // ModID/CID patterns common in government CMS
+            /['"]([^'"]*(?:ModID|CID|calendarId)[^'"]*)['"]/, 
+            // Form submission patterns
+            /submit\(\s*['"]([^'"]*)['"]/, 
+          ];
+
+          for (const pattern of urlPatterns) {
+            const match = onclick.match(pattern);
+            if (match && match[1]) {
+              let potentialUrl = match[1];
+              
+              // Handle relative URLs
+              if (potentialUrl.startsWith('/')) {
+                discoveredPaths.add(potentialUrl);
+              } else if (potentialUrl.startsWith('http')) {
+                try {
+                  const path = new URL(potentialUrl).pathname + new URL(potentialUrl).search;
+                  discoveredPaths.add(path);
+                } catch (e) {
+                  // Invalid URL, skip
+                }
+              } else if (potentialUrl.includes('calendar') || potentialUrl.includes('feed') || potentialUrl.includes('event')) {
+                // Treat as relative path for calendar-related URLs
+                discoveredPaths.add(`/${potentialUrl}`);
+              }
+            }
+          }
+        }
+        
+        // Check data attributes
+        if (dataUrl) {
+          const path = dataUrl.startsWith('/') ? dataUrl : dataUrl.startsWith('http') ? new URL(dataUrl).pathname : `/${dataUrl}`;
+          discoveredPaths.add(path);
+        }
+        
+        // Check href attribute
+        if (href && (href.includes('calendar') || href.includes('feed') || href.includes('download') || href.includes('.ics') || href.includes('.rss'))) {
+          const path = href.startsWith('/') ? href : href.startsWith('http') ? new URL(href, baseUrl).pathname : `/${href}`;
+          discoveredPaths.add(path);
+        }
+        
+        // Check form actions for subscription forms
+        if (formAction && (formAction.includes('calendar') || formAction.includes('subscribe') || formAction.includes('download'))) {
+          const path = formAction.startsWith('/') ? formAction : `/${formAction}`;
+          discoveredPaths.add(path);
+        }
+
+        // Look for nearby hidden inputs or links that might contain the actual URL
+        const nearbyInputs = $el.closest('form, div, span').find('input[type="hidden"], input[name*="url"], input[name*="feed"]');
+        nearbyInputs.each((_, input) => {
+          const value = $(input).attr('value');
+          if (value && (value.includes('calendar') || value.includes('feed') || value.includes('.ics') || value.includes('.rss'))) {
+            const path = value.startsWith('/') ? value : `/${value}`;
+            discoveredPaths.add(path);
+          }
+        });
+      });
+
+      // Enhanced detection of RSS feed icons and iCalendar subscribe links
+      const feedLinkSelectors = [
+        'a[href*="ical"]', 'a[href*="rss"]', 'a[href*=".xml"]', 'a[href*="feed"]',
+        'a[title*="iCalendar"]', 'a[title*="Subscribe"]', 'a[title*="RSS"]', 'a[title*="Feed"]',
+        'img[src*="rss"]', 'img[alt*="RSS"]', 'img[alt*="Feed"]', 'img[alt*="Calendar"]',
+        'a[class*="rss"]', 'a[class*="feed"]', 'a[class*="calendar"]', 'a[class*="subscribe"]',
+        'span[class*="rss"] a', 'div[class*="feed"] a', 'li[class*="subscribe"] a'
+      ];
+
+      $(feedLinkSelectors.join(', ')).each((_, element) => {
+        const $el = $(element);
+        const tagName = (element as any).tagName?.toLowerCase() || 'unknown';
+        
+        // Get href from element or parent
+        const href = $el.attr('href') || $el.parent('a').attr('href') || $el.closest('a').attr('href');
+        
+        if (href) {
+          // Check for direct feed links
+          if (href.includes('.ics') || href.includes('.rss') || href.includes('.xml') || 
+              href.includes('feed') || href.includes('ical') || href.includes('calendar')) {
+            
+            const path = href.startsWith('/') ? href : href.startsWith('http') ? new URL(href, baseUrl).pathname + new URL(href, baseUrl).search : `/${href}`;
             discoveredPaths.add(path);
           }
         }
         
-        if (dataUrl) {
-          const path = dataUrl.startsWith('/') ? dataUrl : new URL(dataUrl, baseUrl).pathname;
-          discoveredPaths.add(path);
-        }
-      });
-
-      // Look for RSS feed icons and iCalendar subscribe links (like in the screenshots)
-      $('a[href*="ical"], a[title*="iCalendar"], a[title*="Subscribe"], img[src*="rss"], img[alt*="RSS"], a[href*="rss"], a[href*=".xml"]').each((_, element) => {
-        const $el = $(element);
-        const href = $el.attr('href');
-        const parentHref = $el.parent('a').attr('href');
-        
-        // Check the link itself
-        if (href && (href.includes('.ics') || href.includes('.rss') || href.includes('.xml') || href.includes('feed') || href.includes('ical'))) {
-          const path = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
-          discoveredPaths.add(path);
-        }
-        
-        // Check parent link (for images inside links)
-        if (parentHref && (parentHref.includes('.ics') || parentHref.includes('.rss') || parentHref.includes('.xml') || parentHref.includes('feed') || parentHref.includes('ical'))) {
-          const path = parentHref.startsWith('/') ? parentHref : new URL(parentHref, baseUrl).pathname;
-          discoveredPaths.add(path);
+        // For images, check if they're inside clickable elements with data attributes
+        if (tagName === 'img') {
+          const clickableParent = $el.closest('[onclick], [data-url], [data-href], a');
+          if (clickableParent.length > 0) {
+            const parentOnclick = clickableParent.attr('onclick');
+            const parentDataUrl = clickableParent.attr('data-url') || clickableParent.attr('data-href');
+            
+            if (parentOnclick && (parentOnclick.includes('calendar') || parentOnclick.includes('feed') || parentOnclick.includes('rss'))) {
+              // Extract URL from parent onclick
+              const urlMatch = parentOnclick.match(/['"]([^'"]*(?:calendar|feed|rss|ical)[^'"]*)['"]/) ||
+                              parentOnclick.match(/window\.open\(['"]([^'"]*)['"]/) ||
+                              parentOnclick.match(/location\.href\s*=\s*['"]([^'"]*)['"]/) ||
+                              parentOnclick.match(/downloadFile\(['"]([^'"]*)['"]/) ||
+                              parentOnclick.match(/subscribe\w*\(['"]([^'"]*)['"]/)
+              if (urlMatch && urlMatch[1]) {
+                const path = urlMatch[1].startsWith('/') ? urlMatch[1] : `/${urlMatch[1]}`;
+                discoveredPaths.add(path);
+              }
+            }
+            
+            if (parentDataUrl) {
+              const path = parentDataUrl.startsWith('/') ? parentDataUrl : `/${parentDataUrl}`;
+              discoveredPaths.add(path);
+            }
+          }
         }
       });
 
@@ -451,9 +561,11 @@ export class LocationFeedDiscoverer {
         }
       });
 
-      // Look for JavaScript-generated links in script tags (only for actual feed files)
+      // Enhanced JavaScript and AJAX endpoint discovery
       $('script').each((_, element) => {
         const scriptContent = $(element).html() || '';
+        
+        // Look for actual feed files
         if (scriptContent.includes('.ics') || scriptContent.includes('.rss') || scriptContent.includes('.xml')) {
           // Extract URLs for actual feed files (not API endpoints)
           const feedFilePatterns = [
@@ -473,6 +585,82 @@ export class LocationFeedDiscoverer {
               }
             }
           });
+        }
+        
+        // Look for AJAX endpoints and dynamic feed URLs
+        if (scriptContent.includes('calendar') || scriptContent.includes('event') || scriptContent.includes('feed')) {
+          const ajaxPatterns = [
+            /(?:url|endpoint|api)['"]?\s*:\s*['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // Object property
+            /fetch\(['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // Fetch API
+            /ajax\(['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // AJAX calls
+            /\.get\(['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // HTTP GET
+            /\.post\(['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // HTTP POST
+            /downloadUrl\s*=\s*['"]([^'"]*(?:calendar|event|feed)[^'"]*)['"]/, // Download URL variable
+            /feedUrl\s*=\s*['"]([^'"]*)['"]/, // Feed URL variable
+            /calendarUrl\s*=\s*['"]([^'"]*)['"]/, // Calendar URL variable
+            /subscribeUrl\s*=\s*['"]([^'"]*)['"]/, // Subscribe URL variable
+            /exportUrl\s*=\s*['"]([^'"]*)['"]/, // Export URL variable
+            /iCalUrl\s*=\s*['"]([^'"]*)['"]/, // iCal URL variable
+            /rssUrl\s*=\s*['"]([^'"]*)['"]/, // RSS URL variable
+          ];
+
+          for (const pattern of ajaxPatterns) {
+            const matches = scriptContent.match(pattern);
+            if (matches && matches[1]) {
+              let url = matches[1];
+              // Handle template variables like {categoryId} or {moduleId}
+              url = url.replace(/\{[^}]+\}/g, 'all').replace(/%7B[^%]+%7D/g, 'all');
+              const path = url.startsWith('/') ? url : `/${url}`;
+              discoveredPaths.add(path);
+            }
+          }
+          
+          // Look for parameter-based subscription URLs (common in government CMS)
+          const paramPatterns = [
+            /ModID['"=:]\s*['"]?(\d+)['"]?/, // ModID parameter
+            /CID['"=:]\s*['"]?([^'",\s}]+)['"]?/, // CID parameter
+            /calendarId['"=:]\s*['"]?([^'",\s}]+)['"]?/, // calendarId parameter
+            /categoryId['"=:]\s*['"]?([^'",\s}]+)['"]?/, // categoryId parameter
+          ];
+
+          paramPatterns.forEach(pattern => {
+            const matches = scriptContent.match(pattern);
+            if (matches && matches[1]) {
+              const paramValue = matches[1];
+              // Try common subscription page patterns with discovered parameters
+              discoveredPaths.add(`/iCalendar.aspx?ModID=${paramValue}&CID=All`);
+              discoveredPaths.add(`/RSSFeed.aspx?ModID=${paramValue}&CID=All`);
+              discoveredPaths.add(`/calendar.aspx?ModID=${paramValue}`);
+              discoveredPaths.add(`/events.aspx?categoryId=${paramValue}`);
+            }
+          });
+          
+          // Look for base64 encoded or obfuscated URLs
+          const encodedPatterns = [
+            /atob\(['"]([A-Za-z0-9+/=]+)['"]/, // Base64 decode
+            /decodeURI(?:Component)?\(['"]([^'"]*)['"]/, // URI decode
+          ];
+          
+          for (const pattern of encodedPatterns) {
+            const matches = scriptContent.match(pattern);
+            if (matches && matches[1]) {
+              try {
+                let decoded = '';
+                if (pattern.source.includes('atob')) {
+                  decoded = Buffer.from(matches[1], 'base64').toString();
+                } else {
+                  decoded = decodeURIComponent(matches[1]);
+                }
+                
+                if (decoded.includes('calendar') || decoded.includes('event') || decoded.includes('feed') || decoded.includes('.ics') || decoded.includes('.rss')) {
+                  const path = decoded.startsWith('/') ? decoded : `/${decoded}`;
+                  discoveredPaths.add(path);
+                }
+              } catch (e) {
+                // Invalid encoding, skip
+              }
+            }
+          }
         }
       });
 
@@ -900,7 +1088,7 @@ export class LocationFeedDiscoverer {
       }
       
       console.log(`Found ${feedUrls.length} potential feed URLs in subscription page:`, feedUrls.slice(0, 3));
-      return [...new Set(feedUrls)]; // Remove duplicates
+      return Array.from(new Set(feedUrls)); // Remove duplicates
     } catch (error) {
       console.log(`Error parsing subscription page ${subscriptionUrl}:`, error);
       return [];
@@ -1033,7 +1221,7 @@ export class LocationFeedDiscoverer {
       // Now follow each subscription URL to find "All" or "All Events" buttons
       const workingFeeds: DiscoveredFeed[] = [];
       
-      for (const subscriptionUrl of subscriptionUrls) {
+      for (const subscriptionUrl of Array.from(subscriptionUrls)) {
 
         console.log(`🔎 Checking subscription page: ${subscriptionUrl}`);
         
@@ -1043,13 +1231,13 @@ export class LocationFeedDiscoverer {
           
           if (workingFeeds.length >= 2) break; // Limit to prevent too many requests
         } catch (error) {
-          console.log(`⚠️ Failed to analyze subscription page ${subscriptionUrl}:`, error.message);
+          console.log(`⚠️ Failed to analyze subscription page ${subscriptionUrl}:`, (error as Error).message);
         }
       }
       
       return workingFeeds;
     } catch (error) {
-      console.log(`❌ Error analyzing calendar page ${calendarPageUrl}:`, error.message);
+      console.log(`❌ Error analyzing calendar page ${calendarPageUrl}:`, (error as Error).message);
       return [];
     }
   }
@@ -1141,7 +1329,7 @@ export class LocationFeedDiscoverer {
       
       return workingFeeds;
     } catch (error) {
-      console.log(`Error analyzing subscription page ${subscriptionUrl}:`, error.message);
+      console.log(`Error analyzing subscription page ${subscriptionUrl}:`, (error as Error).message);
       return [];
     }
   }

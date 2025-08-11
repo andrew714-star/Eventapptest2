@@ -9,7 +9,15 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
-**2025-01-11**: City Website Database Integration
+**2025-01-11**: Enhanced Feed Discovery & City Website Database
+- Enhanced RSS/iCal feed button detection to be more dynamic and comprehensive:
+  - Added advanced JavaScript parsing to detect AJAX endpoints and dynamic feed URLs
+  - Improved detection of onClick handlers, data attributes, and form actions
+  - Added support for base64 encoded and obfuscated feed URLs
+  - Enhanced parameter extraction for government CMS systems (ModID, CID, categoryId patterns)
+  - Added detection of template variables and dynamic URL construction
+  - Improved parsing of subscription pages with multiple feed format options
+- Fixed SelectItem error in city search interface by properly handling "All States" option
 - Added comprehensive US city website database with 19,000+ cities from CSV data
 - Built city search functionality with filters for city name, state, and website availability 
 - Created website validation system to identify parked domains, expired sites, and redirects
