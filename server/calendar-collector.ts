@@ -307,7 +307,7 @@ export class CalendarFeedCollector {
           if (source.feedUrl.includes('.ics') || source.feedUrl.includes('ICalendarHandler')) {
             console.log(`Trying iCal parser for structured feed...`);
             try {
-              events = await this.parseICalFeed(source);
+              events = await this.parseICal(source);
               if (events.length > 0) {
                 console.log(`✓ iCal parser found ${events.length} events`);
                 return events;
@@ -349,7 +349,7 @@ export class CalendarFeedCollector {
       // If no structured feed found, use the original feedType logic
       switch (source.feedType) {
         case 'ical':
-          events = await this.parseICalFeed(source);
+          events = await this.parseICal(source);
           break;
         case 'rss':
           events = await this.parseRSSFeed(source);
@@ -367,7 +367,7 @@ export class CalendarFeedCollector {
           // Try to auto-detect feed type based on URL
           if (source.feedUrl?.includes('.ics') || source.feedUrl?.includes('ICalendarHandler')) {
             console.log(`Auto-detecting as iCal for ${source.name}`);
-            events = await this.parseICalFeed(source);
+            events = await this.parseICal(source);
           } else if (source.feedUrl?.includes('.rss') || source.feedUrl?.includes('rss')) {
             console.log(`Auto-detecting as RSS for ${source.name}`);
             events = await this.parseRSSFeed(source);
@@ -410,18 +410,25 @@ export class CalendarFeedCollector {
     }
   }
 
-  private async parseICalFeed(source: CalendarSource): Promise<InsertEvent[]> {
+  private async parseICal(source: CalendarSource): Promise<InsertEvent[]> {
     if (!source.feedUrl) return [];
 
     try {
       console.log(`Attempting to parse iCal feed: ${source.feedUrl}`);
 
+      // For dynamic calendar APIs, use enhanced headers and longer timeout
+      const isDynamicAPI = source.feedUrl.includes('generate_ical') || 
+                          source.feedUrl.includes('generate_calendar') || 
+                          source.feedUrl.includes('thrillshare');
+
       const response = await axios.get(source.feedUrl, {
-        timeout: 10000,
+        timeout: isDynamicAPI ? 10000 : 6000, // Longer timeout for dynamic APIs
         headers: {
           'User-Agent': 'CityWide Events Aggregator 1.0',
-          'Accept': 'text/calendar, application/calendar, text/plain, */*'
-        }
+          'Accept': isDynamicAPI ? 'text/calendar, application/calendar, text/plain, */*' : 'text/calendar'
+        },
+        maxRedirects: 5, // Allow more redirects for dynamic APIs
+        responseType: isDynamicAPI ? 'text' : 'text' // Ensure we get text response
       });
 
       console.log(`iCal Response Status: ${response.status}, Content-Type: ${response.headers['content-type']}`);
@@ -607,7 +614,7 @@ export class CalendarFeedCollector {
             if (item['calendarEvent:EventTimes']) {
               const eventTimes = item['calendarEvent:EventTimes'][0];
               console.log(`Found event times field: "${eventTimes}"`);
-              
+
               // Parse time range like "02:00 PM - 04:00 PM"
               const timeRangeMatch = eventTimes.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
               if (timeRangeMatch) {
@@ -621,7 +628,7 @@ export class CalendarFeedCollector {
             if (!startTime) {
               // Look for time patterns in description and title
               const timeText = description + ' ' + title;
-              
+
               // Time range pattern
               const timeRangeMatch = timeText.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:-|to)\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i);
               if (timeRangeMatch) {
@@ -658,10 +665,10 @@ export class CalendarFeedCollector {
                 let hours = parseInt(timeParts[1]);
                 const minutes = parseInt(timeParts[2]);
                 const ampm = timeParts[3].toUpperCase();
-                
+
                 if (ampm === 'PM' && hours !== 12) hours += 12;
                 if (ampm === 'AM' && hours === 12) hours = 0;
-                
+
                 eventDate.setHours(hours, minutes, 0, 0);
                 console.log(`Updated event date with extracted time: ${eventDate}`);
               }
@@ -681,10 +688,10 @@ export class CalendarFeedCollector {
                 let endHours = parseInt(endTimeParts[1]);
                 const endMinutes = parseInt(endTimeParts[2]);
                 const endAmPm = endTimeParts[3].toUpperCase();
-                
+
                 if (endAmPm === 'PM' && endHours !== 12) endHours += 12;
                 if (endAmPm === 'AM' && endHours === 12) endHours = 0;
-                
+
                 endDate = new Date(eventDate);
                 endDate.setHours(endHours, endMinutes, 0, 0);
               } else {
@@ -790,7 +797,7 @@ export class CalendarFeedCollector {
   private async parseWebCalFeed(source: CalendarSource): Promise<InsertEvent[]> {
     // WebCal is typically just iCal with webcal:// protocol
     const icalUrl = source.feedUrl?.replace('webcal://', 'https://');
-    return this.parseICalFeed({ ...source, feedUrl: icalUrl });
+    return this.parseICal({ ...source, feedUrl: icalUrl });
   }
 
  private async scrapeHTMLEvents(source: CalendarSource): Promise<InsertEvent[]> {
@@ -966,7 +973,7 @@ export class CalendarFeedCollector {
                                     eventDate = this.getNextOccurrenceDate(title);
                                 }
 
-                                if (eventDate && eventDate > new Date() && title && startTime) { // Only future events
+                                if (eventDate && eventDate > new Date() && this.isValidEventTitle(this.extractEventTitle(line, $cell))) { // Only future events
 
                                     // Generate better descriptions for San Jacinto events
                                     let eventDescription = 'Event details available on website';
@@ -1228,7 +1235,7 @@ export class CalendarFeedCollector {
     try {
       // Clean the date string
       const cleanDateStr = dateStr.trim().replace(/\s+/g, ' ');
-      
+
       // Try direct parsing first
       const directDate = new Date(cleanDateStr);
       if (!isNaN(directDate.getTime())) {
@@ -1556,7 +1563,7 @@ export class CalendarFeedCollector {
     };
 
     let newSourcePriority = feedTypePriority[newSource.feedType] || 0;
-    
+
     // Boost priority for comprehensive feeds (All-calendar, all events, etc.)
     if (newSource.feedUrl && (
       newSource.feedUrl.includes('All-calendar') || 
@@ -2114,22 +2121,6 @@ export class CalendarFeedCollector {
   }
 
   /**
-   * Categorize school events
-   */
-  private getSchoolEventCategory(eventType: string): string {
-    const type = eventType.toLowerCase();
-
-    if (type.includes('board') || type.includes('meeting')) return 'Government';
-    if (type.includes('athletic') || type.includes('game') || type.includes('sport')) return 'Sports & Recreation';
-    if (type.includes('graduation') || type.includes('ceremony') || type.includes('awards')) return 'Education & Learning';
-    if (type.includes('conference') || type.includes('workshop') || type.includes('training')) return 'Education & Learning';
-    if (type.includes('holiday') || type.includes('break') || type.includes('celebration')) return 'Holiday';
-    if (type.includes('registration') || type.includes('enrollment') || type.includes('orientation')) return 'Education & Learning';
-
-    return 'Education & Learning';
-  }
-
-  /**
    * Extract date from calendar table cell context
    */
   private extractCalendarCellDate($element: any): Date | null {
@@ -2180,7 +2171,7 @@ export class CalendarFeedCollector {
   /**
    * Extract dates specifically from list items and table rows (common calendar formats)
    */
-  private extractEventDateFromListOrTable($element: any, elementText: string): Date | null {
+  private extractDateFromListOrTable($element: any, elementText: string): Date | null {
     // First try the original comprehensive method
     const comprehensiveDate = this.extractEventDateComprehensive($element, elementText);
     if (comprehensiveDate) return comprehensiveDate;
@@ -2518,13 +2509,13 @@ export class CalendarFeedCollector {
       /\b(community|city|town|council)\b.*?\b(event|meeting|celebration|festival)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})/i,
 
       // Date-first patterns
-      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,?\s+\d{4})?\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}(?:,?\s+\d{4})?\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|fair|expo|exhibition)/i,
 
       // Time patterns
-      /\b\d{1,2}:\d{2}\s*[ap]m\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      /\b\d{1,2}:\d{2}\s*[ap]m\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|fair|expo|exhibition)/i,
 
       // Weekday patterns
-      /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|registration|fair|expo|exhibition)/i,
+      /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b.*?\b(meeting|event|activity|program|class|session|workshop|seminar|conference|celebration|festival|concert|performance|game|match|tournament|ceremony|graduation|fundraiser|dinner|lunch|dance|show|presentation|lecture|orientation|fair|expo|exhibition)/i,
 
       // Action patterns
       /\b(join us|come|attend|participate|register|rsvp)\b.*?\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2}|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
@@ -2586,7 +2577,7 @@ export class CalendarFeedCollector {
     const datePatterns = [
       /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}(?:,?\s+\d{4})?/i,
       /\d{1,2}\/\d{1,2}\/?\d{0,4}/,
-      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\s]*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)[,\s]+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2}/i,
       /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i
     ];
 

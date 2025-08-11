@@ -706,10 +706,18 @@ export class LocationFeedDiscoverer {
 
   private async validateFeedUrl(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
-      // Skip API endpoints that are likely to be client-side only
-      if (feedUrl.includes('/api/v') || feedUrl.includes('/cms/') || feedUrl.includes('section_ids=')) {
-        console.log(`Skipping client-side API endpoint: ${feedUrl}`);
-        return null;
+      // Handle dynamic calendar generation APIs (like Thrillshare CMS)
+      if (feedUrl.includes('generate_ical') || feedUrl.includes('generate_calendar') || feedUrl.includes('export_ical')) {
+        console.log(`Attempting to validate dynamic calendar generation API: ${feedUrl}`);
+        return await this.validateDynamicCalendarAPI(feedUrl, location);
+      }
+
+      // Skip other API endpoints that are likely to be client-side only
+      if (feedUrl.includes('/api/v') && !feedUrl.includes('generate_ical') && !feedUrl.includes('generate_calendar')) {
+        if (feedUrl.includes('/cms/') && !feedUrl.includes('generate_ical')) {
+          console.log(`Skipping client-side API endpoint: ${feedUrl}`);
+          return null;
+        }
       }
 
       // First verify the domain/website exists before checking feed URLs
@@ -1096,6 +1104,124 @@ export class LocationFeedDiscoverer {
     }
   }
 
+  private async validateDynamicCalendarAPI(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
+    try {
+      // Try the URL as-is first
+      let testUrl = feedUrl;
+      
+      // For Thrillshare CMS and similar systems, try common parameter variations
+      if (feedUrl.includes('filter_ids&section_ids') || feedUrl.includes('filter_ids=&section_ids=')) {
+        // Try without parameters first
+        testUrl = feedUrl.split('?')[0];
+        
+        // Also try with common "all events" parameters
+        const baseUrl = feedUrl.split('?')[0];
+        const variations = [
+          baseUrl,
+          `${baseUrl}?filter_ids=all`,
+          `${baseUrl}?section_ids=all`,
+          `${baseUrl}?filter_ids=all&section_ids=all`,
+          `${baseUrl}?filter_ids=&section_ids=`,
+          `${baseUrl}?export_all=true`,
+          `${baseUrl}?include_all=1`
+        ];
+        
+        for (const variation of variations) {
+          const result = await this.testCalendarAPIUrl(variation, location);
+          if (result) {
+            console.log(`✅ Dynamic calendar API working with URL: ${variation}`);
+            return result;
+          }
+        }
+      } else {
+        // For other dynamic APIs, try the URL directly
+        const result = await this.testCalendarAPIUrl(testUrl, location);
+        if (result) {
+          return result;
+        }
+      }
+      
+      console.log(`❌ Dynamic calendar API not responsive: ${feedUrl}`);
+      return null;
+    } catch (error) {
+      console.log(`Error validating dynamic calendar API ${feedUrl}:`, error);
+      return null;
+    }
+  }
+
+  private async testCalendarAPIUrl(testUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
+    try {
+      const response = await axios.get(testUrl, {
+        timeout: 6000,
+        headers: { 
+          'User-Agent': 'CityWide Events Calendar Bot 1.0',
+          'Accept': 'text/calendar, application/calendar, text/plain, */*'
+        },
+        maxRedirects: 3,
+        validateStatus: (status) => status < 500
+      });
+
+      // Check if we got actual calendar data
+      if (response.status === 200 && response.data) {
+        const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        
+        // Look for iCalendar format
+        if (content.includes('BEGIN:VCALENDAR') || response.headers['content-type']?.includes('text/calendar')) {
+          console.log(`✅ Found valid iCalendar content from dynamic API: ${testUrl}`);
+          
+          return {
+            source: {
+              id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-dynamic-ical-${Date.now()}`,
+              name: `${this.generateSourceName(location)} (Dynamic iCal)`,
+              city: location.city,
+              state: location.state,
+              type: location.organizationType as any,
+              feedUrl: testUrl,
+              websiteUrl: new URL(testUrl).origin,
+              isActive: true,
+              feedType: 'ical' as const
+            },
+            confidence: 0.95,
+            lastChecked: new Date()
+          };
+        }
+        
+        // Check if it's a downloadable file (some APIs return binary data)
+        if (response.headers['content-disposition']?.includes('attachment') || 
+            response.headers['content-type']?.includes('application/octet-stream') ||
+            testUrl.endsWith('.ics')) {
+          console.log(`✅ Found downloadable calendar file from dynamic API: ${testUrl}`);
+          
+          return {
+            source: {
+              id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-download-ical-${Date.now()}`,
+              name: `${this.generateSourceName(location)} (Download iCal)`,
+              city: location.city,
+              state: location.state,
+              type: location.organizationType as any,
+              feedUrl: testUrl,
+              websiteUrl: new URL(testUrl).origin,
+              isActive: true,
+              feedType: 'ical' as const
+            },
+            confidence: 0.9,
+            lastChecked: new Date()
+          };
+        }
+        
+        console.log(`⚠️ Dynamic API returned content but not valid calendar format: ${testUrl}`);
+        console.log(`Content preview: ${content.substring(0, 200)}`);
+      } else {
+        console.log(`⚠️ Dynamic API returned status ${response.status}: ${testUrl}`);
+      }
+      
+      return null;
+    } catch (error) {
+      console.log(`❌ Error testing dynamic calendar API ${testUrl}:`, (error as Error).message);
+      return null;
+    }
+  }
+
   private async validateAndCreateFeed(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.get(feedUrl, {
@@ -1192,6 +1318,10 @@ export class LocationFeedDiscoverer {
          /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe[^<]*<\/a>/gi,
          /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe to calendar[^<]*<\/a>/gi,
         /href=["']([^"']*\/generate_ical[^"']*)["']/gi,
+        /href=["']([^"']*\/generate_calendar[^"']*)["']/gi,
+        /href=["']([^"']*\/export_ical[^"']*)["']/gi,
+        /href=["']([^"']*thrillshare[^"']*generate_ical[^"']*)["']/gi,
+        /href=["']([^"']*\/api\/[^"']*\/events\/generate_ical[^"']*)["']/gi,
         /href=["']([^"']*\/ics[^"']*)["']/gi,
         /href=["']([^"']*\/calendar.*[^"']*)["']/gi,
         /href=["']([^"']*\/feed[^"']*)["']/gi,
