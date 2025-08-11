@@ -244,18 +244,6 @@ export class CalendarFeedCollector {
       feedType: 'ical'
     },
 
-    // Hemet School District - Fixed URL
-    {
-      id: 'hemet-usd',
-      name: 'Hemet Unified School District',
-      city: 'Hemet',
-      state: 'CA',
-      type: 'school',
-      feedUrl: 'https://www.hemetusd.org/events',
-      websiteUrl: 'https://www.hemetusd.org',
-      isActive: true,
-      feedType: 'html'
-    }
   ];
 
   async collectFromAllSources(): Promise<InsertEvent[]> {

@@ -42,7 +42,7 @@ export class LocationFeedDiscoverer {
     '/rss.aspx#events',
     '/calendar.xml',
     '/events.xml',
-    'iCalendar.aspx',
+    '/iCalendar.aspx',
     // Common download/export patterns
     '/calendar/download',
     '/calendar/export',
@@ -361,7 +361,7 @@ export class LocationFeedDiscoverer {
       });
 
       // Look for buttons with common download/export text
-      $('button:contains("Download"), a:contains("Download"), button:contains("Export"), a:contains("Export"), button:contains("Subscribe"), a:contains("Subscribe")').each((_, element) => {
+      $('button:contains("Download"), a:contains("Download"), button:contains("Export"), a:contains("Export"), button:contains("Subscribe"), a:contains("Subscribe"), button:contains("iCalender"), a:contains("iCalendar")').each((_, element) => {
         const $el = $(element);
         // Check for onclick handlers or data attributes that might reveal feed URLs
         const onclick = $el.attr('onclick');
