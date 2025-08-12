@@ -362,7 +362,7 @@ export class LocationFeedDiscoverer {
         }
       });
 
-      // Enhanced button detection for RSS/iCal feeds - focus on downloadable feeds
+      // Enhanced button detection for RSS/iCal feeds -  focus on downloadable feeds
       const downloadableButtonSelectors = [
         // Direct download buttons
         'button:contains("Download")', 'a:contains("Download")',
