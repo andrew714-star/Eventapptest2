@@ -755,8 +755,12 @@ export class LocationFeedDiscoverer {
         return null;
       }
 
+      // Check if this is a downloadable feed URL first
+      const isDownloadableFeed = this.isDownloadableFeedUrl(feedUrl);
+      
       // Identify direct download/API endpoints vs subscription pages
-      const isDirectDownloadAPI = feedUrl.includes('generate_ical') || 
+      const isDirectDownloadAPI = isDownloadableFeed ||
+                                  feedUrl.includes('generate_ical') || 
                                   feedUrl.includes('generate_calendar') || 
                                   feedUrl.includes('export_ical') ||
                                   feedUrl.includes('/api/') && (feedUrl.includes('ical') || feedUrl.includes('calendar') || feedUrl.includes('events')) ||
@@ -775,7 +779,7 @@ export class LocationFeedDiscoverer {
                                  (feedUrl.includes('iCalendar.aspx') && !feedUrl.includes('CID=')) || 
                                  (feedUrl.includes('rss.aspx') && !feedUrl.includes('ModID=')) || 
                                  (feedUrl.includes('calendar.aspx') && !feedUrl.includes('CID=')) ||
-                                 (feedUrl.includes('subscribe') && !feedUrl.includes('.ics') && !feedUrl.includes('.rss'))
+                                 (feedUrl.includes('subscribe') && !feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !this.isDownloadableFeedUrl(feedUrl))
                                 );
       
       if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
