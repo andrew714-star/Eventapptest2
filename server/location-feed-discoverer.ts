@@ -1423,6 +1423,9 @@ export class LocationFeedDiscoverer {
           if (urlMatch) {
             let subscriptionUrl = urlMatch[1];
             
+            // Decode HTML entities
+            subscriptionUrl = subscriptionUrl.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+            
             // Convert to absolute URL
             if (!subscriptionUrl.startsWith('http')) {
               if (subscriptionUrl.startsWith('/')) {
@@ -1432,6 +1435,7 @@ export class LocationFeedDiscoverer {
               }
             }
             
+            console.log(`📋 Found subscription URL: ${subscriptionUrl}`);
             subscriptionUrls.add(subscriptionUrl);
           }
         }
@@ -1443,8 +1447,18 @@ export class LocationFeedDiscoverer {
       const workingFeeds: DiscoveredFeed[] = [];
       
       for (const subscriptionUrl of Array.from(subscriptionUrls)) {
-
         console.log(`🔎 Checking subscription page: ${subscriptionUrl}`);
+        
+        // Check if the subscription URL itself is a downloadable feed (like Thrillshare CMS)
+        if (this.isDownloadableFeedUrl(subscriptionUrl)) {
+          console.log(`🎯 Subscription URL is itself a downloadable feed: ${subscriptionUrl}`);
+          const directFeed = await this.validateAndCreateFeed(subscriptionUrl, location);
+          if (directFeed) {
+            console.log(`✅ Direct subscription feed validated: ${subscriptionUrl}`);
+            workingFeeds.push(directFeed);
+            continue; // Skip further analysis for this URL
+          }
+        }
         
         try {
           const allEventsFeeds = await this.findAllEventsButtonsOnSubscriptionPage(subscriptionUrl, location);
@@ -1469,39 +1483,65 @@ export class LocationFeedDiscoverer {
   private isDownloadableFeedUrl(url: string): boolean {
     if (!url) return false;
     
-    const lowerUrl = url.toLowerCase();
+    // Decode HTML entities first
+    const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+    const lowerUrl = decodedUrl.toLowerCase();
+    
+    console.log(`🔍 Checking if downloadable feed: ${decodedUrl}`);
     
     // Direct feed file extensions
     if (lowerUrl.endsWith('.ics') || lowerUrl.endsWith('.rss') || lowerUrl.endsWith('.xml')) {
+      console.log(`✅ Direct feed file extension detected: ${decodedUrl}`);
       return true;
     }
     
-    // Feed generation endpoints
+    // Feed generation endpoints (including Thrillshare CMS and similar)
     if (lowerUrl.includes('generate_ical') || lowerUrl.includes('generate_calendar') || lowerUrl.includes('export_ical')) {
+      console.log(`✅ Feed generation endpoint detected: ${decodedUrl}`);
+      return true;
+    }
+    
+    // CMS API endpoints that generate calendar data
+    if (lowerUrl.includes('/api/') && lowerUrl.includes('/cms/') && 
+        (lowerUrl.includes('events') || lowerUrl.includes('calendar')) &&
+        (lowerUrl.includes('generate_ical') || lowerUrl.includes('ical') || lowerUrl.includes('export'))) {
+      console.log(`✅ CMS API calendar endpoint detected: ${decodedUrl}`);
+      return true;
+    }
+    
+    // Thrillshare-specific patterns
+    if (lowerUrl.includes('thrillshare') && 
+        (lowerUrl.includes('generate_ical') || lowerUrl.includes('events') || lowerUrl.includes('calendar'))) {
+      console.log(`✅ Thrillshare CMS endpoint detected: ${decodedUrl}`);
       return true;
     }
     
     // Feed endpoints with parameters that return downloadable content
     if (lowerUrl.includes('rssfeed.aspx') || lowerUrl.includes('icalendarfeed.aspx') || lowerUrl.includes('feed.aspx')) {
+      console.log(`✅ ASP.NET feed endpoint detected: ${decodedUrl}`);
       return true;
     }
     
     // Download/export endpoints with calendar keywords
     if ((lowerUrl.includes('download') || lowerUrl.includes('export')) && 
         (lowerUrl.includes('calendar') || lowerUrl.includes('events') || lowerUrl.includes('ical') || lowerUrl.includes('rss'))) {
+      console.log(`✅ Download/export calendar endpoint detected: ${decodedUrl}`);
       return true;
     }
     
     // API endpoints that return calendar data
     if (lowerUrl.includes('/api/') && (lowerUrl.includes('calendar') || lowerUrl.includes('events') || lowerUrl.includes('ical') || lowerUrl.includes('rss'))) {
+      console.log(`✅ API calendar endpoint detected: ${decodedUrl}`);
       return true;
     }
     
     // Feed URLs with specific parameters indicating downloadable content
     if ((lowerUrl.includes('modid=') || lowerUrl.includes('cid=')) && (lowerUrl.includes('calendar') || lowerUrl.includes('rss') || lowerUrl.includes('ical'))) {
+      console.log(`✅ Parameterized feed endpoint detected: ${decodedUrl}`);
       return true;
     }
     
+    console.log(`❌ Not recognized as downloadable feed: ${decodedUrl}`);
     return false;
   }
 
