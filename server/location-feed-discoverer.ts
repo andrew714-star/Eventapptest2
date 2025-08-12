@@ -139,7 +139,7 @@ export class LocationFeedDiscoverer {
     '{city}{state}.us',
     'city{city}.us',
     'cityof{city}.us',
-    
+
   ];
 
   private schoolDistrictPatterns = [
@@ -179,7 +179,7 @@ export class LocationFeedDiscoverer {
 
   async discoverFeedsForLocation(location: LocationInfo): Promise<DiscoveredFeed[]> {
     console.log(`Discovering calendar feeds for ${location.city}, ${location.state}...`);
-    
+
     const discoveredFeeds: DiscoveredFeed[] = [];
     const citySlug = this.createCitySlug(location.city);
     const stateSlug = location.state.toLowerCase();
@@ -213,7 +213,7 @@ export class LocationFeedDiscoverer {
 
   private async discoverGovernmentFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
+
     for (const domainPattern of this.governmentDomainPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -224,7 +224,7 @@ export class LocationFeedDiscoverer {
         type: 'city',
         organizationType: 'city' as const
       });
-      
+
       feeds.push(...discoveredFeeds);
     }
 
@@ -233,9 +233,9 @@ export class LocationFeedDiscoverer {
 
   private async discoverSchoolFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
-  
-    
+
+
+
     for (const domainPattern of this.schoolDistrictPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -246,7 +246,7 @@ export class LocationFeedDiscoverer {
         type: 'city',
         organizationType: 'school' as const
       });
-      
+
       feeds.push(...discoveredFeeds);
     }
 
@@ -255,7 +255,7 @@ export class LocationFeedDiscoverer {
 
   private async discoverChamberFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
+
     for (const domainPattern of this.chamberPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -266,7 +266,7 @@ export class LocationFeedDiscoverer {
         type: 'city',
         organizationType: 'chamber' as const
       });
-      
+
       feeds.push(...discoveredFeeds);
     }
 
@@ -275,7 +275,7 @@ export class LocationFeedDiscoverer {
 
   private async discoverLibraryFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
+
     for (const domainPattern of this.libraryPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -286,7 +286,7 @@ export class LocationFeedDiscoverer {
         type: 'city',
         organizationType: 'library' as const
       });
-      
+
       feeds.push(...discoveredFeeds);
     }
 
@@ -295,7 +295,7 @@ export class LocationFeedDiscoverer {
 
   private async discoverParkRecFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
+
     for (const domainPattern of this.parkRecPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -306,7 +306,7 @@ export class LocationFeedDiscoverer {
         type: 'city',
         organizationType: 'parks' as const
       });
-      
+
       feeds.push(...discoveredFeeds);
     }
 
@@ -315,7 +315,7 @@ export class LocationFeedDiscoverer {
 
   private async checkDomainForFeeds(domain: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-    
+
     try {
       // First check if domain exists with shorter timeout
       const baseUrl = `https://${domain}`;
@@ -399,22 +399,22 @@ export class LocationFeedDiscoverer {
       $(downloadableButtonSelectors.join(', ')).each((_, element) => {
         const $el = $(element);
         const tagName = (element as any).tagName?.toLowerCase() || 'unknown';
-        
+
         console.log(`🔍 Found potential downloadable feed button: ${$el.text().trim()} (${tagName})`);
-        
+
         // Extract potential URLs from various attributes and handlers
         const onclick = $el.attr('onclick') || '';
         const dataUrl = $el.attr('data-url') || $el.attr('data-href') || $el.attr('data-link');
         const formAction = $el.closest('form').attr('action');
         const href = $el.attr('href');
-        
+
         // Check if button/link directly points to downloadable feed
         if (href && this.isDownloadableFeedUrl(href)) {
           console.log(`✅ Found direct downloadable feed URL in href: ${href}`);
           const path = href.startsWith('/') ? href : href.startsWith('http') ? new URL(href, baseUrl).pathname + new URL(href, baseUrl).search : `/${href}`;
           discoveredPaths.add(path);
         }
-        
+
         // Enhanced onclick handler parsing for downloadable feeds
         if (onclick) {
           const downloadableFeedPatterns = [
@@ -428,7 +428,7 @@ export class LocationFeedDiscoverer {
             // Feed generation endpoints
             /['"]([^'"]*(?:generate_ical|generate_calendar|export_ical)[^'"]*)['"]/, 
             // Subscription endpoints that return feeds
-            /subscribe\w*\(['"]([^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
+            /['"]([^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
             // Window open calls for downloads
             /window\.open\(['"]([^'"]*(?:\.ics|\.rss|download|export)[^'"]*)['"]/, 
             // Location changes for downloads
@@ -439,12 +439,47 @@ export class LocationFeedDiscoverer {
             /['"]([^'"]*(?:ModID|CID|calendarId)=[^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
             // Generic downloadable feed patterns
             /['"]([^'"]*(?:RSSFeed\.aspx|iCalendarFeed\.aspx|Feed\.aspx)[^'"]*)['"]/, 
+            // Trumba showWindow specific patterns
+            /Trumba\.EA2\.showWindow\(['"]([^'"]*)['"]\)/, 
+            /showWindow\(['"]subscribe['"]\)/,
+            // Generic showWindow patterns
+            /onclick\s*=\s*["'][^"']*showWindow\(['"]subscribe['"]\)[^"']*["']/,
           ];
 
           // Check for third-party calendar service functions (like Trumba)
           if (onclick.includes('showWindow') && onclick.includes('subscribe')) {
             console.log(`🎯 Found third-party subscription button (Trumba-like): ${onclick}`);
-            
+
+            // Extract the showWindow parameter for more targeted subscription path discovery
+            const showWindowMatch = onclick.match(/showWindow\(['"]([^'"]*)['"]\)/);
+            const showWindowParam = showWindowMatch ? showWindowMatch[1] : 'subscribe';
+            console.log(`📋 ShowWindow parameter detected: ${showWindowParam}`);
+
+            // Check if this is specifically a Trumba.EA2.showWindow call
+            if (onclick.includes('Trumba.EA2.showWindow')) {
+              console.log(`🎯 Detected Trumba.EA2.showWindow subscription button`);
+
+              // Look for Trumba spud configuration in the page
+              const trumbaSpudMatch = response.data.match(/Trumba\.EA2\.addSpud\([^)]*spudId\s*:\s*['"]([^'"]+)['"]/);
+              const trumbaSpudId = trumbaSpudMatch ? trumbaSpudMatch[1] : null;
+              console.log(`📋 Trumba spud ID detected: ${trumbaSpudId}`);
+
+              if (trumbaSpudId) {
+                // Add Trumba-specific subscription URLs using the spud ID
+                const trumbaSubscriptionUrls = [
+                  `https://www.trumba.com/${trumbaSpudId}/rss.aspx`,
+                  `https://www.trumba.com/${trumbaSpudId}/iCalendar.aspx`,
+                  `https://www.trumba.com/${trumbaSpudId}/main.aspx?view=rss`,
+                  `https://www.trumba.com/${trumbaSpudId}/main.aspx?view=ical`,
+                ];
+
+                trumbaSubscriptionUrls.forEach(trumbaUrl => {
+                  console.log(`📋 Adding Trumba spud subscription URL: ${trumbaUrl}`);
+                  discoveredPaths.add(trumbaUrl);
+                });
+              }
+            }
+
             // For third-party services, we need to check if there are subscription page URLs elsewhere
             const currentPath = new URL(baseUrl).pathname;
             const possibleSubscriptionPaths = [
@@ -460,18 +495,18 @@ export class LocationFeedDiscoverer {
               '/events/rss.aspx',
               '/events/iCalendar.aspx'
             ];
-            
+
             possibleSubscriptionPaths.forEach(path => {
               console.log(`📋 Adding potential third-party subscription path: ${path}`);
               discoveredPaths.add(path);
             });
-            
+
             // Look for Trumba-specific subscription URLs in page scripts
             $('script').each((_, scriptEl) => {
               const scriptContent = $(scriptEl).html() || '';
               if (scriptContent.includes('subscribe') || scriptContent.includes('Trumba') || scriptContent.includes('showWindow')) {
                 console.log(`📜 Analyzing script content for Trumba subscription URLs`);
-                
+
                 // Enhanced patterns for Trumba and similar services
                 const subscriptionUrlPatterns = [
                   // Trumba-specific patterns
@@ -492,7 +527,7 @@ export class LocationFeedDiscoverer {
                   /windowUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi,
                   /popupUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi
                 ];
-                
+
                 subscriptionUrlPatterns.forEach(pattern => {
                   const matches = scriptContent.match(pattern);
                   if (matches) {
@@ -509,29 +544,84 @@ export class LocationFeedDiscoverer {
                     });
                   }
                 });
-                
+
                 // Look for base subscription domain/path in Trumba configurations
-                const trumbaConfigPatterns = [
-                  /Trumba\.EA2\.config\s*=\s*{[^}]*baseUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /Trumba\.EA2\.config\s*=\s*{[^}]*domain['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /Trumba\.EA2\.setConfig\([^)]*['"]([^'"]*trumba[^'"]*)['"]/gi
+                const trumbaServicePatterns = [
+                  /Trumba\.EA2\.config\s*=\s*{[^}]*domain\s*:\s*['"]([^'"]+)['"]/gi,
+                  /Trumba\.EA2\.config\s*=\s*{[^}]*baseUrl\s*:\s*['"]([^'"]+)['"]/gi,
+                  /['"]([^'"]*trumba\.com[^'"]*)['"]/, 
+                  /subscribeUrl\s*:\s*['"]([^'"]+)['"]/gi,
+                  /webName\s*:\s*['"]([^'"]+)['"]/gi, // Trumba web name
+                  /Trumba\.EA2\.addSpud\([^)]*spudId\s*:\s*['"]([^'"]+)['"]/gi, // Trumba spud ID
+                  /Trumba\.EA2\.addSpud\([^)]*webName\s*:\s*['"]([^'"]+)['"]/gi, // Trumba web name in spud config
                 ];
-                
-                trumbaConfigPatterns.forEach(pattern => {
-                  const configMatch = scriptContent.match(pattern);
-                  if (configMatch && configMatch[1]) {
-                    const baseDomain = configMatch[1];
-                    console.log(`📜 Found Trumba base domain: ${baseDomain}`);
-                    // Add common Trumba subscription paths
-                    discoveredPaths.add(`${baseDomain}/subscribe`);
-                    discoveredPaths.add(`${baseDomain}/calendar/subscribe`);
-                    discoveredPaths.add(`${baseDomain}/rss.aspx`);
-                    discoveredPaths.add(`${baseDomain}/iCalendar.aspx`);
+
+                for (const servicePattern of trumbaServicePatterns) {
+                  const serviceMatches = scriptContent.match(servicePattern);
+                  if (serviceMatches) {
+                    serviceMatches.forEach(serviceMatch => {
+                      // Handle different pattern types
+                      let serviceUrl = '';
+
+                      if (serviceMatch.includes('spudId') || serviceMatch.includes('webName')) {
+                        // Extract spudId or webName from Trumba.EA2.addSpud calls
+                        const spudMatch = serviceMatch.match(/(?:spudId|webName)\s*:\s*['"]([^'"]+)['"]/);
+                        if (spudMatch && spudMatch[1]) {
+                          serviceUrl = spudMatch[1];
+                          console.log(`📜 Found Trumba spud/web identifier: ${serviceUrl}`);
+                        }
+                      } else {
+                        // Extract URL from other patterns
+                        const serviceUrlMatch = serviceMatch.match(/['"]([^'"]+)['"]/);
+                        if (serviceUrlMatch && serviceUrlMatch[1]) {
+                          serviceUrl = serviceUrlMatch[1];
+                          console.log(`📜 Found Trumba service URL: ${serviceUrl}`);
+                        }
+                      }
+
+                      if (serviceUrl) {
+                        // Build subscription URLs based on the service domain or identifier
+                        if (serviceUrl.includes('trumba.com')) {
+                          const trumbaSubscriptionUrls = [
+                            `${serviceUrl}/subscribe`,
+                            `${serviceUrl}/calendar/subscribe`,
+                            `${serviceUrl}/main.aspx?view=rss`,
+                            `${serviceUrl}/main.aspx?view=ical`,
+                            `${serviceUrl}/rss.aspx`,
+                            `${serviceUrl}/iCalendar.aspx`,
+                            // Handle webName pattern for Trumba hosted calendars
+                            serviceUrl.includes('/') ? `https://www.trumba.com/${serviceUrl.split('/').pop()}/rss.aspx` : `https://www.trumba.com/${serviceUrl}/rss.aspx`,
+                            serviceUrl.includes('/') ? `https://www.trumba.com/${serviceUrl.split('/').pop()}/iCalendar.aspx` : `https://www.trumba.com/${serviceUrl}/iCalendar.aspx`,
+                          ];
+
+                          trumbaSubscriptionUrls.forEach(trumbaUrl => {
+                            console.log(`📋 Adding Trumba subscription URL: ${trumbaUrl}`);
+                            discoveredPaths.add(trumbaUrl);
+                          });
+                        } else if (serviceUrl && !serviceUrl.startsWith('http')) {
+                          // Handle relative or webName-only patterns (spudId/webName)
+                          const trumbaWebUrls = [
+                            `https://www.trumba.com/${serviceUrl}/rss.aspx`,
+                            `https://www.trumba.com/${serviceUrl}/iCalendar.aspx`,
+                            `https://www.trumba.com/${serviceUrl}/main.aspx?view=rss`,
+                            `https://www.trumba.com/${serviceUrl}/main.aspx?view=ical`,
+                            `https://www.trumba.com/${serviceUrl}/subscribe`,
+                            `https://www.trumba.com/${serviceUrl}/calendar/subscribe`,
+                          ];
+
+                          trumbaWebUrls.forEach(webUrl => {
+                            console.log(`📋 Adding Trumba web URL: ${webUrl}`);
+                            discoveredPaths.add(webUrl);
+                          });
+                        }
+                      }
+                    });
                   }
-                });
+                }
+
               }
             });
-            
+
             // Also check for subscription links in the current page that might be hidden or dynamically generated
             const hiddenSubscriptionSelectors = [
               'a[href*="subscribe"][style*="display:none"]',
@@ -540,7 +630,7 @@ export class LocationFeedDiscoverer {
               'script + a[href*="subscribe"]', // Links that might be shown by scripts
               '.subscription-links a', '.calendar-subscribe a', '.feed-links a'
             ];
-            
+
             $(hiddenSubscriptionSelectors.join(', ')).each((_, hiddenEl) => {
               const href = $(hiddenEl).attr('href');
               if (href && (href.includes('subscribe') || href.includes('rss') || href.includes('ical'))) {
@@ -555,7 +645,7 @@ export class LocationFeedDiscoverer {
             if (match && match[1]) {
               let potentialUrl = match[1];
               console.log(`🎯 Found potential downloadable feed in onclick: ${potentialUrl}`);
-              
+
               // Handle relative URLs
               if (potentialUrl.startsWith('/')) {
                 discoveredPaths.add(potentialUrl);
@@ -573,14 +663,14 @@ export class LocationFeedDiscoverer {
             }
           }
         }
-        
+
         // Check data attributes for downloadable feeds
         if (dataUrl && this.isDownloadableFeedUrl(dataUrl)) {
           console.log(`📎 Found downloadable feed in data attribute: ${dataUrl}`);
           const path = dataUrl.startsWith('/') ? dataUrl : dataUrl.startsWith('http') ? new URL(dataUrl, baseUrl).pathname + new URL(dataUrl, baseUrl).search : `/${dataUrl}`;
           discoveredPaths.add(path);
         }
-        
+
         // Check form actions for downloadable feed submissions
         if (formAction && this.isDownloadableFeedUrl(formAction)) {
           console.log(`📋 Found downloadable feed in form action: ${formAction}`);
@@ -615,20 +705,20 @@ export class LocationFeedDiscoverer {
       $(feedLinkSelectors.join(', ')).each((_, element) => {
         const $el = $(element);
         const tagName = (element as any).tagName?.toLowerCase() || 'unknown';
-        
+
         // Get href from element or parent
         const href = $el.attr('href') || $el.parent('a').attr('href') || $el.closest('a').attr('href');
-        
+
         if (href) {
           // Check for direct feed links
           if (href.includes('.ics') || href.includes('.rss') || href.includes('.xml') || 
               href.includes('feed') || href.includes('ical') || href.includes('calendar')) {
-            
+
             const path = href.startsWith('/') ? href : href.startsWith('http') ? new URL(href, baseUrl).pathname + new URL(href, baseUrl).search : `/${href}`;
             discoveredPaths.add(path);
           }
         }
-        
+
         // For images and elements, check if they're inside clickable elements or ImageLink containers
         if (tagName === 'img' || tagName === 'a') {
           const clickableParent = $el.closest('[onclick], [data-url], [data-href], a, span.ImageLink, div.ImageLink');
@@ -636,21 +726,21 @@ export class LocationFeedDiscoverer {
             const parentOnclick = clickableParent.attr('onclick');
             const parentDataUrl = clickableParent.attr('data-url') || clickableParent.attr('data-href');
             const parentClass = clickableParent.attr('class') || '';
-            
+
             // Special handling for third-party calendar services (like Trumba)
             if (parentOnclick && (parentOnclick.includes('showWindow') || parentOnclick.includes('Trumba'))) {
               console.log(`🎯 Found third-party calendar service button in ImageLink: ${parentOnclick}`);
-              
+
               // Check if this is a subscription button
               const isSubscriptionButton = parentOnclick.includes('subscribe') || 
                                          $el.attr('title')?.toLowerCase().includes('subscribe') ||
                                          $el.attr('alt')?.toLowerCase().includes('subscribe') ||
                                          $el.text().toLowerCase().includes('subscribe') ||
                                          $el.attr('aria-label')?.toLowerCase().includes('subscribe');
-                                         
+
               if (isSubscriptionButton) {
                 console.log(`✅ Confirmed ImageLink subscription button - adding comprehensive subscription paths`);
-                
+
                 // Add comprehensive subscription page paths for third-party services
                 const subscriptionPaths = [
                   '/subscribe',
@@ -677,12 +767,12 @@ export class LocationFeedDiscoverer {
                   '/main.aspx?view=rss',
                   '/main.aspx?view=ical'
                 ];
-                
+
                 subscriptionPaths.forEach(path => {
                   console.log(`📋 Adding ImageLink subscription path: ${path}`);
                   discoveredPaths.add(path);
                 });
-                
+
                 // Look for nearby subscription URLs in the same container
                 const container = $el.closest('div, span, section, article');
                 container.find('a[href*="subscribe"], a[href*="rss"], a[href*="ical"], a[href*="feed"]').each((_, nearbyLink) => {
@@ -694,7 +784,7 @@ export class LocationFeedDiscoverer {
                 });
               }
             }
-            
+
             if (parentOnclick && (parentOnclick.includes('calendar') || parentOnclick.includes('feed') || parentOnclick.includes('rss'))) {
               // Extract URL from parent onclick
               const urlMatch = parentOnclick.match(/['"]([^'"]*(?:calendar|feed|rss|ical)[^'"]*)['"]/) ||
@@ -707,7 +797,7 @@ export class LocationFeedDiscoverer {
                 discoveredPaths.add(path);
               }
             }
-            
+
             if (parentDataUrl) {
               const path = parentDataUrl.startsWith('/') ? parentDataUrl : `/${parentDataUrl}`;
               discoveredPaths.add(path);
@@ -721,11 +811,11 @@ export class LocationFeedDiscoverer {
         const $el = $(element);
         const href = $el.attr('href');
         const text = $el.text().toLowerCase();
-        
+
         if (href && (text.includes('calendar') || text.includes('department') || text.includes('city'))) {
           // Try common feed variations for calendar category pages
           const basePath = href.startsWith('/') ? href : new URL(href, baseUrl).pathname;
-          
+
           // Add potential feed URLs for this calendar category
           discoveredPaths.add(`${basePath}/feed`);
           discoveredPaths.add(`${basePath}.rss`);
@@ -760,18 +850,18 @@ export class LocationFeedDiscoverer {
       // Enhanced JavaScript and AJAX endpoint discovery
       $('script').each((_, element) => {
         const scriptContent = $(element).html() || '';
-        
+
         // Look for actual feed files
         if (scriptContent.includes('.ics') || scriptContent.includes('.rss') || scriptContent.includes('.xml')) {
           // Extract URLs for actual feed files (not API endpoints)
           const feedFilePatterns = [
             /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
-            /(['"])(\/[^'"]*(?:calendar|events)\/[^'"]*\.(?:ics|rss|xml))\1/g,
+            /(['"])(\/[^'"]*(?:calendar|events)[^'"]*\.(?:ics|rss|xml))\1/g,
             /url\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
             /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
             /(['"])(\/[^'"]*(?:calendar|events)[^'"]*\.xml)\1/g
           ];
-          
+
           feedFilePatterns.forEach(pattern => {
             let match;
             while ((match = pattern.exec(scriptContent)) !== null) {
@@ -782,7 +872,7 @@ export class LocationFeedDiscoverer {
             }
           });
         }
-        
+
         // Look for AJAX endpoints and dynamic feed URLs
         if (scriptContent.includes('calendar') || scriptContent.includes('event') || scriptContent.includes('feed')) {
           const ajaxPatterns = [
@@ -810,7 +900,7 @@ export class LocationFeedDiscoverer {
               discoveredPaths.add(path);
             }
           }
-          
+
           // Look for parameter-based subscription URLs (common in government CMS)
           const paramPatterns = [
             /ModID['"=:]\s*['"]?(\d+)['"]?/, // ModID parameter
@@ -830,13 +920,13 @@ export class LocationFeedDiscoverer {
               discoveredPaths.add(`/events.aspx?categoryId=${paramValue}`);
             }
           });
-          
+
           // Look for base64 encoded or obfuscated URLs
           const encodedPatterns = [
             /atob\(['"]([A-Za-z0-9+/=]+)['"]/, // Base64 decode
             /decodeURI(?:Component)?\(['"]([^'"]*)['"]/, // URI decode
           ];
-          
+
           for (const pattern of encodedPatterns) {
             const matches = scriptContent.match(pattern);
             if (matches && matches[1]) {
@@ -847,7 +937,7 @@ export class LocationFeedDiscoverer {
                 } else {
                   decoded = decodeURIComponent(matches[1]);
                 }
-                
+
                 if (decoded.includes('calendar') || decoded.includes('event') || decoded.includes('feed') || decoded.includes('.ics') || decoded.includes('.rss')) {
                   const path = decoded.startsWith('/') ? decoded : `/${decoded}`;
                   discoveredPaths.add(path);
@@ -864,7 +954,7 @@ export class LocationFeedDiscoverer {
       const hasCalendarSystem = response.data.includes('calendar') || 
                                 response.data.includes('Calendar') ||
                                 discoveredPaths.size > 0;
-      
+
       if (hasCalendarSystem) {
         // Add common department feed patterns that might not be linked but exist
         const commonDepartments = [
@@ -872,7 +962,7 @@ export class LocationFeedDiscoverer {
           'building', 'fire', 'police', 'public-works', 'parks', 'library',
           'utilities', 'administration', 'mayor', 'clerk'
         ];
-        
+
         commonDepartments.forEach(dept => {
           discoveredPaths.add(`/calendar/${dept}.rss`);
           discoveredPaths.add(`/calendar/${dept}.ics`);
@@ -885,7 +975,7 @@ export class LocationFeedDiscoverer {
       for (const path of Array.from(discoveredPaths).slice(0, 20)) { // Increased limit for department feeds
         const feedUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
         const feed = await this.validateFeedUrl(feedUrl, location);
-        
+
         if (feed) {
           feeds.push(feed);
         }
@@ -923,7 +1013,7 @@ export class LocationFeedDiscoverer {
           headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
           validateStatus: (status) => status < 500
         });
-        
+
         if (domainCheck.status >= 400) {
           console.log(`Domain ${feedDomain} not accessible (${domainCheck.status}) - skipping feed: ${feedUrl}`);
           return null;
@@ -935,7 +1025,7 @@ export class LocationFeedDiscoverer {
 
       // Check if this is a downloadable feed URL first
       const isDownloadableFeed = this.isDownloadableFeedUrl(feedUrl);
-      
+
       // Identify direct download/API endpoints vs subscription pages
       const isDirectDownloadAPI = isDownloadableFeed ||
                                   feedUrl.includes('generate_ical') || 
@@ -952,14 +1042,14 @@ export class LocationFeedDiscoverer {
                                   // Common download/export patterns with parameters
                                   (feedUrl.includes('download') && (feedUrl.includes('calendar') || feedUrl.includes('events'))) ||
                                   (feedUrl.includes('export') && (feedUrl.includes('calendar') || feedUrl.includes('events')));
-      
+
       const isSubscriptionPage = !isDirectDownloadAPI && (
                                  (feedUrl.includes('iCalendar.aspx') && !feedUrl.includes('CID=')) || 
                                  (feedUrl.includes('rss.aspx') && !feedUrl.includes('ModID=')) || 
                                  (feedUrl.includes('calendar.aspx') && !feedUrl.includes('CID=')) ||
                                  (feedUrl.includes('subscribe') && !feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !this.isDownloadableFeedUrl(feedUrl))
                                 );
-      
+
       if (!feedUrl.includes('.ics') && !feedUrl.includes('.rss') && !feedUrl.includes('.xml') && 
           !feedUrl.includes('calendar') && !feedUrl.includes('events') && !feedUrl.includes('feed') && 
           !isSubscriptionPage && !isDirectDownloadAPI) {
@@ -993,7 +1083,7 @@ export class LocationFeedDiscoverer {
             }
           }
         }
-        
+
         // If no feeds found in the page, try common parameter variations
         const parameterVariations = await this.trySubscriptionPageParameters(feedUrl, location);
         if (parameterVariations.length > 0) {
@@ -1011,7 +1101,7 @@ export class LocationFeedDiscoverer {
 
       // For potential feeds that might be behind download buttons, try GET instead of HEAD
       const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') || isSubscriptionPage ? 'get' : 'head';
-      
+
       const response = await axios[method](feedUrl, {
         timeout: 4000,
         headers: { 
@@ -1119,7 +1209,7 @@ export class LocationFeedDiscoverer {
 
   private async trySubscriptionPageParameters(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     const variations: DiscoveredFeed[] = [];
-    
+
     try {
       if (feedUrl.includes('iCalendar.aspx')) {
         // Try common iCalendar parameter combinations without hardcoded ModIDs
@@ -1136,7 +1226,7 @@ export class LocationFeedDiscoverer {
           `${baseUrl}?CID=0`,
           `${baseUrl}?export=ics`
         ];
-        
+
         for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
           try {
             const response = await axios.get(variation, {
@@ -1147,7 +1237,7 @@ export class LocationFeedDiscoverer {
               },
               maxRedirects: 3
             });
-            
+
             // Check if this returns actual calendar data
             if (response.data.includes('BEGIN:VCALENDAR') || response.headers['content-type']?.includes('text/calendar')) {
               variations.push({
@@ -1171,7 +1261,7 @@ export class LocationFeedDiscoverer {
           }
         }
       }
-      
+
       if (feedUrl.includes('rss.aspx')) {
         // Try RSS parameter combinations without hardcoded ModIDs
         const baseUrl = feedUrl.split('?')[0].split('#')[0]; // Clean base URL
@@ -1187,7 +1277,7 @@ export class LocationFeedDiscoverer {
           feedUrl.replace('#calendar', '?CID=all'),
           `${baseUrl}?export=xml`
         ];
-        
+
         for (const variation of rssVariations.slice(0, 5)) {
           try {
             const response = await axios.get(variation, {
@@ -1198,7 +1288,7 @@ export class LocationFeedDiscoverer {
               },
               maxRedirects: 3
             });
-            
+
             // Check if this returns actual RSS data
             if (response.data.includes('<rss') || response.data.includes('<feed') || response.headers['content-type']?.includes('xml')) {
               variations.push({
@@ -1225,7 +1315,7 @@ export class LocationFeedDiscoverer {
     } catch (error) {
       console.log(`Error trying subscription page parameters for ${feedUrl}:`, error);
     }
-    
+
     return variations;
   }
 
@@ -1239,7 +1329,7 @@ export class LocationFeedDiscoverer {
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
-        
+
         if (domainCheck.status >= 400) {
           console.log(`Domain ${subscriptionDomain} not accessible - skipping subscription page parsing`);
           return [];
@@ -1253,13 +1343,13 @@ export class LocationFeedDiscoverer {
         timeout: 5000,
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
-      
+
       const feedUrls: string[] = [];
       const html = response.data;
       const baseUrl = new URL(subscriptionUrl);
-      
+
       console.log(`🔍 Parsing subscription page for downloadable feeds: ${subscriptionUrl}`);
-      
+
       // Enhanced patterns focusing on downloadable feeds
       const downloadableFeedPatterns = [
         // Direct downloadable feed files
@@ -1281,14 +1371,14 @@ export class LocationFeedDiscoverer {
         // Download links for calendar files
         /href=["']([^"']*(?:download|export)[^"']*(?:calendar|events|ical|rss)[^"']*)["']/gi,
       ];
-      
+
       for (const pattern of downloadableFeedPatterns) {
         const matches = html.match(pattern) || [];
         console.log(`Pattern ${pattern.source} found ${matches.length} matches`);
-        
+
         for (const match of matches) {
           let feedPath = match;
-          
+
           // Extract URL from href attribute if needed
           if (match.includes('href=')) {
             const hrefMatch = match.match(/href=["']([^"']*)["']/i);
@@ -1296,10 +1386,10 @@ export class LocationFeedDiscoverer {
               feedPath = hrefMatch[1];
             }
           }
-          
+
           // Clean up the path
           feedPath = feedPath.replace(/^["']|["']$/g, '');
-          
+
           // Only include if it's likely a downloadable feed
           if (this.isDownloadableFeedUrl(feedPath)) {
             // Convert to absolute URL
@@ -1311,23 +1401,23 @@ export class LocationFeedDiscoverer {
             } else {
               fullUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedPath}`;
             }
-            
+
             console.log(`✅ Found downloadable feed URL: ${fullUrl}`);
             feedUrls.push(fullUrl);
           }
         }
       }
-      
+
       // Look for JavaScript variables that contain downloadable feed URLs
       const jsDownloadableFeedPatterns = [
         /(?:feedUrl|downloadUrl|exportUrl|calendarUrl|rssUrl|icalUrl)\s*[:=]\s*["']([^"']+\.(?:ics|rss|xml)[^"']*)["']/gi,
         /(?:feedUrl|downloadUrl|exportUrl|calendarUrl|rssUrl|icalUrl)\s*[:=]\s*["']([^"']*(?:generate_ical|export|RSSFeed\.aspx|iCalendarFeed\.aspx)[^"']*)["']/gi,
       ];
-      
+
       for (const jsPattern of jsDownloadableFeedPatterns) {
         const matches = html.match(jsPattern) || [];
         for (const match of matches) {
-          const urlMatch = match.match(/["']([^"']+)["']/);
+          const urlMatch = match.match(/["']([^"']*)["']/);
           if (urlMatch) {
             const jsUrl = urlMatch[1];
             if (this.isDownloadableFeedUrl(jsUrl)) {
@@ -1338,7 +1428,7 @@ export class LocationFeedDiscoverer {
           }
         }
       }
-      
+
       // Look for form actions that submit to downloadable feed endpoints
       const formActions = html.match(/<form[^>]*action=["']([^"']*)["'][^>]*>/gi) || [];
       for (const formAction of formActions) {
@@ -1352,7 +1442,7 @@ export class LocationFeedDiscoverer {
           }
         }
       }
-      
+
       const uniqueFeedUrls = Array.from(new Set(feedUrls));
       console.log(`Found ${uniqueFeedUrls.length} downloadable feed URLs in subscription page:`, uniqueFeedUrls.slice(0, 3));
       return uniqueFeedUrls;
@@ -1367,12 +1457,12 @@ export class LocationFeedDiscoverer {
       console.log(`🔗 Validating direct download API endpoint: ${feedUrl}`);
       // Try the URL as-is first
       let testUrl = feedUrl;
-      
+
       // For Thrillshare CMS and similar systems, try common parameter variations
       if (feedUrl.includes('filter_ids&section_ids') || feedUrl.includes('filter_ids=&section_ids=')) {
         // Try without parameters first
         testUrl = feedUrl.split('?')[0];
-        
+
         // Also try with common "all events" parameters
         const baseUrl = feedUrl.split('?')[0];
         const variations = [
@@ -1384,7 +1474,7 @@ export class LocationFeedDiscoverer {
           `${baseUrl}?export_all=true`,
           `${baseUrl}?include_all=1`
         ];
-        
+
         for (const variation of variations) {
           console.log(`🧪 Testing API parameter variation: ${variation}`);
           const result = await this.testCalendarAPIUrl(variation, location);
@@ -1402,7 +1492,7 @@ export class LocationFeedDiscoverer {
           return result;
         }
       }
-      
+
       console.log(`❌ Dynamic calendar API not responsive: ${feedUrl}`);
       return null;
     } catch (error) {
@@ -1426,11 +1516,11 @@ export class LocationFeedDiscoverer {
       // Check if we got actual calendar data
       if (response.status === 200 && response.data) {
         const content = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        
+
         // Look for iCalendar format
         if (content.includes('BEGIN:VCALENDAR') || response.headers['content-type']?.includes('text/calendar')) {
           console.log(`✅ Found valid iCalendar content from dynamic API: ${testUrl}`);
-          
+
           return {
             source: {
               id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-dynamic-ical-${Date.now()}`,
@@ -1447,13 +1537,13 @@ export class LocationFeedDiscoverer {
             lastChecked: new Date()
           };
         }
-        
+
         // Check if it's a downloadable file (some APIs return binary data)
         if (response.headers['content-disposition']?.includes('attachment') || 
             response.headers['content-type']?.includes('application/octet-stream') ||
             testUrl.endsWith('.ics')) {
           console.log(`✅ Found downloadable calendar file from dynamic API: ${testUrl}`);
-          
+
           return {
             source: {
               id: `discovered-${location.city.toLowerCase().replace(/\s+/g, '-')}-${location.organizationType}-download-ical-${Date.now()}`,
@@ -1470,13 +1560,13 @@ export class LocationFeedDiscoverer {
             lastChecked: new Date()
           };
         }
-        
+
         console.log(`⚠️ Dynamic API returned content but not valid calendar format: ${testUrl}`);
         console.log(`Content preview: ${content.substring(0, 200)}`);
       } else {
         console.log(`⚠️ Dynamic API returned status ${response.status}: ${testUrl}`);
       }
-      
+
       return null;
     } catch (error) {
       console.log(`❌ Error testing dynamic calendar API ${testUrl}:`, (error as Error).message);
@@ -1536,7 +1626,7 @@ export class LocationFeedDiscoverer {
 
   private async findSubscriptionFeedsOnCalendarPage(calendarPageUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     console.log(`🔍 Analyzing calendar page for subscription buttons: ${calendarPageUrl}`);
-    
+
     try {
       // First verify the website exists
       const calendarDomain = new URL(calendarPageUrl).origin;
@@ -1546,7 +1636,7 @@ export class LocationFeedDiscoverer {
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
-        
+
         if (domainCheck.status >= 400) {
           console.log(`❌ Domain ${calendarDomain} not accessible - skipping calendar page analysis`);
           return [];
@@ -1560,10 +1650,10 @@ export class LocationFeedDiscoverer {
         timeout: 5000,
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
-      
+
       const html = response.data;
       const baseUrl = new URL(calendarPageUrl);
-      
+
       // Look for subscription buttons/links on the calendar page
       const subscriptionPatterns = [
         // Look for RSS subscription buttons
@@ -1591,19 +1681,19 @@ export class LocationFeedDiscoverer {
         /href=["']([^"']*ical[^"']*)["']/gi
 
       ];
-      
+
       const subscriptionUrls = new Set<string>();
-      
+
       for (const pattern of subscriptionPatterns) {
         const matches = html.match(pattern) || [];
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
           if (urlMatch) {
             let subscriptionUrl = urlMatch[1];
-            
+
             // Decode HTML entities
             subscriptionUrl = subscriptionUrl.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
-            
+
             // Convert to absolute URL
             if (!subscriptionUrl.startsWith('http')) {
               if (subscriptionUrl.startsWith('/')) {
@@ -1612,21 +1702,21 @@ export class LocationFeedDiscoverer {
                 subscriptionUrl = `${baseUrl.protocol}//${baseUrl.host}/${subscriptionUrl}`;
               }
             }
-            
+
             console.log(`📋 Found subscription URL: ${subscriptionUrl}`);
             subscriptionUrls.add(subscriptionUrl);
           }
         }
       }
-      
+
       console.log(`📋 Found ${subscriptionUrls.size} subscription URLs on calendar page`);
-      
+
       // Now follow each subscription URL to find "All" or "All Events" buttons
       const workingFeeds: DiscoveredFeed[] = [];
-      
+
       for (const subscriptionUrl of Array.from(subscriptionUrls)) {
         console.log(`🔎 Checking subscription page: ${subscriptionUrl}`);
-        
+
         // Check if the subscription URL itself is a downloadable feed (like Thrillshare CMS)
         if (this.isDownloadableFeedUrl(subscriptionUrl)) {
           console.log(`🎯 Subscription URL is itself a downloadable feed: ${subscriptionUrl}`);
@@ -1637,17 +1727,17 @@ export class LocationFeedDiscoverer {
             continue; // Skip further analysis for this URL
           }
         }
-        
+
         try {
           const allEventsFeeds = await this.findAllEventsButtonsOnSubscriptionPage(subscriptionUrl, location);
           workingFeeds.push(...allEventsFeeds);
-          
+
           if (workingFeeds.length >= 2) break; // Limit to prevent too many requests
         } catch (error) {
           console.log(`⚠️ Failed to analyze subscription page ${subscriptionUrl}:`, (error as Error).message);
         }
       }
-      
+
       return workingFeeds;
     } catch (error) {
       console.log(`❌ Error analyzing calendar page ${calendarPageUrl}:`, (error as Error).message);
@@ -1660,25 +1750,25 @@ export class LocationFeedDiscoverer {
    */
   private isDownloadableFeedUrl(url: string): boolean {
     if (!url) return false;
-    
+
     // Decode HTML entities first
     const decodedUrl = url.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
     const lowerUrl = decodedUrl.toLowerCase();
-    
+
     console.log(`🔍 Checking if downloadable feed: ${decodedUrl}`);
-    
+
     // Direct feed file extensions
     if (lowerUrl.endsWith('.ics') || lowerUrl.endsWith('.rss') || lowerUrl.endsWith('.xml')) {
       console.log(`✅ Direct feed file extension detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // Feed generation endpoints (including Thrillshare CMS and similar)
     if (lowerUrl.includes('generate_ical') || lowerUrl.includes('generate_calendar') || lowerUrl.includes('export_ical')) {
       console.log(`✅ Feed generation endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // CMS API endpoints that generate calendar data
     if (lowerUrl.includes('/api/') && lowerUrl.includes('/cms/') && 
         (lowerUrl.includes('events') || lowerUrl.includes('calendar')) &&
@@ -1686,39 +1776,39 @@ export class LocationFeedDiscoverer {
       console.log(`✅ CMS API calendar endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // Thrillshare-specific patterns
     if (lowerUrl.includes('thrillshare') && 
         (lowerUrl.includes('generate_ical') || lowerUrl.includes('events') || lowerUrl.includes('calendar'))) {
       console.log(`✅ Thrillshare CMS endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // Feed endpoints with parameters that return downloadable content
     if (lowerUrl.includes('rssfeed.aspx') || lowerUrl.includes('icalendarfeed.aspx') || lowerUrl.includes('feed.aspx')) {
       console.log(`✅ ASP.NET feed endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // Download/export endpoints with calendar keywords
     if ((lowerUrl.includes('download') || lowerUrl.includes('export')) && 
         (lowerUrl.includes('calendar') || lowerUrl.includes('events') || lowerUrl.includes('ical') || lowerUrl.includes('rss'))) {
       console.log(`✅ Download/export calendar endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // API endpoints that return calendar data
     if (lowerUrl.includes('/api/') && (lowerUrl.includes('calendar') || lowerUrl.includes('events') || lowerUrl.includes('ical') || lowerUrl.includes('rss'))) {
       console.log(`✅ API calendar endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     // Feed URLs with specific parameters indicating downloadable content
     if ((lowerUrl.includes('modid=') || lowerUrl.includes('cid=')) && (lowerUrl.includes('calendar') || lowerUrl.includes('rss') || lowerUrl.includes('ical'))) {
       console.log(`✅ Parameterized feed endpoint detected: ${decodedUrl}`);
       return true;
     }
-    
+
     console.log(`❌ Not recognized as downloadable feed: ${decodedUrl}`);
     return false;
   }
@@ -1729,10 +1819,10 @@ export class LocationFeedDiscoverer {
         timeout: 5000,
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
-      
+
       const html = response.data;
       const baseUrl = new URL(subscriptionUrl);
-      
+
       // Look specifically for calendar and events feeds, not just "All" buttons
       const calendarFeedPatterns = [
         // Look for calendar-specific feed links
@@ -1752,16 +1842,16 @@ export class LocationFeedDiscoverer {
         // Look for download/export calendar links
         /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx[^"']*?)["'][^>]*>[^<]*(?:download|export|subscribe to).*(?:calendar|events)[^<]*<\/a>/gi
       ];
-      
+
       const feedUrls: string[] = [];
-      
+
       for (const pattern of calendarFeedPatterns) {
         const matches = html.match(pattern) || [];
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
           if (urlMatch) {
             let feedUrl = urlMatch[1];
-            
+
             // Convert to absolute URL
             if (!feedUrl.startsWith('http')) {
               if (feedUrl.startsWith('/')) {
@@ -1770,44 +1860,44 @@ export class LocationFeedDiscoverer {
                 feedUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedUrl}`;
               }
             }
-            
+
             feedUrls.push(feedUrl);
           }
         }
       }
-      
+
       console.log(`🎯 Found ${feedUrls.length} calendar-specific feed URLs: ${feedUrls.slice(0, 3).join(', ')}`);
-      
+
       // Test each discovered feed URL to see if it returns actual feed content
       const workingFeeds: DiscoveredFeed[] = [];
-      
+
       // Sort feeds to prioritize "All-calendar" feeds over category-specific ones
       const sortedFeedUrls = feedUrls.sort((a, b) => {
         const aHasAllCalendar = a.includes('All-calendar') || a.includes('all-calendar') || a.includes('CID=All');
         const bHasAllCalendar = b.includes('All-calendar') || b.includes('all-calendar') || b.includes('CID=All');
-        
+
         if (aHasAllCalendar && !bHasAllCalendar) return -1;
         if (!aHasAllCalendar && bHasAllCalendar) return 1;
         return 0;
       });
-      
+
       for (const feedUrl of sortedFeedUrls.slice(0, 5)) { // Increased limit for calendar-specific feeds
         const workingFeed = await this.validateAndCreateFeed(feedUrl, location);
         if (workingFeed) {
           console.log(`✅ Validated working feed: ${feedUrl}`);
-          
+
           // Boost confidence for "All-calendar" feeds
           if (feedUrl.includes('All-calendar') || feedUrl.includes('all-calendar') || feedUrl.includes('CID=All')) {
             workingFeed.confidence = Math.min(workingFeed.confidence + 0.3, 1.0);
             console.log(`🎯 Boosted confidence for All-calendar feed: ${feedUrl} (confidence: ${workingFeed.confidence})`);
           }
-          
+
           workingFeeds.push(workingFeed);
         } else {
           console.log(`❌ Invalid feed: ${feedUrl}`);
         }
       }
-      
+
       return workingFeeds;
     } catch (error) {
       console.log(`Error analyzing subscription page ${subscriptionUrl}:`, (error as Error).message);
@@ -1848,7 +1938,7 @@ export class LocationFeedDiscoverer {
     };
 
     const feeds = await this.discoverFeedsForLocation(location);
-    
+
     // For popular locations, also check known government patterns
     const additionalFeeds = await this.checkKnownPatterns(location);
     feeds.push(...additionalFeeds);
@@ -1876,7 +1966,7 @@ export class LocationFeedDiscoverer {
         ...location,
         organizationType: 'city' as const
       });
-      
+
       if (feed) {
         feed.confidence = Math.min(feed.confidence + 0.3, 1.0); // Boost confidence for known patterns
         feeds.push(feed);
@@ -1894,15 +1984,15 @@ export class LocationFeedDiscoverer {
     summary: string;
   }> {
     console.log(`Discovering feeds for ${request.regions.length} regions...`);
-    
+
     const allFeeds: DiscoveredFeed[] = [];
     const processedRegions: LocationInfo[] = [];
-    
+
     for (const regionName of request.regions) {
       try {
         // Parse region name (e.g., "Portland, OR" or "New York, NY")
         const [cityName, stateCode] = regionName.split(',').map(s => s.trim());
-        
+
         if (!cityName || !stateCode) {
           console.log(`Invalid region format: ${regionName}`);
           continue;
@@ -1910,7 +2000,7 @@ export class LocationFeedDiscoverer {
 
         // Find city in database
         const cityData = cityDiscoverer.getCityByName(cityName, stateCode);
-        
+
         if (cityData) {
           // Use database information for accurate discovery
           const location: LocationInfo = {
@@ -1923,7 +2013,7 @@ export class LocationFeedDiscoverer {
           const feeds = await this.discoverFeedsForLocation(location);
           allFeeds.push(...feeds);
           processedRegions.push(location);
-          
+
           console.log(`✓ Discovered ${feeds.length} feeds for ${cityData.name}, ${cityData.stateCode}`);
         } else {
           // Fallback to original discovery method
@@ -1936,7 +2026,7 @@ export class LocationFeedDiscoverer {
           const feeds = await this.discoverFeedsForLocation(location);
           allFeeds.push(...feeds);
           processedRegions.push(location);
-          
+
           console.log(`✓ Discovered ${feeds.length} feeds for ${cityName}, ${stateCode} (fallback)`);
         }
 
@@ -1971,9 +2061,9 @@ export class LocationFeedDiscoverer {
     count: number;
   }> {
     console.log(`Discovering feeds for all cities in ${stateCode}...`);
-    
+
     let cities = cityDiscoverer.getCitiesByState(stateCode);
-    
+
     // Apply filters
     if (options?.populationRange) {
       cities = cities.filter(city => 
@@ -1981,18 +2071,18 @@ export class LocationFeedDiscoverer {
         city.population <= options.populationRange!.max
       );
     }
-    
+
     if (options?.cityTypes) {
       cities = cities.filter(city => options.cityTypes!.includes(city.type));
     }
-    
+
     if (options?.limit) {
       cities = cities.slice(0, options.limit);
     }
 
     const regionNames = cities.map(city => `${city.name}, ${city.stateCode}`);
     const result = await this.discoverFeedsForRegions({ regions: regionNames });
-    
+
     return {
       discoveredFeeds: result.discoveredFeeds,
       cities: regionNames,
@@ -2000,7 +2090,7 @@ export class LocationFeedDiscoverer {
     };
   }
 
-  // Discover feeds for cities by population size
+  // Discover feeds for cities by population
   async discoverFeedsByPopulation(
     minPopulation: number, 
     maxPopulation: number = Infinity,
@@ -2011,13 +2101,13 @@ export class LocationFeedDiscoverer {
     count: number;
   }> {
     console.log(`Discovering feeds for cities with population ${minPopulation} - ${maxPopulation}...`);
-    
+
     const cities = cityDiscoverer.getCitiesByPopulation(minPopulation, maxPopulation)
       .slice(0, limit);
-    
+
     const regionNames = cities.map(city => `${city.name}, ${city.stateCode}`);
     const result = await this.discoverFeedsForRegions({ regions: regionNames });
-    
+
     return {
       discoveredFeeds: result.discoveredFeeds,
       cities: regionNames,
@@ -2028,11 +2118,11 @@ export class LocationFeedDiscoverer {
   // Get comprehensive city suggestions for autocomplete
   getCitySuggestions(query: string, limit: number = 20): string[] {
     if (!query || query.length < 2) return [];
-    
+
     const results = cityDiscoverer.searchCities(query)
       .slice(0, limit)
       .map(city => `${city.name}, ${city.stateCode}`);
-      
+
     return results;
   }
 
@@ -2050,14 +2140,14 @@ export class LocationFeedDiscoverer {
     totalCount: number;
   }> {
     console.log(`Discovering feeds for top ${count} US cities by population...`);
-    
+
     const topCities = [...US_CITIES_DATABASE]
       .sort((a, b) => b.population - a.population)
       .slice(0, count);
-    
+
     const regionNames = topCities.map(city => `${city.name}, ${city.stateCode}`);
     const result = await this.discoverFeedsForRegions({ regions: regionNames });
-    
+
     return {
       discoveredFeeds: result.discoveredFeeds,
       cities: regionNames,
