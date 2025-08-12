@@ -482,6 +482,7 @@ export class LocationFeedDiscoverer {
                   // Generic subscription URLs in scripts
                   /['"]([^'"]*\/subscribe[^'"]*)['"]/, 
                   /['"]([^'"]*subscribe[^'"]*)['"]/, 
+                  /showWindow\(['"]([^'"]*)['"]\)/gi,
                   // Calendar service configuration URLs
                   /calendarUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /feedUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
