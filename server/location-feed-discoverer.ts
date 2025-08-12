@@ -444,7 +444,6 @@ export class LocationFeedDiscoverer {
           // Check for third-party calendar service functions (like Trumba)
           if (onclick.includes('showWindow') && onclick.includes('subscribe')) {
             console.log(`🎯 Found third-party subscription button (Trumba-like): ${onclick}`);
-            
             // For third-party services, we need to check if there are subscription page URLs elsewhere
             const currentPath = new URL(baseUrl).pathname;
             const possibleSubscriptionPaths = [
@@ -454,11 +453,7 @@ export class LocationFeedDiscoverer {
               '/events/subscribe',
               '/subscribe',
               '/rss.aspx',
-              '/iCalendar.aspx',
-              '/calendar/rss.aspx',
-              '/calendar/iCalendar.aspx',
-              '/events/rss.aspx',
-              '/events/iCalendar.aspx'
+              '/iCalendar.aspx'
             ];
             
             possibleSubscriptionPaths.forEach(path => {
@@ -466,30 +461,15 @@ export class LocationFeedDiscoverer {
               discoveredPaths.add(path);
             });
             
-            // Look for Trumba-specific subscription URLs in page scripts
+            // Also look for the subscription window URL in page scripts
             $('script').each((_, scriptEl) => {
               const scriptContent = $(scriptEl).html() || '';
-              if (scriptContent.includes('subscribe') || scriptContent.includes('Trumba') || scriptContent.includes('showWindow')) {
-                console.log(`📜 Analyzing script content for Trumba subscription URLs`);
-                
-                // Enhanced patterns for Trumba and similar services
+              if (scriptContent.includes('subscribe') || scriptContent.includes('Trumba')) {
+                // Look for subscription URLs in the script
                 const subscriptionUrlPatterns = [
-                  // Trumba-specific patterns
                   /subscribe['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /subscribeUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /showWindow\(['"]subscribe['"][^)]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /Trumba\.EA2\.showWindow\(['"]subscribe['"]\)[^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  // Generic subscription URLs in scripts
-                  /['"]([^'"]*\/subscribe[^'"]*)['"]/, 
-                  /['"]([^'"]*subscribe[^'"]*)['"]/, 
-                  // Calendar service configuration URLs
-                  /calendarUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /feedUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /rssUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /icalUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  // Subscription window configuration
-                  /windowUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi,
-                  /popupUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi
+                  /['"]([^'"]*\/subscribe[^'"]*)['"]|['"]([^'"]*subscribe[^'"]*)['"]/, // Generic subscription URLs
                 ];
                 
                 subscriptionUrlPatterns.forEach(pattern => {
@@ -497,54 +477,13 @@ export class LocationFeedDiscoverer {
                   if (matches) {
                     matches.forEach(match => {
                       const urlMatch = match.match(/['"]([^'"]+)['"]/);
-                      if (urlMatch && urlMatch[1]) {
-                        const foundUrl = urlMatch[1];
-                        // Only add URLs that look like subscription endpoints
-                        if (foundUrl.includes('subscribe') || foundUrl.includes('rss') || foundUrl.includes('ical') || foundUrl.includes('feed')) {
-                          console.log(`📜 Found subscription URL in script: ${foundUrl}`);
-                          discoveredPaths.add(foundUrl);
-                        }
+                      if (urlMatch) {
+                        console.log(`📜 Found subscription URL in script: ${urlMatch[1]}`);
+                        discoveredPaths.add(urlMatch[1]);
                       }
                     });
                   }
                 });
-                
-                // Look for base subscription domain/path in Trumba configurations
-                const trumbaConfigPatterns = [
-                  /Trumba\.EA2\.config\s*=\s*{[^}]*baseUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /Trumba\.EA2\.config\s*=\s*{[^}]*domain['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /Trumba\.EA2\.setConfig\([^)]*['"]([^'"]*trumba[^'"]*)['"]/gi
-                ];
-                
-                trumbaConfigPatterns.forEach(pattern => {
-                  const configMatch = scriptContent.match(pattern);
-                  if (configMatch && configMatch[1]) {
-                    const baseDomain = configMatch[1];
-                    console.log(`📜 Found Trumba base domain: ${baseDomain}`);
-                    // Add common Trumba subscription paths
-                    discoveredPaths.add(`${baseDomain}/subscribe`);
-                    discoveredPaths.add(`${baseDomain}/calendar/subscribe`);
-                    discoveredPaths.add(`${baseDomain}/rss.aspx`);
-                    discoveredPaths.add(`${baseDomain}/iCalendar.aspx`);
-                  }
-                });
-              }
-            });
-            
-            // Also check for subscription links in the current page that might be hidden or dynamically generated
-            const hiddenSubscriptionSelectors = [
-              'a[href*="subscribe"][style*="display:none"]',
-              'a[href*="subscribe"][hidden]',
-              'div[style*="display:none"] a[href*="subscribe"]',
-              'script + a[href*="subscribe"]', // Links that might be shown by scripts
-              '.subscription-links a', '.calendar-subscribe a', '.feed-links a'
-            ];
-            
-            $(hiddenSubscriptionSelectors.join(', ')).each((_, hiddenEl) => {
-              const href = $(hiddenEl).attr('href');
-              if (href && (href.includes('subscribe') || href.includes('rss') || href.includes('ical'))) {
-                console.log(`🔗 Found hidden subscription link: ${href}`);
-                discoveredPaths.add(href);
               }
             });
           }
@@ -644,53 +583,19 @@ export class LocationFeedDiscoverer {
               const isSubscriptionButton = parentOnclick.includes('subscribe') || 
                                          $el.attr('title')?.toLowerCase().includes('subscribe') ||
                                          $el.attr('alt')?.toLowerCase().includes('subscribe') ||
-                                         $el.text().toLowerCase().includes('subscribe') ||
-                                         $el.attr('aria-label')?.toLowerCase().includes('subscribe');
+                                         $el.text().toLowerCase().includes('subscribe');
                                          
               if (isSubscriptionButton) {
-                console.log(`✅ Confirmed ImageLink subscription button - adding comprehensive subscription paths`);
-                
-                // Add comprehensive subscription page paths for third-party services
-                const subscriptionPaths = [
-                  '/subscribe',
-                  '/calendar/subscribe', 
-                  '/events/subscribe',
-                  '/rss.aspx',
-                  '/iCalendar.aspx',
-                  '/calendar/rss.aspx',
-                  '/calendar/iCalendar.aspx',
-                  '/events/rss.aspx', 
-                  '/events/iCalendar.aspx',
-                  '/feed',
-                  '/calendar/feed',
-                  '/events/feed',
-                  '/calendar.rss',
-                  '/events.rss',
-                  '/calendar.ics',
-                  '/events.ics',
-                  // Common Trumba paths
-                  '/calendar/calendar.rss',
-                  '/calendar/events.rss',
-                  '/spuds.aspx', // Sometimes used by Trumba
-                  '/main.aspx', // Common Trumba calendar page
-                  '/main.aspx?view=rss',
-                  '/main.aspx?view=ical'
-                ];
-                
-                subscriptionPaths.forEach(path => {
-                  console.log(`📋 Adding ImageLink subscription path: ${path}`);
-                  discoveredPaths.add(path);
-                });
-                
-                // Look for nearby subscription URLs in the same container
-                const container = $el.closest('div, span, section, article');
-                container.find('a[href*="subscribe"], a[href*="rss"], a[href*="ical"], a[href*="feed"]').each((_, nearbyLink) => {
-                  const nearbyHref = $(nearbyLink).attr('href');
-                  if (nearbyHref) {
-                    console.log(`🔗 Found nearby subscription link in ImageLink container: ${nearbyHref}`);
-                    discoveredPaths.add(nearbyHref);
-                  }
-                });
+                console.log(`✅ Confirmed subscription button - checking for subscription pages`);
+                // Add common subscription page paths for third-party services
+                discoveredPaths.add('/subscribe');
+                discoveredPaths.add('/calendar/subscribe');
+                discoveredPaths.add('/events/subscribe');
+                discoveredPaths.add('/rss.aspx');
+                discoveredPaths.add('/iCalendar.aspx');
+                discoveredPaths.add('/feed');
+                discoveredPaths.add('/calendar/feed');
+                discoveredPaths.add('/events/feed');
               }
             }
             
