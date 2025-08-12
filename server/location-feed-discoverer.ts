@@ -386,7 +386,14 @@ export class LocationFeedDiscoverer {
         // Icons that indicate downloadable feeds
         'a[href*=".ics"] img', 'a[href*=".rss"] img',
         'a[href*="download"] img[alt*="calendar"]',
-        'a[href*="export"] img[alt*="calendar"]'
+        'a[href*="export"] img[alt*="calendar"]',
+        // Third-party calendar service buttons (Trumba, etc.)
+        'a[onclick*="subscribe"]', 'button[onclick*="subscribe"]',
+        'a[onclick*="showWindow"]', 'button[onclick*="showWindow"]',
+        'a[onclick*="Trumba"]', 'button[onclick*="Trumba"]',
+        'span.ImageLink a', 'div.ImageLink a',
+        'a[onclick*="calendar"]', 'button[onclick*="calendar"]',
+        'a[onclick*="feed"]', 'button[onclick*="feed"]'
       ];
 
       $(downloadableButtonSelectors.join(', ')).each((_, element) => {
@@ -433,6 +440,53 @@ export class LocationFeedDiscoverer {
             // Generic downloadable feed patterns
             /['"]([^'"]*(?:RSSFeed\.aspx|iCalendarFeed\.aspx|Feed\.aspx)[^'"]*)['"]/, 
           ];
+
+          // Check for third-party calendar service functions (like Trumba)
+          if (onclick.includes('showWindow') && onclick.includes('subscribe')) {
+            console.log(`🎯 Found third-party subscription button (Trumba-like): ${onclick}`);
+            // For third-party services, we need to check if there are subscription page URLs elsewhere
+            const currentPath = new URL(baseUrl).pathname;
+            const possibleSubscriptionPaths = [
+              `${currentPath}/subscribe`,
+              `${currentPath}?subscribe=true`,
+              '/calendar/subscribe',
+              '/events/subscribe',
+              '/subscribe',
+              '/rss.aspx',
+              '/iCalendar.aspx'
+            ];
+            
+            possibleSubscriptionPaths.forEach(path => {
+              console.log(`📋 Adding potential third-party subscription path: ${path}`);
+              discoveredPaths.add(path);
+            });
+            
+            // Also look for the subscription window URL in page scripts
+            $('script').each((_, scriptEl) => {
+              const scriptContent = $(scriptEl).html() || '';
+              if (scriptContent.includes('subscribe') || scriptContent.includes('Trumba')) {
+                // Look for subscription URLs in the script
+                const subscriptionUrlPatterns = [
+                  /subscribe['"]\s*:\s*['"]([^'"]+)['"]/gi,
+                  /subscribeUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
+                  /['"]([^'"]*\/subscribe[^'"]*)['"]|['"]([^'"]*subscribe[^'"]*)['"]/, // Generic subscription URLs
+                ];
+                
+                subscriptionUrlPatterns.forEach(pattern => {
+                  const matches = scriptContent.match(pattern);
+                  if (matches) {
+                    matches.forEach(match => {
+                      const urlMatch = match.match(/['"]([^'"]+)['"]/);
+                      if (urlMatch) {
+                        console.log(`📜 Found subscription URL in script: ${urlMatch[1]}`);
+                        discoveredPaths.add(urlMatch[1]);
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
 
           for (const pattern of downloadableFeedPatterns) {
             const match = onclick.match(pattern);
@@ -490,7 +544,10 @@ export class LocationFeedDiscoverer {
         'a[title*="iCalendar"]', 'a[title*="Subscribe"]', 'a[title*="RSS"]', 'a[title*="Feed"]',
         'img[src*="rss"]', 'img[alt*="RSS"]', 'img[alt*="Feed"]', 'img[alt*="Calendar"]',
         'a[class*="rss"]', 'a[class*="feed"]', 'a[class*="calendar"]', 'a[class*="subscribe"]',
-        'span[class*="rss"] a', 'div[class*="feed"] a', 'li[class*="subscribe"] a', 'a.ImageLink'
+        'span[class*="rss"] a', 'div[class*="feed"] a', 'li[class*="subscribe"] a', 'a.ImageLink',
+        // Third-party calendar service specific patterns
+        'span.ImageLink a[onclick*="subscribe"]', '.ImageLink a[title*="Subscribe"]',
+        'span.ImageLink a[onclick*="showWindow"]', 'div.ImageLink a[onclick*="calendar"]'
       ];
 
       $(feedLinkSelectors.join(', ')).each((_, element) => {
@@ -510,12 +567,37 @@ export class LocationFeedDiscoverer {
           }
         }
         
-        // For images, check if they're inside clickable elements with data attributes
-        if (tagName === 'img') {
-          const clickableParent = $el.closest('[onclick], [data-url], [data-href], a');
+        // For images and elements, check if they're inside clickable elements or ImageLink containers
+        if (tagName === 'img' || tagName === 'a') {
+          const clickableParent = $el.closest('[onclick], [data-url], [data-href], a, span.ImageLink, div.ImageLink');
           if (clickableParent.length > 0) {
             const parentOnclick = clickableParent.attr('onclick');
             const parentDataUrl = clickableParent.attr('data-url') || clickableParent.attr('data-href');
+            const parentClass = clickableParent.attr('class') || '';
+            
+            // Special handling for third-party calendar services (like Trumba)
+            if (parentOnclick && (parentOnclick.includes('showWindow') || parentOnclick.includes('Trumba'))) {
+              console.log(`🎯 Found third-party calendar service button in ImageLink: ${parentOnclick}`);
+              
+              // Check if this is a subscription button
+              const isSubscriptionButton = parentOnclick.includes('subscribe') || 
+                                         $el.attr('title')?.toLowerCase().includes('subscribe') ||
+                                         $el.attr('alt')?.toLowerCase().includes('subscribe') ||
+                                         $el.text().toLowerCase().includes('subscribe');
+                                         
+              if (isSubscriptionButton) {
+                console.log(`✅ Confirmed subscription button - checking for subscription pages`);
+                // Add common subscription page paths for third-party services
+                discoveredPaths.add('/subscribe');
+                discoveredPaths.add('/calendar/subscribe');
+                discoveredPaths.add('/events/subscribe');
+                discoveredPaths.add('/rss.aspx');
+                discoveredPaths.add('/iCalendar.aspx');
+                discoveredPaths.add('/feed');
+                discoveredPaths.add('/calendar/feed');
+                discoveredPaths.add('/events/feed');
+              }
+            }
             
             if (parentOnclick && (parentOnclick.includes('calendar') || parentOnclick.includes('feed') || parentOnclick.includes('rss'))) {
               // Extract URL from parent onclick
