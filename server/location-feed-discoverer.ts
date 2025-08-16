@@ -124,13 +124,11 @@ export class LocationFeedDiscoverer {
     '/calendar/all.ics'
   ];
 
-  interface WebsiteValidationResult {
+  private async validateWebsiteExists(url: string): Promise<{
     isValid: boolean;
     reason: string;
     canRetry: boolean;
-  }
-
-  private async validateWebsiteExists(url: string): Promise<WebsiteValidationResult> {
+  }> {
     try {
       const { WebsiteValidator } = await import('./website-validator');
       const validation = await WebsiteValidator.validateWebsite(url);
