@@ -80,6 +80,34 @@ export class WebsiteValidator {
     'public works'
   ];
 
+  private static readonly EDUCATIONAL_INDICATORS = [
+    'school district',
+    'unified school',
+    'elementary school',
+    'high school',
+    'middle school',
+    'school board',
+    'superintendent',
+    'principal',
+    'teacher',
+    'student',
+    'education',
+    'academic',
+    'enrollment',
+    'classroom',
+    'campus',
+    'grade',
+    'curriculum',
+    'learning',
+    'faculty',
+    'staff directory',
+    'school calendar',
+    'lunch menu',
+    'transportation',
+    'athletics',
+    'library'
+  ];
+
   static async validateWebsite(url: string): Promise<WebsiteValidation> {
     try {
       // Ensure URL has protocol
@@ -177,10 +205,11 @@ export class WebsiteValidator {
       // Check content quality
       const hasValidContent = this.hasValidContent(htmlLower, title, contentLength);
       
-      // For government sites, be more lenient if basic indicators are present
+      // For government and educational sites, be more lenient if basic indicators are present
       const isGovernmentSite = this.isGovernmentSite(htmlLower, title, fullUrl);
+      const isEducationalSite = this.isEducationalSite(htmlLower, title, fullUrl);
       
-      if (!hasValidContent && !isGovernmentSite) {
+      if (!hasValidContent && !isGovernmentSite && !isEducationalSite) {
         return {
           isValid: false,
           status: 'error',
@@ -243,30 +272,42 @@ export class WebsiteValidator {
   }
 
   private static isParkedDomain(html: string, title?: string): boolean {
-    // Check HTML content
-    const hasParkedIndicator = this.PARKED_INDICATORS.some(indicator => 
-      html.includes(indicator)
-    );
+    // Check HTML content - but be more specific about matches
+    const hasParkedIndicator = this.PARKED_INDICATORS.some(indicator => {
+      // Use word boundaries to avoid false positives
+      const regex = new RegExp(`\\b${indicator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      return regex.test(html);
+    });
     
-    // Check title
-    const titleParked = title && this.PARKED_INDICATORS.some(indicator => 
-      title.toLowerCase().includes(indicator)
-    );
+    // Check title with word boundaries
+    const titleParked = title && this.PARKED_INDICATORS.some(indicator => {
+      const regex = new RegExp(`\\b${indicator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      return regex.test(title);
+    });
     
-    // Check for domain broker patterns
+    // Check for domain broker patterns - be more specific
     const brokerPatterns = [
-      /buy.*domain/i,
-      /premium.*domain/i,
-      /domain.*for.*sale/i,
-      /register.*domain/i,
-      /domain.*marketplace/i
+      /\bbuy\s+this\s+domain\b/i,
+      /\bpremium\s+domain\s+for\s+sale\b/i,
+      /\bdomain\s+for\s+sale\b/i,
+      /\bregister\s+this\s+domain\b/i,
+      /\bdomain\s+marketplace\b/i,
+      /\bparked\s+by\b/i,
+      /\bdomain\s+parking\b/i
     ];
     
     const hasBrokerPattern = brokerPatterns.some(pattern => 
       pattern.test(html) || (title && pattern.test(title))
     );
     
-    return hasParkedIndicator || titleParked || hasBrokerPattern;
+    // Only consider it parked if we have strong indicators
+    const strongParkedIndicators = [
+      hasParkedIndicator && html.includes('for sale'),
+      titleParked && title && title.toLowerCase().includes('for sale'),
+      hasBrokerPattern
+    ].filter(Boolean).length;
+    
+    return strongParkedIndicators > 0;
   }
 
   private static isMaintenancePage(html: string, title?: string): boolean {
@@ -340,8 +381,8 @@ export class WebsiteValidator {
   }
 
   private static hasValidContent(html: string, title?: string, contentLength?: number): boolean {
-    // Minimum content length
-    if (!contentLength || contentLength < 500) {
+    // More lenient minimum content length
+    if (!contentLength || contentLength < 300) {
       return false;
     }
     
@@ -369,8 +410,14 @@ export class WebsiteValidator {
                               !this.PARKED_INDICATORS.some(indicator => 
                                 title.toLowerCase().includes(indicator));
     
-    // Need at least 2 of these indicators for valid content
-    const validityScore = [hasNavigation, hasContent, hasInteractivity, hasMeaningfulTitle]
+    // Check for images or media content
+    const hasMedia = /<img|<video|<audio|<iframe/i.test(html);
+    
+    // Check for links
+    const hasLinks = /<a\s+href/i.test(html);
+    
+    // More lenient scoring - need at least 2 of these indicators for valid content
+    const validityScore = [hasNavigation, hasContent, hasInteractivity, hasMeaningfulTitle, hasMedia, hasLinks]
                          .filter(Boolean).length;
     
     return validityScore >= 2;
@@ -389,6 +436,25 @@ export class WebsiteValidator {
     );
     
     return hasGovContent;
+  }
+
+  private static isEducationalSite(html: string, title?: string, url?: string): boolean {
+    // Check URL for educational domain indicators
+    if (url) {
+      const isEduDomain = url.includes('.edu') || 
+                         url.includes('school') || 
+                         url.includes('usd.') || 
+                         url.includes('district') ||
+                         url.includes('k12.');
+      if (isEduDomain) return true;
+    }
+    
+    // Check content for educational indicators
+    const hasEduContent = this.EDUCATIONAL_INDICATORS.some(indicator => 
+      html.includes(indicator) || (title && title.toLowerCase().includes(indicator))
+    );
+    
+    return hasEduContent;
   }
 
   private static extractTitle(html: string): string | undefined {
