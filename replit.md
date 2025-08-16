@@ -9,6 +9,15 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
+**2025-01-16**: Enhanced Library and Parks Feed Discovery within City Websites
+- Modified library and parks feed discovery to search within existing city websites instead of only trying separate domains
+- Added new `checkSpecificPathForFeeds` method that searches for calendar feeds within `/library`, `/park`, and `/recreation` paths on city websites
+- Enhanced discovery workflow to use working city government websites as base URLs for library and parks department calendar searches
+- Library discovery now checks paths like `/library/calendar`, `/departments/library/events`, etc. within the city website
+- Parks discovery now checks paths like `/parks/calendar`, `/recreation/events`, `/departments/parks-recreation`, etc. within the city website
+- Improved feed discovery reliability by leveraging already-validated city government websites for department-specific calendars
+- Maintained fallback to separate domain patterns (e.g., citylibrary.org) for cases where departments have independent websites
+
 **2025-01-16**: Improved City Website Database Validation
 - Replaced city search functionality with simple "Add City" form that checks if website exists in database
 - Added automatic website validation when cities are found - no longer just showing database status

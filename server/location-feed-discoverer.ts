@@ -164,10 +164,7 @@ export class LocationFeedDiscoverer {
 
   private libraryPatterns = [
     '{city}library.org',
-    '{city}publiclibrary.org',
-    'www.{city}library.org',
-    'www.{city}pl.org',
-    '{city}lib.org'
+
   ];
 
   private parkRecPatterns = [
@@ -188,6 +185,21 @@ export class LocationFeedDiscoverer {
     const govFeeds = await this.discoverGovernmentFeeds(location, citySlug, stateSlug);
     discoveredFeeds.push(...govFeeds);
 
+    // Find working city website for library and parks discovery
+    let workingCityWebsite: string | null = null;
+    for (const feed of govFeeds) {
+      if (feed.source.feedUrl) {
+        try {
+          const url = new URL(feed.source.feedUrl);
+          workingCityWebsite = `${url.protocol}//${url.hostname}`;
+          console.log(`Found working city website for library/parks discovery: ${workingCityWebsite}`);
+          break;
+        } catch (e) {
+          // Continue to next feed
+        }
+      }
+    }
+
     // Discover school district feeds
     const schoolFeeds = await this.discoverSchoolFeeds(location, citySlug, stateSlug);
     discoveredFeeds.push(...schoolFeeds);
@@ -196,12 +208,12 @@ export class LocationFeedDiscoverer {
     const chamberFeeds = await this.discoverChamberFeeds(location, citySlug, stateSlug);
     discoveredFeeds.push(...chamberFeeds);
 
-    // Discover library feeds
-    const libraryFeeds = await this.discoverLibraryFeeds(location, citySlug, stateSlug);
+    // Discover library feeds (use city website if found)
+    const libraryFeeds = await this.discoverLibraryFeeds(location, citySlug, stateSlug, workingCityWebsite);
     discoveredFeeds.push(...libraryFeeds);
 
-    // Discover parks and recreation feeds
-    const parkRecFeeds = await this.discoverParkRecFeeds(location, citySlug, stateSlug);
+    // Discover parks and recreation feeds (use city website if found)
+    const parkRecFeeds = await this.discoverParkRecFeeds(location, citySlug, stateSlug, workingCityWebsite);
     discoveredFeeds.push(...parkRecFeeds);
 
     // Sort by confidence score
@@ -273,9 +285,40 @@ export class LocationFeedDiscoverer {
     return feeds;
   }
 
-  private async discoverLibraryFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
+  private async discoverLibraryFeeds(location: LocationInfo, citySlug: string, stateSlug: string, workingCityWebsite?: string | null): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
 
+    // First, try searching within the city website if available
+    if (workingCityWebsite) {
+      console.log(`Searching for library feeds within city website: ${workingCityWebsite}`);
+      const libraryPaths = [
+        '/library',
+        '/libraries',
+        '/library/calendar',
+        '/library/events',
+        '/libraries/calendar',
+        '/libraries/events',
+        '/departments/library',
+        '/departments/library/calendar',
+        '/departments/library/events'
+      ];
+
+      for (const path of libraryPaths) {
+        try {
+          const domain = workingCityWebsite.replace(/^https?:\/\//, '');
+          const discoveredFeeds = await this.checkSpecificPathForFeeds(domain, path, {
+            ...location,
+            type: 'city',
+            organizationType: 'library' as const
+          });
+          feeds.push(...discoveredFeeds);
+        } catch (error) {
+          console.log(`Error checking library path ${path} on ${workingCityWebsite}:`, error);
+        }
+      }
+    }
+
+    // Then try traditional separate library domain patterns
     for (const domainPattern of this.libraryPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -293,9 +336,53 @@ export class LocationFeedDiscoverer {
     return feeds;
   }
 
-  private async discoverParkRecFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
+  private async discoverParkRecFeeds(location: LocationInfo, citySlug: string, stateSlug: string, workingCityWebsite?: string | null): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
 
+    // First, try searching within the city website if available
+    if (workingCityWebsite) {
+      console.log(`Searching for parks & recreation feeds within city website: ${workingCityWebsite}`);
+      const parksPaths = [
+        '/park',
+        '/parks',
+        '/recreation', 
+        '/parks-recreation',
+        '/parksandrec',
+        '/park/calendar',
+        '/parks/calendar',
+        '/recreation/calendar',
+        '/parks-recreation/calendar',
+        '/park/events',
+        '/parks/events',
+        '/recreation/events',
+        '/parks-recreation/events',
+        '/departments/parks',
+        '/departments/parks/calendar',
+        '/departments/parks/events',
+        '/departments/recreation',
+        '/departments/recreation/calendar',
+        '/departments/recreation/events',
+        '/departments/parks-recreation',
+        '/departments/parks-recreation/calendar',
+        '/departments/parks-recreation/events'
+      ];
+
+      for (const path of parksPaths) {
+        try {
+          const domain = workingCityWebsite.replace(/^https?:\/\//, '');
+          const discoveredFeeds = await this.checkSpecificPathForFeeds(domain, path, {
+            ...location,
+            type: 'city',
+            organizationType: 'parks' as const
+          });
+          feeds.push(...discoveredFeeds);
+        } catch (error) {
+          console.log(`Error checking parks path ${path} on ${workingCityWebsite}:`, error);
+        }
+      }
+    }
+
+    // Then try traditional separate parks domain patterns
     for (const domainPattern of this.parkRecPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -987,6 +1074,94 @@ export class LocationFeedDiscoverer {
     } catch (error) {
       // Domain doesn't exist or is not accessible
       console.log(`Domain ${domain} not accessible: ${error}`);
+    }
+
+    return feeds;
+  }
+
+  private async checkSpecificPathForFeeds(domain: string, specificPath: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
+    const feeds: DiscoveredFeed[] = [];
+
+    try {
+      const baseUrl = `https://${domain}`;
+      const fullUrl = `${baseUrl}${specificPath}`;
+      
+      console.log(`Checking specific path: ${fullUrl}`);
+
+      // First check if the specific path exists
+      const response = await axios.get(fullUrl, {
+        timeout: 3000,
+        headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
+        validateStatus: (status) => status < 500,
+        maxRedirects: 3
+      });
+
+      // Check if path actually exists and returns content
+      if (response.status === 404 || response.status >= 400) {
+        console.log(`Path ${specificPath} on ${domain} returned status ${response.status} - skipping`);
+        return feeds;
+      }
+
+      // Verify we got actual content
+      if (!response.data || typeof response.data !== 'string' || response.data.length < 100) {
+        console.log(`Path ${specificPath} on ${domain} returned insufficient content - skipping`);
+        return feeds;
+      }
+
+      console.log(`✓ Found content at ${specificPath} on ${domain} - searching for feeds`);
+
+      // Parse the page content to look for calendar/events feeds
+      const $ = cheerio.load(response.data);
+      const discoveredPaths = new Set<string>();
+
+      // Look for calendar/events links on this specific page
+      $('a[href*="calendar"], a[href*="events"]').each((_, element) => {
+        const href = $(element).attr('href');
+        if (href) {
+          const path = href.startsWith('/') ? href : new URL(href, fullUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Look for direct feed links (.ics, .rss, etc.)
+      $('a[href*=".ics"], a[href*=".rss"], a[href*=".xml"], a[href*="download"], a[href*="export"], a[href*="subscribe"]').each((_, element) => {
+        const href = $(element).attr('href');
+        if (href) {
+          const path = href.startsWith('/') ? href : new URL(href, fullUrl).pathname;
+          discoveredPaths.add(path);
+        }
+      });
+
+      // Add common feed paths based on the specific department/section we're looking at
+      const pathType = specificPath.toLowerCase();
+      if (pathType.includes('library') || pathType.includes('libraries')) {
+        discoveredPaths.add(`${specificPath}/calendar.ics`);
+        discoveredPaths.add(`${specificPath}/events.ics`);
+        discoveredPaths.add(`${specificPath}/calendar.rss`);
+        discoveredPaths.add(`${specificPath}/events.rss`);
+        discoveredPaths.add(`${specificPath}/calendar`);
+        discoveredPaths.add(`${specificPath}/events`);
+      } else if (pathType.includes('park') || pathType.includes('recreation')) {
+        discoveredPaths.add(`${specificPath}/calendar.ics`);
+        discoveredPaths.add(`${specificPath}/events.ics`);
+        discoveredPaths.add(`${specificPath}/calendar.rss`);
+        discoveredPaths.add(`${specificPath}/events.rss`);
+        discoveredPaths.add(`${specificPath}/calendar`);
+        discoveredPaths.add(`${specificPath}/events`);
+      }
+
+      // Check each discovered path for feeds
+      for (const path of Array.from(discoveredPaths).slice(0, 10)) {
+        const feedUrl = path.startsWith('http') ? path : `${baseUrl}${path}`;
+        const feed = await this.validateFeedUrl(feedUrl, location);
+
+        if (feed) {
+          feeds.push(feed);
+        }
+      }
+
+    } catch (error) {
+      console.log(`Error checking specific path ${specificPath} on ${domain}:`, (error as Error).message);
     }
 
     return feeds;
