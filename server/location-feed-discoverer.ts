@@ -47,92 +47,18 @@ export class LocationFeedDiscoverer {
     '/calendar/download',
     '/calendar/export',
     '/events/download',
-    '/events/export',
-    '/calendar/subscribe',
-    '/events/subscribe',
-    '/calendar/ical',
-    '/events/ical',
-    '/download/calendar',
-    '/download/events',
-    '/export/calendar',
-    '/export/events',
-    // Common CMS feed patterns (skip client-side API endpoints)
-    '/calendar/rss',
-    '/events/rss',
-    '/calendar/feed.xml',
-    '/events/feed.xml',
-    // WordPress and common CMS patterns
-    '/wp-content/uploads/calendar.ics',
-    '/?feed=calendar',
-    '/?feed=events',
-    '/feed/?post_type=event',
-    '/feed/?post_type=calendar',
-    // Government-specific patterns  
-    '/modules/calendar/calendar.ics',
-    '/modules/events/events.ics',
-    '/departments/events/calendar.ics',
-    '/calendar/icalendar',
-    '/events/icalendar',
-    // School district CMS patterns
-    '/calendar/feed',
-    '/events/feed', 
-    '/calendar/calendar.rss',
-    '/events/events.rss',
-    '/calendar/index.rss',
-    '/events/index.rss',
-    // Apptegy CMS (common for school districts)
-    '/calendar.rss',
-    '/events.rss',
-    '/news/feed',
-    // Finalsite CMS patterns
-    '/calendar/feed.rss',
-    '/events/feed.rss',
-    // Common query parameter patterns
-    '/calendar?format=ics',
-    '/events?format=ics',
-    '/calendar?export=ics',
-    '/events?export=ics',
-    '/calendar?download=1',
-    '/events?download=1',
-    // Department-specific calendar patterns (based on screenshots)
-    '/calendar/building-department/rss',
-    '/calendar/city-council/rss',
-    '/calendar/fire-department/rss',
-    '/calendar/police-department/rss',
-    '/calendar/public-works/rss',
-    '/calendar/planning-department/rss',
-    '/calendar/main-calendar/rss',
-    '/calendar/all/rss',
-    '/calendar/housing/rss',
-    // Alternative department feed formats
-    '/calendar/building-department.rss',
-    '/calendar/city-council.rss',
-    '/calendar/fire-department.rss',
-    '/calendar/police-department.rss',
-    '/calendar/public-works.rss',
-    '/calendar/planning-department.rss',
-    '/calendar/main-calendar.rss',
-    '/calendar/all.rss',
-    // iCalendar versions of department feeds
-    '/calendar/building-department.ics',
-    '/calendar/city-council.ics',
-    '/calendar/fire-department.ics',
-    '/calendar/police-department.ics',
-    '/calendar/public-works.ics',
-    '/calendar/planning-department.ics',
-    '/calendar/main-calendar.ics',
-    '/calendar/all.ics'
-  ];
 
-  private async validateWebsiteExists(url: string): Promise<{
+  interface WebsiteValidationResult {
     isValid: boolean;
     reason: string;
     canRetry: boolean;
-  }> {
+  }
+
+  private async validateWebsiteExists(url: string): Promise<WebsiteValidationResult> {
     try {
       const { WebsiteValidator } = await import('./website-validator');
       const validation = await WebsiteValidator.validateWebsite(url);
-
+      
       if (validation.isValid) {
         return { isValid: true, reason: 'Website is accessible', canRetry: false };
       }
@@ -428,7 +354,7 @@ export class LocationFeedDiscoverer {
     const databaseWebsite = await this.getCityWebsiteFromDatabase(location.city, location.state);
     if (databaseWebsite) {
       console.log(`✓ Found city website in database: ${databaseWebsite} - checking for feeds`);
-
+      
       const domain = databaseWebsite.replace(/^https?:\/\//, '');
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -447,7 +373,7 @@ export class LocationFeedDiscoverer {
 
     // If no database website or no feeds found, try pattern-based discovery
     const cityInitials = this.createCityInitials(location.city);
-
+    
     for (const domainPattern of this.governmentDomainPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -563,7 +489,7 @@ export class LocationFeedDiscoverer {
 
     // Then try traditional separate library domain patterns
     const cityInitials = this.createCityInitials(location.city);
-
+    
     for (const domainPattern of this.libraryPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -636,7 +562,7 @@ export class LocationFeedDiscoverer {
 
     // Then try traditional separate parks domain patterns
     const cityInitials = this.createCityInitials(location.city);
-
+    
     for (const domainPattern of this.parkRecPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
@@ -667,11 +593,11 @@ export class LocationFeedDiscoverer {
     try {
       // First check if domain exists with comprehensive validation
       const baseUrl = `https://${domain}`;
-
+      
       // Use the website validator for better detection of non-existent/parked domains
       const { WebsiteValidator } = await import('./website-validator');
       const validation = await WebsiteValidator.validateWebsite(baseUrl);
-
+      
       if (!validation.isValid) {
         console.log(`❌ Website ${domain} is not valid: ${validation.status} - ${validation.error || 'Unknown error'}`);
         return feeds;
@@ -745,7 +671,7 @@ export class LocationFeedDiscoverer {
       const downloadableButtonSelectors = [
         // Direct download buttons
         'button:contains("Download")', 'a:contains("Download")',
-        'button:contains("Export")', 'a:contains("Export")',
+        'button:contains("Export")', 'a:contains("Export")', 
         'button:contains("Subscribe")', 'a:contains("Subscribe")',
         'button:contains("iCalendar")', 'a:contains("iCalendar")',
         'button:contains("RSS")', 'a:contains("RSS")',
@@ -815,7 +741,7 @@ export class LocationFeedDiscoverer {
             // API endpoints for calendar data
             /['"]([^'"]*\/api\/[^'"]*(?:calendar|events|ical|rss)[^'"]*)['"]/, 
             // Feed URLs with parameters
-            /['"]([^'"]*(?:ModID|CID)=[^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
+            /['"]([^'"]*(?:ModID|CID|calendarId)=[^'"]*\.(?:ics|rss|xml)[^'"]*)['"]/, 
             // Generic downloadable feed patterns
             /['"]([^'"]*(?:RSSFeed\.aspx|iCalendarFeed\.aspx|Feed\.aspx)[^'"]*)['"]/, 
             // Trumba showWindow specific patterns
@@ -824,29 +750,6 @@ export class LocationFeedDiscoverer {
             // Generic showWindow patterns
             /onclick\s*=\s*["'][^"']*showWindow\(['"]subscribe['"]\)[^"']*["']/,
           ];
-
-          for (const pattern of downloadableFeedPatterns) {
-            const match = onclick.match(pattern);
-            if (match && match[1]) {
-              let potentialUrl = match[1];
-              console.log(`🎯 Found potential downloadable feed in onclick: ${potentialUrl}`);
-
-              // Handle relative URLs
-              if (potentialUrl.startsWith('/')) {
-                discoveredPaths.add(potentialUrl);
-              } else if (potentialUrl.startsWith('http')) {
-                try {
-                  const path = new URL(potentialUrl).pathname + new URL(potentialUrl).search;
-                  discoveredPaths.add(path);
-                } catch (e) {
-                  // Invalid URL, skip
-                }
-              } else if (this.isDownloadableFeedUrl(potentialUrl)) {
-                // Treat as relative path for downloadable feeds
-                discoveredPaths.add(`/${potentialUrl}`);
-              }
-            }
-          }
 
           // Check for third-party calendar service functions (like Trumba)
           if (onclick.includes('showWindow') && onclick.includes('subscribe')) {
@@ -914,7 +817,7 @@ export class LocationFeedDiscoverer {
                   // Trumba-specific patterns
                   /subscribe['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /subscribeUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /showWindow\(['"]subscribe['"][^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
+                  /showWindow\(['"]subscribe['"][^)]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi,
                   /Trumba\.EA2\.showWindow\(['"]subscribe['"]\)[^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   // Generic subscription URLs in scripts
@@ -1043,6 +946,29 @@ export class LocationFeedDiscoverer {
                 discoveredPaths.add(href);
               }
             });
+          }
+
+          for (const pattern of downloadableFeedPatterns) {
+            const match = onclick.match(pattern);
+            if (match && match[1]) {
+              let potentialUrl = match[1];
+              console.log(`🎯 Found potential downloadable feed in onclick: ${potentialUrl}`);
+
+              // Handle relative URLs
+              if (potentialUrl.startsWith('/')) {
+                discoveredPaths.add(potentialUrl);
+              } else if (potentialUrl.startsWith('http')) {
+                try {
+                  const path = new URL(potentialUrl).pathname + new URL(potentialUrl).search;
+                  discoveredPaths.add(path);
+                } catch (e) {
+                  // Invalid URL, skip
+                }
+              } else if (this.isDownloadableFeedUrl(potentialUrl)) {
+                // Treat as relative path for downloadable feeds
+                discoveredPaths.add(`/${potentialUrl}`);
+              }
+            }
           }
         }
 
@@ -1239,8 +1165,8 @@ export class LocationFeedDiscoverer {
           const feedFilePatterns = [
             /(['"])(\/[^'"]*\.(?:ics|rss|xml))\1/g,
             /(['"])(\/[^'"]*(?:calendar|events)[^'"]*\.(?:ics|rss|xml))\1/g,
-            /url\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml))\1/g,
-            /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml))\1/g,
+            /url\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
+            /href\s*:\s*(['"])([^'"]*\.(?:ics|rss|xml)[^'"]*)\1/g,
             /(['"])(\/[^'"]*(?:calendar|events)[^'"]*\.xml)\1/g
           ];
 
@@ -1387,7 +1313,7 @@ export class LocationFeedDiscoverer {
     try {
       const baseUrl = `https://${domain}`;
       const fullUrl = `${baseUrl}${specificPath}`;
-
+      
       console.log(`Checking specific path: ${fullUrl}`);
 
       // First check if the specific path exists
@@ -1490,7 +1416,7 @@ export class LocationFeedDiscoverer {
         // Use website validator for comprehensive domain checking
         const { WebsiteValidator } = await import('./website-validator');
         const validation = await WebsiteValidator.validateWebsite(feedDomain);
-
+        
         if (!validation.isValid) {
           console.log(`❌ Domain ${feedDomain} validation failed: ${validation.status} - ${validation.error} - skipping feed: ${feedUrl}`);
           return null;
@@ -1512,7 +1438,7 @@ export class LocationFeedDiscoverer {
           console.log(`❌ Domain ${feedDomain} not accessible (HTTP ${domainCheck.status}) - skipping feed: ${feedUrl}`);
           return null;
         }
-
+        
         console.log(`✅ Domain ${feedDomain} validated successfully - testing feed: ${feedUrl}`);
       } catch (error: any) {
         if (error.code === 'ENOTFOUND') {
@@ -1733,7 +1659,7 @@ export class LocationFeedDiscoverer {
         for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
           try {
             const response = await axios.get(variation, {
-
+              
               headers: { 
                 'User-Agent': 'CityWide Events Calendar Bot 1.0',
                 'Accept': 'text/calendar, application/calendar, text/plain, */*'
@@ -1784,7 +1710,7 @@ export class LocationFeedDiscoverer {
         for (const variation of rssVariations.slice(0, 5)) {
           try {
             const response = await axios.get(variation, {
-
+              
               headers: { 
                 'User-Agent': 'CityWide Events Calendar Bot 1.0',
                 'Accept': 'application/rss+xml, application/xml, text/xml, */*'
@@ -1828,7 +1754,7 @@ export class LocationFeedDiscoverer {
       const subscriptionDomain = new URL(subscriptionUrl).origin;
       try {
         const domainCheck = await axios.get(subscriptionDomain, {
-
+          
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
@@ -1843,7 +1769,7 @@ export class LocationFeedDiscoverer {
       }
 
       const response = await axios.get(subscriptionUrl, {
-
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 
@@ -2010,7 +1936,7 @@ export class LocationFeedDiscoverer {
   private async testCalendarAPIUrl(testUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.get(testUrl, {
-
+        
         headers: { 
           'User-Agent': 'CityWide Events Calendar Bot 1.0',
           'Accept': 'text/calendar, application/calendar, text/plain, */*'
@@ -2083,7 +2009,7 @@ export class LocationFeedDiscoverer {
   private async validateAndCreateFeed(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.get(feedUrl, {
-
+        
         headers: { 
           'User-Agent': 'CityWide Events Calendar Bot 1.0',
           'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, */*'
@@ -2138,7 +2064,7 @@ export class LocationFeedDiscoverer {
       const calendarDomain = new URL(calendarPageUrl).origin;
       try {
         const domainCheck = await axios.get(calendarDomain, {
-
+          
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
@@ -2153,7 +2079,7 @@ export class LocationFeedDiscoverer {
       }
 
       const response = await axios.get(calendarPageUrl, {
-
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 
@@ -2323,7 +2249,7 @@ export class LocationFeedDiscoverer {
   private async findAllEventsButtonsOnSubscriptionPage(subscriptionUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     try {
       const response = await axios.get(subscriptionUrl, {
-
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 
@@ -2407,7 +2333,7 @@ export class LocationFeedDiscoverer {
 
       return workingFeeds;
     } catch (error) {
-      console.log(`❌ Error analyzing calendar page ${subscriptionUrl}:`, (error as Error).message);
+      console.log(`Error analyzing subscription page ${subscriptionUrl}:`, (error as Error).message);
       return [];
     }
   }
@@ -2450,7 +2376,7 @@ export class LocationFeedDiscoverer {
       // Import the city data loader and check the CSV database
       const { CityDataLoader } = await import('./city-data-loader');
       const cities = await CityDataLoader.loadCities();
-
+      
       // Search through cities to find matching name and state
       for (const city of cities.values()) {
         if (city.municipality.toLowerCase() === cityName.toLowerCase() && 
@@ -2460,7 +2386,7 @@ export class LocationFeedDiscoverer {
           return city.websiteUrl;
         }
       }
-
+      
       return null;
     } catch (error) {
       console.log(`Error looking up city website in database for ${cityName}, ${state}:`, (error as Error).message);
