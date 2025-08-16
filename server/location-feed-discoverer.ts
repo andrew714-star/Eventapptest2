@@ -389,7 +389,7 @@ export class LocationFeedDiscoverer {
         'a[href*="export"] img[alt*="calendar"]',
         // Third-party calendar service buttons (Trumba, etc.)
         'a[onclick*="subscribe"]', 'button[onclick*="subscribe"]',
-        'a[onclick*="showWindow"]', 'button[onclick*="showWindow"]',
+        'a[onclick*=".showWindow"]', 'button[onclick*=".showWindow"]',
         'a[onclick*="Trumba"]', 'button[onclick*="Trumba"]',
         'span.ImageLink a', 'div.ImageLink a',
         'a[onclick*="calendar"]', 'button[onclick*="calendar"]',
@@ -513,6 +513,7 @@ export class LocationFeedDiscoverer {
                   /subscribe['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /subscribeUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /showWindow\(['"]subscribe['"][^)]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
+                  /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi,
                   /Trumba\.EA2\.showWindow\(['"]subscribe['"]\)[^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   // Generic subscription URLs in scripts
                   /['"]([^'"]*\/subscribe[^'"]*)['"]/, 
@@ -525,7 +526,9 @@ export class LocationFeedDiscoverer {
                   /icalUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   // Subscription window configuration
                   /windowUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi,
-                  /popupUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi
+                  /popupUrl['"]\s*:\s*['"]([^'"]*subscribe[^'"]*)['"]/gi,
+                  /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi,
+
                 ];
 
                 subscriptionUrlPatterns.forEach(pattern => {
@@ -1354,6 +1357,9 @@ export class LocationFeedDiscoverer {
       const downloadableFeedPatterns = [
         // Direct downloadable feed files
         /href=["']([^"']*\.(?:ics|rss|xml)[^"']*)["']/gi,
+        /href=["']([^"']*\.(?:ical)[^"']*)["']/gi,
+        /href=["']([^"']*\.(?:ics|rss|xml|ical)[^"']*)["']/gi,
+
         // RSS Feed endpoints that return downloadable content
         /RSSFeed\.aspx\?[^"'>\s]+/g,
         /rssfeed\.aspx\?[^"'>\s]+/gi,
@@ -1678,7 +1684,8 @@ export class LocationFeedDiscoverer {
         /href=["']([^"']*\/calendar.*[^"']*)["']/gi,
         /href=["']([^"']*\/feed[^"']*)["']/gi,
         /href=["']([^"']*subscribe[^"']*)["']/gi,
-        /href=["']([^"']*ical[^"']*)["']/gi
+        /href=["']([^"']*ical[^"']*)["']/gi,
+        /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi
 
       ];
 
