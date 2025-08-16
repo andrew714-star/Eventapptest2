@@ -139,7 +139,21 @@ export class LocationFeedDiscoverer {
     '{city}{state}.us',
     'city{city}.us',
     'cityof{city}.us',
-
+    // Initials-based patterns for multi-word cities
+    '{initials}.gov',
+    '{initials}.{state}.gov',
+    'www.{initials}.gov',
+    'www.{initials}.{state}.gov',
+    '{initials}{state}.gov',
+    'city{initials}.gov',
+    'cityof{initials}.gov',
+    '{initials}.us',
+    '{initials}.{state}.us',
+    'www.{initials}.us',
+    'www.{initials}.{state}.us',
+    '{initials}{state}.us',
+    'city{initials}.us',
+    'cityof{initials}.us'
   ];
 
   private schoolDistrictPatterns = [
@@ -150,7 +164,16 @@ export class LocationFeedDiscoverer {
     '{city}isd.org',
     '{city}usd.org',
     'www.{city}schools.org',
-    'www.{city}schools.edu'
+    'www.{city}schools.edu',
+    // Initials-based patterns
+    '{initials}.K12.{state}.us',
+    '{initials}schools.org',
+    '{initials}schools.edu',
+    '{initials}sd.org',
+    '{initials}isd.org',
+    '{initials}usd.org',
+    'www.{initials}schools.org',
+    'www.{initials}schools.edu'
   ];
 
   private chamberPatterns = [
@@ -159,19 +182,42 @@ export class LocationFeedDiscoverer {
     'www.{city}chamber.org',
     'www.{city}chamber.com',
     '{city}chamberofcommerce.org',
-    '{city}chamberofcommerce.com'
+    '{city}chamberofcommerce.com',
+    // Initials-based patterns
+    '{initials}chamber.org',
+    '{initials}chamber.com',
+    'www.{initials}chamber.org',
+    'www.{initials}chamber.com',
+    '{initials}chamberofcommerce.org',
+    '{initials}chamberofcommerce.com'
   ];
 
   private libraryPatterns = [
     '{city}library.org',
-
+    '{city}library.com',
+    'www.{city}library.org',
+    'www.{city}library.com',
+    '{city}publiclibrary.org',
+    // Initials-based patterns
+    '{initials}library.org',
+    '{initials}library.com',
+    'www.{initials}library.org',
+    'www.{initials}library.com',
+    '{initials}publiclibrary.org'
   ];
 
   private parkRecPatterns = [
     '{city}parks.org',
     '{city}recreation.org',
     'www.{city}parks.org',
-    '{city}parksandrec.org'
+    '{city}parksandrec.org',
+    '{city}parksandrecreation.org',
+    // Initials-based patterns
+    '{initials}parks.org',
+    '{initials}recreation.org',
+    'www.{initials}parks.org',
+    '{initials}parksandrec.org',
+    '{initials}parksandrecreation.org'
   ];
 
   async discoverFeedsForLocation(location: LocationInfo): Promise<DiscoveredFeed[]> {
@@ -226,10 +272,35 @@ export class LocationFeedDiscoverer {
   private async discoverGovernmentFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
 
+    // First, check if we have the city website in our database
+    const databaseWebsite = await this.getCityWebsiteFromDatabase(location.city, location.state);
+    if (databaseWebsite) {
+      console.log(`✓ Found city website in database: ${databaseWebsite} - checking for feeds`);
+      
+      const domain = databaseWebsite.replace(/^https?:\/\//, '');
+      const discoveredFeeds = await this.checkDomainForFeeds(domain, {
+        ...location,
+        type: 'city',
+        organizationType: 'city' as const
+      });
+
+      feeds.push(...discoveredFeeds);
+
+      // If we found feeds from the database website, we're done
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found feeds from database website ${databaseWebsite} - stopping search`);
+        return feeds;
+      }
+    }
+
+    // If no database website or no feeds found, try pattern-based discovery
+    const cityInitials = this.createCityInitials(location.city);
+    
     for (const domainPattern of this.governmentDomainPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
-        .replace('{state}', stateSlug);
+        .replace('{state}', stateSlug)
+        .replace('{initials}', cityInitials);
 
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -251,11 +322,13 @@ export class LocationFeedDiscoverer {
 
   private async discoverSchoolFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
+    const cityInitials = this.createCityInitials(location.city);
 
     for (const domainPattern of this.schoolDistrictPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
-        .replace('{state}', stateSlug);
+        .replace('{state}', stateSlug)
+        .replace('{initials}', cityInitials);
 
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -277,11 +350,13 @@ export class LocationFeedDiscoverer {
 
   private async discoverChamberFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
+    const cityInitials = this.createCityInitials(location.city);
 
     for (const domainPattern of this.chamberPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
-        .replace('{state}', stateSlug);
+        .replace('{state}', stateSlug)
+        .replace('{initials}', cityInitials);
 
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -335,10 +410,13 @@ export class LocationFeedDiscoverer {
     }
 
     // Then try traditional separate library domain patterns
+    const cityInitials = this.createCityInitials(location.city);
+    
     for (const domainPattern of this.libraryPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
-        .replace('{state}', stateSlug);
+        .replace('{state}', stateSlug)
+        .replace('{initials}', cityInitials);
 
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -405,10 +483,13 @@ export class LocationFeedDiscoverer {
     }
 
     // Then try traditional separate parks domain patterns
+    const cityInitials = this.createCityInitials(location.city);
+    
     for (const domainPattern of this.parkRecPatterns) {
       const domain = domainPattern
         .replace('{city}', citySlug)
-        .replace('{state}', stateSlug);
+        .replace('{state}', stateSlug)
+        .replace('{initials}', cityInitials);
 
       const discoveredFeeds = await this.checkDomainForFeeds(domain, {
         ...location,
@@ -2133,6 +2214,38 @@ export class LocationFeedDiscoverer {
       .toLowerCase()
       .replace(/\s+/g, '')
       .replace(/[^a-z0-9]/g, '');
+  }
+
+  private createCityInitials(city: string): string {
+    return city
+      .toLowerCase()
+      .split(/\s+/)
+      .map(word => word.charAt(0))
+      .join('')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private async getCityWebsiteFromDatabase(cityName: string, state: string): Promise<string | null> {
+    try {
+      // Import the city data loader and check the CSV database
+      const { CityDataLoader } = await import('./city-data-loader');
+      const cities = await CityDataLoader.loadCities();
+      
+      // Search through cities to find matching name and state
+      for (const city of cities.values()) {
+        if (city.municipality.toLowerCase() === cityName.toLowerCase() && 
+            city.state.toLowerCase() === state.toLowerCase() && 
+            city.websiteUrl) {
+          console.log(`Found city website in database: ${city.municipality}, ${city.state} -> ${city.websiteUrl}`);
+          return city.websiteUrl;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.log(`Error looking up city website in database for ${cityName}, ${state}:`, (error as Error).message);
+      return null;
+    }
   }
 
   // Enhanced method to discover feeds for popular US locations

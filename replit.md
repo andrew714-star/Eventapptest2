@@ -18,7 +18,14 @@ Event loading behavior: Events should not load or be searched until after a user
 - Improved feed discovery reliability by leveraging already-validated city government websites for department-specific calendars
 - Maintained fallback to separate domain patterns (e.g., citylibrary.org) for cases where departments have independent websites
 
-**2025-01-16**: Optimized Feed Discovery Performance
+**2025-01-16**: Enhanced Multi-Word City Discovery and Database Integration
+- Added support for initials-based domain patterns for multi-word cities (e.g., "Long Beach" → "lb.gov", "San Diego" → "sd.gov")
+- Integrated city website database lookup to find known websites faster before trying pattern-based discovery
+- Enhanced all organization types (government, school, chamber, library, parks) with initials-based domain patterns
+- Database-first approach significantly reduces discovery time by using known working websites from 19,000+ city database
+- Improved discovery success rate for cities with multi-word names that commonly use abbreviated domain names
+
+**2025-01-16**: Optimized Feed Discovery Performance  
 - Removed all 3000ms and other timeout limitations from HTTP requests to prevent premature timeouts on slower government websites
 - Implemented smart discovery optimization: stops searching for additional domains in each category (city, school, chamber, library, parks) once a working website is found
 - Significantly reduced discovery time and API calls while maintaining comprehensive coverage
