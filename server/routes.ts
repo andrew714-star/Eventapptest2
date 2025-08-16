@@ -1330,11 +1330,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`API /api/cities/check-website called with cityName: ${cityName}, state: ${state || 'any'}`);
       const city = await storage.getCityByName(cityName.trim(), state);
       
-      res.json({
-        found: !!city,
-        city: city || null,
-        websiteValidation: undefined // Will be populated by frontend if user requests validation
-      });
+      if (!city) {
+        return res.json({
+          found: false,
+          city: null,
+          websiteValidation: undefined
+        });
+      }
+
+      // If city has a website URL, automatically validate it
+      let websiteValidation = undefined;
+      if (city.websiteUrl) {
+        try {
+          console.log(`Auto-validating website for ${city.municipality}, ${city.state}: ${city.websiteUrl}`);
+          const validationResults = await WebsiteValidator.validateMultiple([city.websiteUrl]);
+          websiteValidation = validationResults.get(city.websiteUrl);
+          
+          // Update the city data with validation results
+          const updatedCity = {
+            ...city,
+            actualWebsiteStatus: websiteValidation?.status || 'unknown'
+          };
+          
+          console.log(`Website validation for ${city.municipality}: ${websiteValidation?.status} - ${websiteValidation?.isValid ? 'Valid' : 'Invalid'}`);
+          
+          res.json({
+            found: true,
+            city: updatedCity,
+            websiteValidation
+          });
+        } catch (validationError) {
+          console.error(`Failed to validate website for ${city.municipality}:`, validationError);
+          // Still return the city data even if validation fails
+          res.json({
+            found: true,
+            city,
+            websiteValidation: {
+              isValid: false,
+              status: 'error',
+              error: 'Failed to validate website'
+            }
+          });
+        }
+      } else {
+        res.json({
+          found: true,
+          city,
+          websiteValidation: undefined
+        });
+      }
     } catch (error) {
       console.error("Error in /api/cities/check-website:", error);
       res.status(500).json({ message: "Failed to check city website" });

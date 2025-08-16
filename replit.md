@@ -9,6 +9,14 @@ Event loading behavior: Events should not load or be searched until after a user
 
 # Recent Changes
 
+**2025-01-16**: Improved City Website Database Validation
+- Replaced city search functionality with simple "Add City" form that checks if website exists in database
+- Added automatic website validation when cities are found - no longer just showing database status
+- Enhanced UI to clearly distinguish between "Listed in Database" vs "ACTUAL STATUS" of websites
+- Added prominent warning messages when database shows website exists but validation reveals it's parked, expired, or not accessible
+- Improved user messaging to explain that database may contain outdated information
+- System now automatically validates website accessibility in real-time to give users accurate information
+
 **2025-01-11**: Enhanced Feed Discovery & City Website Database
 - Enhanced RSS/iCal feed button detection to be more dynamic and comprehensive:
   - Added advanced JavaScript parsing to detect AJAX endpoints and dynamic feed URLs

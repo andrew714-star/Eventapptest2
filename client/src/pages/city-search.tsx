@@ -159,8 +159,13 @@ export default function CitySearchPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2" data-testid="page-title">Check City Website Database</h1>
         <p className="text-muted-foreground">
-          Enter a city name to check if its website exists in our database of 19,000+ US cities.
+          Enter a city name to check if its website exists in our database of 19,000+ US cities. We automatically verify if the website actually works.
         </p>
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-sm text-blue-700">
+            <strong>Note:</strong> Our database may contain outdated website information. We automatically check if websites are actually accessible when you search for a city.
+          </p>
+        </div>
       </div>
 
       {/* Add City Form */}
@@ -260,7 +265,7 @@ export default function CitySearchPage() {
                       variant={checkResult.city?.websiteAvailable ? "default" : "secondary"}
                       data-testid={`website-status-${checkResult.city?.geoid}`}
                     >
-                      {checkResult.city?.websiteAvailable ? "Website Available" : "No Website"}
+                      {checkResult.city?.websiteAvailable ? "Listed in Database" : "No Website Listed"}
                     </Badge>
                     
                     {checkResult.websiteValidation && (
@@ -270,19 +275,47 @@ export default function CitySearchPage() {
                         data-testid={`validation-status-${checkResult.city?.geoid}`}
                       >
                         {getValidationIcon(checkResult.websiteValidation)}
-                        {getValidationStatus(checkResult.websiteValidation)}
+                        <strong>ACTUAL STATUS: {getValidationStatus(checkResult.websiteValidation)}</strong>
                       </Badge>
                     )}
                   </div>
 
                   {checkResult.city?.websiteUrl && (
                     <div className="space-y-2">
+                      {/* Warning for invalid websites */}
+                      {checkResult.websiteValidation && !checkResult.websiteValidation.isValid && (
+                        <div className="p-3 border border-red-200 bg-red-50 rounded-md">
+                          <div className="flex items-center gap-2 text-red-700">
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="font-medium">Website Issue Detected</span>
+                          </div>
+                          <p className="text-sm text-red-600 mt-1">
+                            The database lists a website for this city, but it appears to be{' '}
+                            {checkResult.websiteValidation.status === 'parked' ? 'parked or for sale' :
+                             checkResult.websiteValidation.status === 'expired' ? 'expired' :
+                             checkResult.websiteValidation.status === 'redirect' ? 'redirecting to another domain' :
+                             checkResult.websiteValidation.status === 'error' ? 'not accessible' :
+                             'not working properly'}
+                            . The website data may be outdated.
+                          </p>
+                          {checkResult.websiteValidation.error && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Details: {checkResult.websiteValidation.error}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      
                       <div className="flex items-center gap-2">
                         <a
                           href={checkResult.city.websiteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          className={`flex items-center gap-1 ${
+                            checkResult.websiteValidation && !checkResult.websiteValidation.isValid 
+                              ? 'text-red-600 hover:text-red-800' 
+                              : 'text-blue-600 hover:text-blue-800'
+                          }`}
                           data-testid={`website-link-${checkResult.city.geoid}`}
                         >
                           {checkResult.city.websiteUrl}
