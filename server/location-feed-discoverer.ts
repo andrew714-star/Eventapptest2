@@ -669,7 +669,7 @@ export class LocationFeedDiscoverer {
             // Generic downloadable feed patterns
             /['"]([^'"]*(?:RSSFeed\.aspx|iCalendarFeed\.aspx|Feed\.aspx)[^'"]*)['"]/, 
             // Trumba showWindow specific patterns
-            /Trumba\.EA2\.showWindow\(['"]([^'"]*)['"]\),
+            /Trumba\.EA2\.showWindow\(['"]([^'"]*)['"]\)/,
             /showWindow\(['"]subscribe['"]\)/,
             // Generic showWindow patterns
             /onclick\s*=\s*["'][^"']*showWindow\(['"]subscribe['"]\)[^"']*["']/,
