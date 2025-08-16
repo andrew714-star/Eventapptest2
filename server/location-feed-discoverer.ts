@@ -124,158 +124,6 @@ export class LocationFeedDiscoverer {
     '/calendar/all.ics'
   ];
 
-  private async validateWebsiteExists(url: string): Promise<{
-    isValid: boolean;
-    reason: string;
-    canRetry: boolean;
-  }> {
-    try {
-      const { WebsiteValidator } = await import('./website-validator');
-      const validation = await WebsiteValidator.validateWebsite(url);
-
-      if (validation.isValid) {
-        return { isValid: true, reason: 'Website is accessible', canRetry: false };
-      }
-
-      switch (validation.status) {
-        case 'parked':
-          return { 
-            isValid: false, 
-            reason: 'Domain appears to be parked or for sale', 
-            canRetry: false 
-          };
-        case 'expired':
-          return { 
-            isValid: false, 
-            reason: 'Domain has expired', 
-            canRetry: false 
-          };
-        case 'redirect':
-          return { 
-            isValid: false, 
-            reason: `Domain redirects to different site: ${validation.actualUrl}`, 
-            canRetry: false 
-          };
-        case 'timeout':
-          return { 
-            isValid: false, 
-            reason: 'Website request timed out (server too slow)', 
-            canRetry: true 
-          };
-        case 'error':
-          if (validation.error?.includes('ENOTFOUND')) {
-            return { 
-              isValid: false, 
-              reason: 'Domain does not exist (DNS lookup failed)', 
-              canRetry: false 
-            };
-          } else if (validation.error?.includes('ECONNREFUSED')) {
-            return { 
-              isValid: false, 
-              reason: 'Connection refused (server not responding)', 
-              canRetry: true 
-            };
-          } else {
-            return { 
-              isValid: false, 
-              reason: `Website error: ${validation.error}`, 
-              canRetry: true 
-            };
-          }
-        default:
-          return { 
-            isValid: false, 
-            reason: 'Website validation failed', 
-            canRetry: true 
-          };
-      }
-    } catch (error: any) {
-      return { 
-        isValid: false, 
-        reason: `Validation error: ${error.message}`, 
-        canRetry: true 
-      };
-    }
-  }
-
-
-    '/events/export',
-    '/calendar/subscribe',
-    '/events/subscribe',
-    '/calendar/ical',
-    '/events/ical',
-    '/download/calendar',
-    '/download/events',
-    '/export/calendar',
-    '/export/events',
-    // Common CMS feed patterns (skip client-side API endpoints)
-    '/calendar/rss',
-    '/events/rss',
-    '/calendar/feed.xml',
-    '/events/feed.xml',
-    // WordPress and common CMS patterns
-    '/wp-content/uploads/calendar.ics',
-    '/?feed=calendar',
-    '/?feed=events',
-    '/feed/?post_type=event',
-    '/feed/?post_type=calendar',
-    // Government-specific patterns  
-    '/modules/calendar/calendar.ics',
-    '/modules/events/events.ics',
-    '/departments/events/calendar.ics',
-    '/calendar/icalendar',
-    '/events/icalendar',
-    // School district CMS patterns
-    '/calendar/feed',
-    '/events/feed', 
-    '/calendar/calendar.rss',
-    '/events/events.rss',
-    '/calendar/index.rss',
-    '/events/index.rss',
-    // Apptegy CMS (common for school districts)
-    '/calendar.rss',
-    '/events.rss',
-    '/news/feed',
-    // Finalsite CMS patterns
-    '/calendar/feed.rss',
-    '/events/feed.rss',
-    // Common query parameter patterns
-    '/calendar?format=ics',
-    '/events?format=ics',
-    '/calendar?export=ics',
-    '/events?export=ics',
-    '/calendar?download=1',
-    '/events?download=1',
-    // Department-specific calendar patterns (based on screenshots)
-    '/calendar/building-department/rss',
-    '/calendar/city-council/rss',
-    '/calendar/fire-department/rss',
-    '/calendar/police-department/rss',
-    '/calendar/public-works/rss',
-    '/calendar/planning-department/rss',
-    '/calendar/main-calendar/rss',
-    '/calendar/all/rss',
-    '/calendar/housing/rss',
-    // Alternative department feed formats
-    '/calendar/building-department.rss',
-    '/calendar/city-council.rss',
-    '/calendar/fire-department.rss',
-    '/calendar/police-department.rss',
-    '/calendar/public-works.rss',
-    '/calendar/planning-department.rss',
-    '/calendar/main-calendar.rss',
-    '/calendar/all.rss',
-    // iCalendar versions of department feeds
-    '/calendar/building-department.ics',
-    '/calendar/city-council.ics',
-    '/calendar/fire-department.ics',
-    '/calendar/police-department.ics',
-    '/calendar/public-works.ics',
-    '/calendar/planning-department.ics',
-    '/calendar/main-calendar.ics',
-    '/calendar/all.ics'
-  ];
-
   private governmentDomainPatterns = [
     '{city}.gov',
     '{city}.{state}.gov', 
@@ -894,7 +742,7 @@ export class LocationFeedDiscoverer {
               '/iCalendar.aspx',
               '/calendar/rss.aspx',
               '/calendar/iCalendar.aspx',
-              '/events/rss.aspx',
+              '/events/rss.aspx', 
               '/events/iCalendar.aspx'
             ];
 
@@ -914,7 +762,7 @@ export class LocationFeedDiscoverer {
                   // Trumba-specific patterns
                   /subscribe['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /subscribeUrl['"]\s*:\s*['"]([^'"]+)['"]/gi,
-                  /showWindow\(['"]subscribe['"][^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
+                  /showWindow\(['"]subscribe['"]\)[^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi,
                   /Trumba\.EA2\.showWindow\(['"]subscribe['"]\)[^}]*url['"]\s*:\s*['"]([^'"]+)['"]/gi,
                   // Generic subscription URLs in scripts
@@ -1659,21 +1507,6 @@ export class LocationFeedDiscoverer {
         confidence = 0.5;
       }
 
-      // Reject feeds that returned errors
-      if (response.status >= 400) {
-        console.log(`Feed validation failed for ${feedUrl}: HTTP ${response.status}`);
-        return null;
-      }
-
-      // If this is supposed to be a calendar/RSS feed but has HTML content, likely not a real feed
-      if ((feedUrl.includes('.ics') || feedUrl.includes('.rss')) && 
-          contentType.includes('text/html') && 
-          !actualContent.includes('BEGIN:VCALENDAR') && 
-          !actualContent.includes('<rss')) {
-        console.log(`Feed validation failed for ${feedUrl}: Expected feed format but got HTML`);
-        return null;
-      }
-
       // Require minimum confidence for discovery - higher threshold for calendar feeds
       const minConfidence = feedUrl.includes('calendar') || feedUrl.includes('events') ? 0.6 : 0.5;
       if (confidence < minConfidence) {
@@ -2333,11 +2166,11 @@ export class LocationFeedDiscoverer {
       // Look specifically for calendar and events feeds, not just "All" buttons
       const calendarFeedPatterns = [
         // Look for calendar-specific feed links
-        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|rss)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|ical)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/rss\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/iCalendarFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|ical)[^<]*<\/a>/gi,
         // Look for events-specific feed links
-        /<a[^>]+href=["']([^"']*RSSFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|rss)[^<]*<\/a>/gi,
-        /<a[^>]+href=["']([^"']*iCalendarFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|ical)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/rss\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/iCalendarFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|ical)[^<]*<\/a>/gi,
         // Look for "All Calendar" or "All Events" specifically
         /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*(?:All.*calendar|calendar.*All|All.*events|events.*All)[^"']*)["'][^>]*>[^<]*<\/a>/gi,
         // Look for main calendar feeds with CID parameters
