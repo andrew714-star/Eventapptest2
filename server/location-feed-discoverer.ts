@@ -669,7 +669,7 @@ export class LocationFeedDiscoverer {
             // Generic downloadable feed patterns
             /['"]([^'"]*(?:RSSFeed\.aspx|iCalendarFeed\.aspx|Feed\.aspx)[^'"]*)['"]/, 
             // Trumba showWindow specific patterns
-            /Trumba\.EA2\.showWindow\(['"]([^'"]*)['"]\)/, 
+            /Trumba\.EA2\.showWindow\(['"]([^'"]*)['"]\),
             /showWindow\(['"]subscribe['"]\)/,
             // Generic showWindow patterns
             /onclick\s*=\s*["'][^"']*showWindow\(['"]subscribe['"]\)[^"']*["']/,
@@ -700,7 +700,7 @@ export class LocationFeedDiscoverer {
 
           // Check for third-party calendar service functions (like Trumba)
           if (onclick.includes('showWindow') && onclick.includes('subscribe')) {
-            console.log(`🎯 Found third-party subscription button (Trumba-like): ${onclick}`);
+            console.log(`🎯 Found third-party subscription button: ${onclick}`);
 
             // Extract the showWindow parameter for more targeted subscription path discovery
             const showWindowMatch = onclick.match(/showWindow\(['"]([^'"]*)['"]\)/);
@@ -1995,46 +1995,34 @@ export class LocationFeedDiscoverer {
       const html = response.data;
       const baseUrl = new URL(calendarPageUrl);
 
-      // Look for subscription buttons/links on the calendar page
-      const subscriptionPatterns = [
-        // Look for RSS subscription buttons
-        /href=["']([^"']*\/rss\.aspx[^"']*)["']/gi,
-        /href=["']([^"']*\/RSSFeed\.aspx[^"']*)["']/gi,
-        // Look for iCalendar subscription buttons
-        /href=["']([^"']*\/iCalendar\.aspx[^"']*)["']/gi,
-        /href=["']([^"']*\/iCalendarFeed\.aspx[^"']*)["']/gi,
-        // Look for generic subscription/download buttons
-        /href=["']([^"']*subscribe[^"']*)["']/gi,
-        /href=["']([^"']*download[^"']*calendar[^"']*)["']/gi,
-        /href=["']([^"']*export[^"']*calendar[^"']*)["']/gi,
-        /<a\b[^>]*(onclick=["'][^"']*showWindow\(\s*['"]subscribe['"]\)[^"']*["']|title=["'][^"']*subscribe[^"']*["']|aria-label=["'][^"']*subscribe[^"']*["'])[^>]*>/gi,
-         /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe[^<]*<\/a>/gi,
-         /<a[^>]+href=["']([^"']*)["'][^>]*>[^<]*Subscribe to calendar[^<]*<\/a>/gi,
-        /href=["']([^"']*\/generate_ical[^"']*)["']/gi,
-        /href=["']([^"']*\/generate_calendar[^"']*)["']/gi,
-        /href=["']([^"']*\/export_ical[^"']*)["']/gi,
-        /href=["']([^"']*thrillshare[^"']*generate_ical[^"']*)["']/gi,
-        /href=["']([^"']*\/api\/[^"']*\/events\/generate_ical[^"']*)["']/gi,
-        /href=["']([^"']*\/ics[^"']*)["']/gi,
-        /href=["']([^"']*\/calendar.*[^"']*)["']/gi,
-        /href=["']([^"']*\/feed[^"']*)["']/gi,
-        /href=["']([^"']*subscribe[^"']*)["']/gi,
-        /href=["']([^"']*ical[^"']*)["']/gi,
-        /onclick=["']Trumba\.EA2\.showWindow\(['"]([^'"]+)['"]\)/gi
-
+      // Look specifically for calendar and events feeds, not just "All" buttons
+      const calendarFeedPatterns = [
+        // Look for calendar-specific feed links
+        /<a[^>]+href=["']([^"']*\/rss\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/iCalendarFeed\.aspx[^"']*calendar[^"']*)["'][^>]*>[^<]*(?:calendar|subscribe|ical)[^<]*<\/a>/gi,
+        // Look for events-specific feed links
+        /<a[^>]+href=["']([^"']*\/rss\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|rss)[^<]*<\/a>/gi,
+        /<a[^>]+href=["']([^"']*\/iCalendarFeed\.aspx[^"']*events[^"']*)["'][^>]*>[^<]*(?:events|subscribe|ical)[^<]*<\/a>/gi,
+        // Look for "All Calendar" or "All Events" specifically
+        /<a[^>]+href=["']([^"']*(?:RSS|iCal)[^"']*(?:All.*calendar|calendar.*All|All.*events|events.*All)[^"']*)["'][^>]*>[^<]*<\/a>/gi,
+        // Look for main calendar feeds with CID parameters
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?CID=[^"']*?)["'][^>]*>[^<]*(?:main|primary|city|government|official|master).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for department calendar feeds
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?)["'][^>]*>[^<]*(?:department|council|planning|public works|fire|police|library|parks).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for comprehensive calendar feeds with broader text patterns
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx\?[^"']*?)["'][^>]*>[^<]*(?:view all|complete|full|comprehensive|master|entire).*(?:calendar|events)[^<]*<\/a>/gi,
+        // Look for download/export calendar links
+        /<a[^>]+href=["']([^"']*?(?:RSS|iCalendar)Feed\.aspx[^"']*?)["'][^>]*>[^<]*(?:download|export|subscribe to).*(?:calendar|events)[^<]*<\/a>/gi
       ];
 
-      const subscriptionUrls = new Set<string>();
+      const feedUrls: string[] = [];
 
-      for (const pattern of subscriptionPatterns) {
+      for (const pattern of calendarFeedPatterns) {
         const matches = html.match(pattern) || [];
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
           if (urlMatch) {
             let subscriptionUrl = urlMatch[1];
-
-            // Decode HTML entities
-            subscriptionUrl = subscriptionUrl.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
 
             // Convert to absolute URL
             if (!subscriptionUrl.startsWith('http')) {
@@ -2046,17 +2034,17 @@ export class LocationFeedDiscoverer {
             }
 
             console.log(`📋 Found subscription URL: ${subscriptionUrl}`);
-            subscriptionUrls.add(subscriptionUrl);
+            feedUrls.push(subscriptionUrl);
           }
         }
       }
 
-      console.log(`📋 Found ${subscriptionUrls.size} subscription URLs on calendar page`);
+      console.log(`📋 Found ${feedUrls.length} subscription URLs on calendar page`);
 
       // Now follow each subscription URL to find "All" or "All Events" buttons
       const workingFeeds: DiscoveredFeed[] = [];
 
-      for (const subscriptionUrl of Array.from(subscriptionUrls)) {
+      for (const subscriptionUrl of Array.from(feedUrls)) {
         console.log(`🔎 Checking subscription page: ${subscriptionUrl}`);
 
         // Check if the subscription URL itself is a downloadable feed (like Thrillshare CMS)
@@ -2192,18 +2180,19 @@ export class LocationFeedDiscoverer {
         for (const match of matches) {
           const urlMatch = match.match(/href=["']([^"']*)["']/i);
           if (urlMatch) {
-            let feedUrl = urlMatch[1];
+            let subscriptionUrl = urlMatch[1];
 
             // Convert to absolute URL
-            if (!feedUrl.startsWith('http')) {
-              if (feedUrl.startsWith('/')) {
-                feedUrl = `${baseUrl.protocol}//${baseUrl.host}${feedUrl}`;
+            if (!subscriptionUrl.startsWith('http')) {
+              if (subscriptionUrl.startsWith('/')) {
+                subscriptionUrl = `${baseUrl.protocol}//${baseUrl.host}${subscriptionUrl}`;
               } else {
-                feedUrl = `${baseUrl.protocol}//${baseUrl.host}/${feedUrl}`;
+                subscriptionUrl = `${baseUrl.protocol}//${baseUrl.host}/${subscriptionUrl}`;
               }
             }
 
-            feedUrls.push(feedUrl);
+            console.log(`📋 Found subscription URL: ${subscriptionUrl}`);
+            feedUrls.push(subscriptionUrl);
           }
         }
       }
@@ -2350,7 +2339,7 @@ export class LocationFeedDiscoverer {
     return feeds;
   }
 
-  // Enhanced method to discover feeds for multiple regions
+  // Discover feeds for multiple regions
   async discoverFeedsForRegions(request: RegionalDiscoveryRequest): Promise<{
     discoveredFeeds: DiscoveredFeed[];
     regions: LocationInfo[];

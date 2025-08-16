@@ -41,6 +41,25 @@ export class WebsiteValidator {
         validateStatus: (status) => status < 500 // Accept redirects and client errors
       });
 
+      // Check for HTTP errors that indicate non-existent websites
+      if (response.status === 404) {
+        return {
+          isValid: false,
+          status: 'error',
+          actualUrl: fullUrl,
+          error: 'Website not found (404)'
+        };
+      }
+
+      if (response.status >= 400) {
+        return {
+          isValid: false,
+          status: 'error',
+          actualUrl: fullUrl,
+          error: `HTTP error: ${response.status} ${response.statusText}`
+        };
+      }
+
       const html = response.data.toLowerCase();
       const title = this.extractTitle(response.data);
       
@@ -64,7 +83,11 @@ export class WebsiteValidator {
       const originalDomain = new URL(fullUrl).hostname;
       const finalDomain = new URL(finalUrl).hostname;
       
-      if (originalDomain !== finalDomain && !finalDomain.includes(originalDomain.replace('www.', ''))) {
+      // Allow www redirects and subdomain variations
+      const normalizedOriginal = originalDomain.replace(/^www\./, '');
+      const normalizedFinal = finalDomain.replace(/^www\./, '');
+      
+      if (normalizedOriginal !== normalizedFinal && !normalizedFinal.includes(normalizedOriginal) && !normalizedOriginal.includes(normalizedFinal)) {
         return {
           isValid: false,
           status: 'redirect',
