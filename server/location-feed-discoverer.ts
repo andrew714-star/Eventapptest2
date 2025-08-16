@@ -238,6 +238,12 @@ export class LocationFeedDiscoverer {
       });
 
       feeds.push(...discoveredFeeds);
+
+      // Stop searching once we find a working government website
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found working government website ${domain} - stopping search for additional government domains`);
+        break;
+      }
     }
 
     return feeds;
@@ -245,8 +251,6 @@ export class LocationFeedDiscoverer {
 
   private async discoverSchoolFeeds(location: LocationInfo, citySlug: string, stateSlug: string): Promise<DiscoveredFeed[]> {
     const feeds: DiscoveredFeed[] = [];
-
-
 
     for (const domainPattern of this.schoolDistrictPatterns) {
       const domain = domainPattern
@@ -260,6 +264,12 @@ export class LocationFeedDiscoverer {
       });
 
       feeds.push(...discoveredFeeds);
+
+      // Stop searching once we find a working school district website
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found working school district website ${domain} - stopping search for additional school domains`);
+        break;
+      }
     }
 
     return feeds;
@@ -280,6 +290,12 @@ export class LocationFeedDiscoverer {
       });
 
       feeds.push(...discoveredFeeds);
+
+      // Stop searching once we find a working chamber website
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found working chamber website ${domain} - stopping search for additional chamber domains`);
+        break;
+      }
     }
 
     return feeds;
@@ -331,6 +347,12 @@ export class LocationFeedDiscoverer {
       });
 
       feeds.push(...discoveredFeeds);
+
+      // Stop searching once we find a working library website
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found working library website ${domain} - stopping search for additional library domains`);
+        break;
+      }
     }
 
     return feeds;
@@ -395,6 +417,12 @@ export class LocationFeedDiscoverer {
       });
 
       feeds.push(...discoveredFeeds);
+
+      // Stop searching once we find a working parks website
+      if (discoveredFeeds.length > 0) {
+        console.log(`✓ Found working parks website ${domain} - stopping search for additional parks domains`);
+        break;
+      }
     }
 
     return feeds;
@@ -407,7 +435,6 @@ export class LocationFeedDiscoverer {
       // First check if domain exists with shorter timeout
       const baseUrl = `https://${domain}`;
       const response = await axios.get(baseUrl, {
-        timeout: 3000, // Reduced from 5000ms
         headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
         validateStatus: (status) => status < 500, // Accept 404s but not server errors
         maxRedirects: 3 // Limit redirects
@@ -1090,7 +1117,6 @@ export class LocationFeedDiscoverer {
 
       // First check if the specific path exists
       const response = await axios.get(fullUrl, {
-        timeout: 3000,
         headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
         validateStatus: (status) => status < 500,
         maxRedirects: 3
@@ -1187,7 +1213,6 @@ export class LocationFeedDiscoverer {
       const feedDomain = new URL(feedUrl).origin;
       try {
         const domainCheck = await axios.get(feedDomain, {
-          timeout: 2000,
           headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
           validateStatus: (status) => status < 500
         });
@@ -1281,7 +1306,6 @@ export class LocationFeedDiscoverer {
       const method = feedUrl.includes('download') || feedUrl.includes('export') || feedUrl.includes('.ics') || feedUrl.includes('.rss') || isSubscriptionPage ? 'get' : 'head';
 
       const response = await axios[method](feedUrl, {
-        timeout: 4000,
         headers: { 
           'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0',
           'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, application/json, text/html, */*'
@@ -1408,7 +1432,7 @@ export class LocationFeedDiscoverer {
         for (const variation of iCalVariations.slice(0, 5)) { // Limit to prevent too many requests
           try {
             const response = await axios.get(variation, {
-              timeout: 3000,
+              
               headers: { 
                 'User-Agent': 'CityWide Events Calendar Bot 1.0',
                 'Accept': 'text/calendar, application/calendar, text/plain, */*'
@@ -1459,7 +1483,7 @@ export class LocationFeedDiscoverer {
         for (const variation of rssVariations.slice(0, 5)) {
           try {
             const response = await axios.get(variation, {
-              timeout: 3000,
+              
               headers: { 
                 'User-Agent': 'CityWide Events Calendar Bot 1.0',
                 'Accept': 'application/rss+xml, application/xml, text/xml, */*'
@@ -1503,7 +1527,7 @@ export class LocationFeedDiscoverer {
       const subscriptionDomain = new URL(subscriptionUrl).origin;
       try {
         const domainCheck = await axios.get(subscriptionDomain, {
-          timeout: 2000,
+          
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
@@ -1518,7 +1542,7 @@ export class LocationFeedDiscoverer {
       }
 
       const response = await axios.get(subscriptionUrl, {
-        timeout: 5000,
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 
@@ -1685,7 +1709,7 @@ export class LocationFeedDiscoverer {
   private async testCalendarAPIUrl(testUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.get(testUrl, {
-        timeout: 6000,
+        
         headers: { 
           'User-Agent': 'CityWide Events Calendar Bot 1.0',
           'Accept': 'text/calendar, application/calendar, text/plain, */*'
@@ -1758,7 +1782,7 @@ export class LocationFeedDiscoverer {
   private async validateAndCreateFeed(feedUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed | null> {
     try {
       const response = await axios.get(feedUrl, {
-        timeout: 4000,
+        
         headers: { 
           'User-Agent': 'CityWide Events Calendar Bot 1.0',
           'Accept': 'text/calendar, application/calendar, application/rss+xml, application/xml, text/xml, */*'
@@ -1813,7 +1837,7 @@ export class LocationFeedDiscoverer {
       const calendarDomain = new URL(calendarPageUrl).origin;
       try {
         const domainCheck = await axios.get(calendarDomain, {
-          timeout: 2000,
+          
           headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' },
           validateStatus: (status) => status < 500
         });
@@ -1828,7 +1852,7 @@ export class LocationFeedDiscoverer {
       }
 
       const response = await axios.get(calendarPageUrl, {
-        timeout: 5000,
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 
@@ -1998,7 +2022,7 @@ export class LocationFeedDiscoverer {
   private async findAllEventsButtonsOnSubscriptionPage(subscriptionUrl: string, location: LocationInfo & { organizationType: 'city' | 'school' | 'chamber' | 'library' | 'parks' }): Promise<DiscoveredFeed[]> {
     try {
       const response = await axios.get(subscriptionUrl, {
-        timeout: 5000,
+        
         headers: { 'User-Agent': 'CityWide Events Calendar Bot 1.0' }
       });
 

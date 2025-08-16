@@ -18,6 +18,12 @@ Event loading behavior: Events should not load or be searched until after a user
 - Improved feed discovery reliability by leveraging already-validated city government websites for department-specific calendars
 - Maintained fallback to separate domain patterns (e.g., citylibrary.org) for cases where departments have independent websites
 
+**2025-01-16**: Optimized Feed Discovery Performance
+- Removed all 3000ms and other timeout limitations from HTTP requests to prevent premature timeouts on slower government websites
+- Implemented smart discovery optimization: stops searching for additional domains in each category (city, school, chamber, library, parks) once a working website is found
+- Significantly reduced discovery time and API calls while maintaining comprehensive coverage
+- Enhanced efficiency by avoiding unnecessary domain checks after successful discovery in each organization type
+
 **2025-01-16**: Improved City Website Database Validation
 - Replaced city search functionality with simple "Add City" form that checks if website exists in database
 - Added automatic website validation when cities are found - no longer just showing database status
