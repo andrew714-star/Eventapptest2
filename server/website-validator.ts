@@ -32,10 +32,11 @@ export class WebsiteValidator {
       const fullUrl = url.startsWith('http') ? url : `https://${url}`;
       
       const response = await axios.get(fullUrl, {
-        timeout: 10000,
+        timeout: 15000, // Increased timeout for slower government sites
         maxRedirects: 5,
         headers: {
           'User-Agent': 'CityWide Events Website Validator 1.0',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         },
         validateStatus: (status) => status < 500 // Accept redirects and client errors
       });

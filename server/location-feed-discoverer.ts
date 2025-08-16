@@ -47,6 +47,84 @@ export class LocationFeedDiscoverer {
     '/calendar/download',
     '/calendar/export',
     '/events/download',
+
+  interface WebsiteValidationResult {
+    isValid: boolean;
+    reason: string;
+    canRetry: boolean;
+  }
+
+  private async validateWebsiteExists(url: string): Promise<WebsiteValidationResult> {
+    try {
+      const { WebsiteValidator } = await import('./website-validator');
+      const validation = await WebsiteValidator.validateWebsite(url);
+      
+      if (validation.isValid) {
+        return { isValid: true, reason: 'Website is accessible', canRetry: false };
+      }
+
+      switch (validation.status) {
+        case 'parked':
+          return { 
+            isValid: false, 
+            reason: 'Domain appears to be parked or for sale', 
+            canRetry: false 
+          };
+        case 'expired':
+          return { 
+            isValid: false, 
+            reason: 'Domain has expired', 
+            canRetry: false 
+          };
+        case 'redirect':
+          return { 
+            isValid: false, 
+            reason: `Domain redirects to different site: ${validation.actualUrl}`, 
+            canRetry: false 
+          };
+        case 'timeout':
+          return { 
+            isValid: false, 
+            reason: 'Website request timed out (server too slow)', 
+            canRetry: true 
+          };
+        case 'error':
+          if (validation.error?.includes('ENOTFOUND')) {
+            return { 
+              isValid: false, 
+              reason: 'Domain does not exist (DNS lookup failed)', 
+              canRetry: false 
+            };
+          } else if (validation.error?.includes('ECONNREFUSED')) {
+            return { 
+              isValid: false, 
+              reason: 'Connection refused (server not responding)', 
+              canRetry: true 
+            };
+          } else {
+            return { 
+              isValid: false, 
+              reason: `Website error: ${validation.error}`, 
+              canRetry: true 
+            };
+          }
+        default:
+          return { 
+            isValid: false, 
+            reason: 'Website validation failed', 
+            canRetry: true 
+          };
+      }
+    } catch (error: any) {
+      return { 
+        isValid: false, 
+        reason: `Validation error: ${error.message}`, 
+        canRetry: true 
+      };
+    }
+  }
+
+
     '/events/export',
     '/calendar/subscribe',
     '/events/subscribe',
@@ -513,9 +591,26 @@ export class LocationFeedDiscoverer {
     const feeds: DiscoveredFeed[] = [];
 
     try {
-      // First check if domain exists with shorter timeout
+      // First check if domain exists with comprehensive validation
       const baseUrl = `https://${domain}`;
+      
+      // Use the website validator for better detection of non-existent/parked domains
+      const { WebsiteValidator } = await import('./website-validator');
+      const validation = await WebsiteValidator.validateWebsite(baseUrl);
+      
+      if (!validation.isValid) {
+        console.log(`❌ Website ${domain} is not valid: ${validation.status} - ${validation.error || 'Unknown error'}`);
+        return feeds;
+      }
+
+      if (validation.status === 'parked' || validation.status === 'redirect') {
+        console.log(`❌ Website ${domain} is ${validation.status} - skipping feed discovery`);
+        return feeds;
+      }
+
+      // Additional check with direct HTTP request
       const response = await axios.get(baseUrl, {
+        timeout: 10000,
         headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
         validateStatus: (status) => status < 500, // Accept 404s but not server errors
         maxRedirects: 3 // Limit redirects
@@ -523,17 +618,32 @@ export class LocationFeedDiscoverer {
 
       // Check if website actually exists and is accessible
       if (response.status === 404 || response.status >= 400) {
-        console.log(`Website ${domain} returned status ${response.status} - skipping feed discovery`);
-        return feeds; // Domain doesn't exist or is not accessible
+        console.log(`❌ Website ${domain} returned HTTP ${response.status} - not accessible`);
+        return feeds;
       }
 
       // Verify we got actual website content, not just a redirect or error page
       if (!response.data || typeof response.data !== 'string' || response.data.length < 100) {
-        console.log(`Website ${domain} returned insufficient content - skipping feed discovery`);
+        console.log(`❌ Website ${domain} returned insufficient content (${response.data?.length || 0} bytes) - likely not a real website`);
         return feeds;
       }
 
-      console.log(`✓ Confirmed website ${domain} exists and is accessible - proceeding with feed discovery`);
+      // Check for common "domain for sale" or parking page indicators
+      const content = response.data.toLowerCase();
+      const parkingIndicators = [
+        'domain for sale', 'buy this domain', 'domain parking', 'parked domain',
+        'expired domain', 'domain expired', 'godaddy', 'namecheap', 'sedo',
+        'underconstruction', 'coming soon', 'site not found', 'page not found',
+        'temporarily unavailable', 'this domain may be for sale'
+      ];
+
+      const isParkedDomain = parkingIndicators.some(indicator => content.includes(indicator));
+      if (isParkedDomain) {
+        console.log(`❌ Website ${domain} appears to be a parked or for-sale domain - skipping`);
+        return feeds;
+      }
+
+      console.log(`✅ Confirmed website ${domain} exists and is accessible - proceeding with feed discovery`);
 
       // Parse the homepage to look for calendar/events links
       const $ = cheerio.load(response.data);
@@ -1179,9 +1289,19 @@ export class LocationFeedDiscoverer {
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       // Domain doesn't exist or is not accessible
-      console.log(`Domain ${domain} not accessible: ${error}`);
+      if (error.code === 'ENOTFOUND') {
+        console.log(`❌ Domain ${domain} does not exist (DNS resolution failed)`);
+      } else if (error.code === 'ECONNREFUSED') {
+        console.log(`❌ Domain ${domain} connection refused (server not responding)`);
+      } else if (error.code === 'ETIMEDOUT') {
+        console.log(`❌ Domain ${domain} request timed out (server too slow or unreachable)`);
+      } else if (error.response && error.response.status >= 400) {
+        console.log(`❌ Domain ${domain} returned HTTP ${error.response.status} (${error.response.statusText})`);
+      } else {
+        console.log(`❌ Domain ${domain} not accessible: ${error.message || error}`);
+      }
     }
 
     return feeds;
@@ -1293,17 +1413,43 @@ export class LocationFeedDiscoverer {
       // First verify the domain/website exists before checking feed URLs
       const feedDomain = new URL(feedUrl).origin;
       try {
+        // Use website validator for comprehensive domain checking
+        const { WebsiteValidator } = await import('./website-validator');
+        const validation = await WebsiteValidator.validateWebsite(feedDomain);
+        
+        if (!validation.isValid) {
+          console.log(`❌ Domain ${feedDomain} validation failed: ${validation.status} - ${validation.error} - skipping feed: ${feedUrl}`);
+          return null;
+        }
+
+        if (validation.status === 'parked' || validation.status === 'redirect') {
+          console.log(`❌ Domain ${feedDomain} is ${validation.status} - skipping feed: ${feedUrl}`);
+          return null;
+        }
+
+        // Additional backup check
         const domainCheck = await axios.get(feedDomain, {
+          timeout: 8000,
           headers: { 'User-Agent': 'CityWide Events Calendar Discovery Bot 1.0' },
           validateStatus: (status) => status < 500
         });
 
         if (domainCheck.status >= 400) {
-          console.log(`Domain ${feedDomain} not accessible (${domainCheck.status}) - skipping feed: ${feedUrl}`);
+          console.log(`❌ Domain ${feedDomain} not accessible (HTTP ${domainCheck.status}) - skipping feed: ${feedUrl}`);
           return null;
         }
-      } catch (error) {
-        console.log(`Domain ${feedDomain} not accessible - skipping feed: ${feedUrl}`);
+        
+        console.log(`✅ Domain ${feedDomain} validated successfully - testing feed: ${feedUrl}`);
+      } catch (error: any) {
+        if (error.code === 'ENOTFOUND') {
+          console.log(`❌ Domain ${feedDomain} does not exist - skipping feed: ${feedUrl}`);
+        } else if (error.code === 'ECONNREFUSED') {
+          console.log(`❌ Domain ${feedDomain} connection refused - skipping feed: ${feedUrl}`);
+        } else if (error.code === 'ETIMEDOUT') {
+          console.log(`❌ Domain ${feedDomain} timed out - skipping feed: ${feedUrl}`);
+        } else {
+          console.log(`❌ Domain ${feedDomain} error: ${error.message} - skipping feed: ${feedUrl}`);
+        }
         return null;
       }
 
