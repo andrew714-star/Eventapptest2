@@ -16,6 +16,7 @@ export interface IStorage {
   // City methods
   searchCities(search: CitySearch): Promise<City[]>;
   getCityByGeoid(geoid: string): Promise<City | undefined>;
+  getCityByName(cityName: string, state?: string): Promise<City | undefined>;
   getAllCities(): Promise<City[]>;
 }
 
@@ -203,6 +204,51 @@ export class MemStorage implements IStorage {
   async getCityByGeoid(geoid: string): Promise<City | undefined> {
     const cities = await CityDataLoader.loadCities();
     return cities.get(geoid);
+  }
+
+  async getCityByName(cityName: string, state?: string): Promise<City | undefined> {
+    const cities = await CityDataLoader.loadCities();
+    const query = cityName.toLowerCase();
+    
+    // Find cities that match the name
+    const matchingCities = Array.from(cities.values()).filter(city => {
+      const municipalityMatch = city.municipality.toLowerCase() === query;
+      const stateMatch = !state || city.state.toLowerCase() === state.toLowerCase();
+      return municipalityMatch && stateMatch;
+    });
+
+    // If we have an exact match with state preference, return it
+    if (matchingCities.length === 1) {
+      return matchingCities[0];
+    }
+
+    // If multiple matches, prioritize based on state filter or return first exact match
+    if (matchingCities.length > 1) {
+      if (state) {
+        const stateFiltered = matchingCities.filter(city => 
+          city.state.toLowerCase() === state.toLowerCase()
+        );
+        if (stateFiltered.length > 0) {
+          return stateFiltered[0];
+        }
+      }
+      return matchingCities[0]; // Return first match if no state preference
+    }
+
+    // If no exact match, try partial matching
+    const partialMatches = Array.from(cities.values()).filter(city => {
+      const municipalityPartial = city.municipality.toLowerCase().includes(query);
+      const stateMatch = !state || city.state.toLowerCase() === state.toLowerCase();
+      return municipalityPartial && stateMatch;
+    });
+
+    if (partialMatches.length > 0) {
+      // Sort by closest match (shortest municipality name that contains the query)
+      partialMatches.sort((a, b) => a.municipality.length - b.municipality.length);
+      return partialMatches[0];
+    }
+
+    return undefined;
   }
 
   async getAllCities(): Promise<City[]> {

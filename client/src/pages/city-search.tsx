@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, ExternalLink, MapPin, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react";
-import { type City, type CitySearch } from "@shared/schema";
+import { Plus, ExternalLink, MapPin, CheckCircle, XCircle, AlertCircle, Clock } from "lucide-react";
+import { type City } from "@shared/schema";
 
 interface WebsiteValidation {
   isValid: boolean;
@@ -17,85 +16,97 @@ interface WebsiteValidation {
   error?: string;
 }
 
+interface CityWebsiteCheck {
+  city: City | null;
+  websiteValidation?: WebsiteValidation;
+  found: boolean;
+}
+
 export default function CitySearchPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [cityName, setCityName] = useState("");
   const [selectedState, setSelectedState] = useState<string>("");
-  const [websiteRequired, setWebsiteRequired] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [websiteValidations, setWebsiteValidations] = useState<Record<string, WebsiteValidation>>({});
+  const [checkResult, setCheckResult] = useState<CityWebsiteCheck | null>(null);
+  const [hasChecked, setHasChecked] = useState(false);
 
-  const searchQuery = useQuery({
-    queryKey: ['/api/cities/search', searchTerm, selectedState, websiteRequired],
-    queryFn: async (): Promise<City[]> => {
-      if (!searchTerm.trim()) return [];
-      
-      const searchParams: CitySearch = {
-        query: searchTerm.trim(),
-        state: selectedState && selectedState !== "all" ? selectedState : undefined,
-        websiteRequired: websiteRequired || undefined
-      };
-
-      const response = await fetch('/api/cities/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(searchParams),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to search cities');
+  const checkCityMutation = useMutation({
+    mutationFn: async (): Promise<CityWebsiteCheck> => {
+      if (!cityName.trim()) {
+        throw new Error('City name is required');
       }
-
-      return response.json();
-    },
-    enabled: false, // Only run when manually triggered
-  });
-
-  const validateWebsitesMutation = useMutation({
-    mutationFn: async (urls: string[]): Promise<{ validations: Record<string, WebsiteValidation> }> => {
-      const response = await fetch('/api/cities/validate-websites', {
+      
+      const response = await fetch('/api/cities/check-website', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ 
+          cityName: cityName.trim(),
+          state: selectedState && selectedState !== "all" ? selectedState : undefined
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to validate websites');
+        throw new Error('Failed to check city website');
       }
 
       return response.json();
     },
     onSuccess: (data) => {
-      setWebsiteValidations(prev => ({ ...prev, ...data.validations }));
+      setCheckResult(data);
+      setHasChecked(true);
     }
   });
 
-  const handleSearch = () => {
-    if (searchTerm.trim()) {
-      setHasSearched(true);
-      searchQuery.refetch();
+  const validateWebsiteMutation = useMutation({
+    mutationFn: async (url: string): Promise<WebsiteValidation> => {
+      const response = await fetch('/api/cities/validate-websites', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ urls: [url] }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to validate website');
+      }
+
+      const result = await response.json();
+      return result.validations[url];
+    },
+    onSuccess: (validation) => {
+      if (checkResult) {
+        setCheckResult({
+          ...checkResult,
+          websiteValidation: validation
+        });
+      }
+    }
+  });
+
+  const handleCheck = () => {
+    if (cityName.trim()) {
+      setHasChecked(false);
+      setCheckResult(null);
+      checkCityMutation.mutate();
     }
   };
 
-  const handleValidateWebsites = () => {
-    const cities = searchQuery.data || [];
-    const urlsToValidate = cities
-      .filter(city => city.websiteUrl && !websiteValidations[city.websiteUrl])
-      .map(city => city.websiteUrl!)
-      .slice(0, 10); // Limit to 10 to avoid overwhelming
-      
-    if (urlsToValidate.length > 0) {
-      validateWebsitesMutation.mutate(urlsToValidate);
+  const handleValidateWebsite = () => {
+    if (checkResult?.city?.websiteUrl) {
+      validateWebsiteMutation.mutate(checkResult.city.websiteUrl);
     }
   };
 
-  const getValidationIcon = (url: string | null) => {
-    if (!url || !websiteValidations[url]) return null;
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleCheck();
+    }
+  };
+
+  const getValidationIcon = (validation?: WebsiteValidation) => {
+    if (!validation) return null;
     
-    const validation = websiteValidations[url];
     switch (validation.status) {
       case 'valid':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -112,31 +123,24 @@ export default function CitySearchPage() {
     }
   };
 
-  const getValidationStatus = (url: string | null): string => {
-    if (!url || !websiteValidations[url]) return 'Not Checked';
+  const getValidationStatus = (validation?: WebsiteValidation): string => {
+    if (!validation) return 'Not Checked';
     
-    const validation = websiteValidations[url];
     switch (validation.status) {
       case 'valid':
         return 'Valid Website';
       case 'parked':
-        return 'Parked Domain';
+        return 'Domain Parked';
       case 'expired':
-        return 'Expired Domain';
+        return 'Domain Expired';
       case 'redirect':
-        return `Redirects to ${new URL(validation.actualUrl || '').hostname}`;
+        return 'Redirects';
       case 'timeout':
-        return 'Connection Timeout';
+        return 'Timeout';
       case 'error':
-        return 'Connection Error';
+        return 'Error';
       default:
-        return 'Unknown Status';
-    }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
+        return 'Unknown';
     }
   };
 
@@ -151,44 +155,44 @@ export default function CitySearchPage() {
   ];
 
   return (
-    <div className="container mx-auto p-4 max-w-6xl">
+    <div className="container mx-auto p-4 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2" data-testid="page-title">US City Website Database</h1>
+        <h1 className="text-3xl font-bold mb-2" data-testid="page-title">Check City Website Database</h1>
         <p className="text-muted-foreground">
-          Search through 19,000+ US cities to find their official websites and contact information.
+          Enter a city name to check if its website exists in our database of 19,000+ US cities.
         </p>
       </div>
 
-      {/* Search Form */}
+      {/* Add City Form */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Search Cities
+            <Plus className="h-5 w-5" />
+            Check City Website
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-4">
             <div className="flex-1">
               <Input
-                data-testid="input-search-city"
+                data-testid="input-city-name"
                 placeholder="Enter city name (e.g., 'San Francisco', 'Austin', 'New York')"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={cityName}
+                onChange={(e) => setCityName(e.target.value)}
                 onKeyPress={handleKeyPress}
                 className="text-base"
               />
             </div>
             <Button 
-              data-testid="button-search"
-              onClick={handleSearch} 
-              disabled={!searchTerm.trim() || searchQuery.isLoading}
+              data-testid="button-check"
+              onClick={handleCheck} 
+              disabled={!cityName.trim() || checkCityMutation.isPending}
             >
-              {searchQuery.isLoading ? "Searching..." : "Search"}
+              {checkCityMutation.isPending ? "Checking..." : "Check"}
             </Button>
           </div>
           
-          <div className="flex gap-4 items-center flex-wrap">
+          <div className="flex gap-4 items-center">
             <div className="min-w-[200px]">
               <Select value={selectedState} onValueChange={setSelectedState}>
                 <SelectTrigger data-testid="select-state">
@@ -197,175 +201,133 @@ export default function CitySearchPage() {
                 <SelectContent>
                   <SelectItem value="all">All States</SelectItem>
                   {states.map((state) => (
-                    <SelectItem key={state} value={state}>
-                      {state}
-                    </SelectItem>
+                    <SelectItem key={state} value={state}>{state}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="website-required"
-                data-testid="checkbox-website-required"
-                checked={websiteRequired}
-                onCheckedChange={(checked) => setWebsiteRequired(checked as boolean)}
-              />
-              <label htmlFor="website-required" className="text-sm font-medium">
-                Only cities with websites
-              </label>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Results */}
-      {searchQuery.isLoading && (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="mt-2 text-muted-foreground">Searching cities...</p>
-        </div>
-      )}
-
-      {searchQuery.error && (
-        <Card className="border-destructive">
+      {/* Error Display */}
+      {checkCityMutation.error && (
+        <Card className="mb-6 border-red-200">
           <CardContent className="pt-6">
-            <p className="text-destructive" data-testid="error-message">
-              Failed to search cities. Please try again.
-            </p>
+            <div className="flex items-center gap-2 text-red-600">
+              <XCircle className="h-5 w-5" />
+              <span data-testid="error-message">
+                {checkCityMutation.error.message}
+              </span>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {hasSearched && !searchQuery.isLoading && !searchQuery.error && (
+      {/* Results */}
+      {hasChecked && !checkCityMutation.isPending && !checkCityMutation.error && checkResult && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold" data-testid="results-title">
-              Search Results
+              Check Results
             </h2>
-            <div className="flex items-center gap-4">
-              <Button
-                onClick={handleValidateWebsites}
-                disabled={validateWebsitesMutation.isPending || !searchQuery.data?.some(city => city.websiteUrl && !websiteValidations[city.websiteUrl])}
-                size="sm"
-                variant="outline"
-                data-testid="button-validate-websites"
-              >
-                <Clock className="mr-2 h-4 w-4" />
-                {validateWebsitesMutation.isPending ? "Validating..." : "Check Website Status"}
-              </Button>
-              <p className="text-muted-foreground" data-testid="results-count">
-                {searchQuery.data?.length || 0} cities found
-              </p>
-            </div>
           </div>
 
-          {searchQuery.data?.length === 0 ? (
+          {!checkResult.found ? (
             <Card>
               <CardContent className="pt-6 text-center">
                 <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground" data-testid="no-results">
-                  No cities found matching your search criteria. Try adjusting your search terms.
+                  City "{cityName}" not found in our database. Try checking the spelling or use a different search term.
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {searchQuery.data?.map((city) => (
-                <Card key={city.geoid} className="hover:shadow-md transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="space-y-3">
-                      <div>
-                        <h3 className="font-semibold text-lg" data-testid={`city-name-${city.geoid}`}>
-                          {city.municipality}
-                        </h3>
-                        <p className="text-muted-foreground" data-testid={`city-state-${city.geoid}`}>
-                          {city.state}
-                        </p>
-                      </div>
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="font-semibold text-lg" data-testid={`city-name-${checkResult.city?.geoid}`}>
+                      {checkResult.city?.municipality}
+                    </h3>
+                    <p className="text-muted-foreground" data-testid={`city-state-${checkResult.city?.geoid}`}>
+                      {checkResult.city?.state}
+                    </p>
+                  </div>
 
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge 
-                          variant={city.websiteAvailable ? "default" : "secondary"}
-                          data-testid={`website-status-${city.geoid}`}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge 
+                      variant={checkResult.city?.websiteAvailable ? "default" : "secondary"}
+                      data-testid={`website-status-${checkResult.city?.geoid}`}
+                    >
+                      {checkResult.city?.websiteAvailable ? "Website Available" : "No Website"}
+                    </Badge>
+                    
+                    {checkResult.websiteValidation && (
+                      <Badge 
+                        variant={checkResult.websiteValidation.isValid ? "default" : "destructive"}
+                        className="flex items-center gap-1"
+                        data-testid={`validation-status-${checkResult.city?.geoid}`}
+                      >
+                        {getValidationIcon(checkResult.websiteValidation)}
+                        {getValidationStatus(checkResult.websiteValidation)}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {checkResult.city?.websiteUrl && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={checkResult.city.websiteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          data-testid={`website-link-${checkResult.city.geoid}`}
                         >
-                          {city.websiteAvailable ? "Website Available" : "No Website"}
-                        </Badge>
-                        
-                        {city.websiteUrl && getValidationIcon(city.websiteUrl) && (
-                          <div className="flex items-center gap-1">
-                            {getValidationIcon(city.websiteUrl)}
-                            <span className="text-xs text-muted-foreground">
-                              {getValidationStatus(city.websiteUrl)}
-                            </span>
-                          </div>
-                        )}
+                          {checkResult.city.websiteUrl}
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
                       </div>
-
-                      {city.websiteUrl && (
-                        <div>
-                          <p className="text-sm font-medium mb-2">Official Website:</p>
-                          <div className="space-y-1">
-                            <a
-                              href={city.websiteUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline text-sm"
-                              data-testid={`website-link-${city.geoid}`}
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                              {city.websiteUrl}
-                            </a>
-                            
-                            {websiteValidations[city.websiteUrl] && (
-                              <div className="flex items-center gap-2 text-xs">
-                                {getValidationIcon(city.websiteUrl)}
-                                <span 
-                                  className={`${
-                                    websiteValidations[city.websiteUrl].status === 'valid' 
-                                      ? 'text-green-600' 
-                                      : websiteValidations[city.websiteUrl].status === 'parked' 
-                                      ? 'text-red-600' 
-                                      : 'text-yellow-600'
-                                  }`}
-                                >
-                                  {websiteValidations[city.websiteUrl].status === 'parked' 
-                                    ? '⚠️ This appears to be a parked domain or for sale page'
-                                    : websiteValidations[city.websiteUrl].status === 'redirect'
-                                    ? `🔄 Redirects to: ${new URL(websiteValidations[city.websiteUrl].actualUrl || '').hostname}`
-                                    : websiteValidations[city.websiteUrl].status === 'valid'
-                                    ? '✅ Website is accessible and appears to be legitimate'
-                                    : websiteValidations[city.websiteUrl].error || 'Status unknown'
-                                  }
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      
+                      {!checkResult.websiteValidation && (
+                        <Button
+                          onClick={handleValidateWebsite}
+                          disabled={validateWebsiteMutation.isPending}
+                          size="sm"
+                          variant="outline"
+                          data-testid="button-validate-website"
+                        >
+                          <Clock className="mr-2 h-4 w-4" />
+                          {validateWebsiteMutation.isPending ? "Validating..." : "Check Website Status"}
+                        </Button>
                       )}
-
-                      <div className="text-xs text-muted-foreground">
-                        <p data-testid={`city-geoid-${city.geoid}`}>GEOID: {city.geoid}</p>
-                      </div>
+                      
+                      {checkResult.websiteValidation && checkResult.websiteValidation.actualUrl && 
+                       checkResult.websiteValidation.actualUrl !== checkResult.city.websiteUrl && (
+                        <p className="text-sm text-muted-foreground">
+                          Redirects to: {checkResult.websiteValidation.actualUrl}
+                        </p>
+                      )}
+                      
+                      {checkResult.websiteValidation?.title && (
+                        <p className="text-sm text-muted-foreground">
+                          Page title: {checkResult.websiteValidation.title}
+                        </p>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  )}
+
+                  {checkResult.city?.geoid && (
+                    <div className="text-sm text-muted-foreground">
+                      City ID: {checkResult.city.geoid}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
-      )}
-
-      {!hasSearched && (
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground" data-testid="search-prompt">
-              Enter a city name above to search the US city website database.
-            </p>
-          </CardContent>
-        </Card>
       )}
     </div>
   );

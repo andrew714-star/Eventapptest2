@@ -1319,42 +1319,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Validate websites
-  app.post("/api/cities/validate-websites", async (req, res) => {
+  // Check city website in database
+  app.post("/api/cities/check-website", async (req, res) => {
     try {
-      const { urls } = req.body;
-      
-      if (!Array.isArray(urls)) {
-        return res.status(400).json({ message: "URLs must be an array" });
+      const { cityName, state } = req.body;
+      if (!cityName || typeof cityName !== 'string') {
+        return res.status(400).json({ message: "City name is required" });
       }
 
-      const validator = new WebsiteValidator();
-      const validations: Record<string, any> = {};
-
-      // Validate each URL (limit to 10 to prevent abuse)
-      const urlsToValidate = urls.slice(0, 10);
+      console.log(`API /api/cities/check-website called with cityName: ${cityName}, state: ${state || 'any'}`);
+      const city = await storage.getCityByName(cityName.trim(), state);
       
-      for (const url of urlsToValidate) {
-        try {
-          const validation = await validator.validateWebsite(url);
-          validations[url] = validation;
-        } catch (error) {
-          console.error(`Error validating ${url}:`, error);
-          validations[url] = {
-            isValid: false,
-            status: 'error',
-            error: 'Failed to validate website'
-          };
-        }
-      }
-
-      res.json({ validations });
+      res.json({
+        found: !!city,
+        city: city || null,
+        websiteValidation: undefined // Will be populated by frontend if user requests validation
+      });
     } catch (error) {
-      console.error("Error in /api/cities/validate-websites:", error);
-      res.status(500).json({ message: "Failed to validate websites" });
+      console.error("Error in /api/cities/check-website:", error);
+      res.status(500).json({ message: "Failed to check city website" });
     }
   });
 
+  // Validate websites
   app.post("/api/cities/validate-websites", async (req, res) => {
     try {
       const { urls } = req.body;
